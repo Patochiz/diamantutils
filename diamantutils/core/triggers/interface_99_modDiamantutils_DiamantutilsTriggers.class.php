@@ -42,7 +42,13 @@ class InterfaceDiamantutilsTriggers extends DolibarrTriggers
 
 		$mode = getDolGlobalString('DIAMANTUTILS_INVOICE_CHECK_MODE', 'AFFICHER');
 
-		if ($mode == 'DESACTIVE' || empty($object->lines)) {
+		if ($mode == 'DESACTIVE') {
+			return 0;
+		}
+
+		$object->fetch_lines();
+
+		if (empty($object->lines)) {
 			return 0;
 		}
 
