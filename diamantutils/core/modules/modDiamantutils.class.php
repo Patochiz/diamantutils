@@ -27,7 +27,7 @@ class modDiamantutils extends DolibarrModules
 
 		$this->module_parts = array(
 			'triggers' => 1,
-			'hooks' => array(),
+			'hooks' => array('invoicecard'),
 		);
 
 		$this->dirs = array();
