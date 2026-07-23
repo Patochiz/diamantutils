@@ -7,14 +7,12 @@ DiamantutilsFeature = Feature
 DiamantutilsSetting = Setting
 DiamantutilsConfigUpdated = Configuration updated
 DiamantutilsInvoiceCheckLabel = Already-invoiced check on order lines
-DiamantutilsInvoiceCheckDesc = Applied on each invoice creation from one or more orders (single or grouped)
+DiamantutilsInvoiceCheckDesc = Applied on each invoice creation from one or more orders (single or grouped). Related invoices are displayed in the "Invoices" extrafield.
 DiamantutilsModeDisabled = Disabled — no check
 DiamantutilsModeHide = Hide — silently removes fully invoiced lines
-DiamantutilsModeShow = Show — adds an "already invoiced" note on the line, no blocking
-DiamantutilsModeShowBlock = Show + Block — adds the note and refuses creation if a line exceeds the remaining quantity
+DiamantutilsModeShow = Show — lists related invoices in the extrafield, no blocking
+DiamantutilsModeShowBlock = Show + Block — lists related invoices and refuses creation if a line exceeds the remaining quantity
 
 # Trigger messages
-DiamantutilsAlreadyInvoiced = [Already invoiced: %s/%s]
 DiamantutilsLineExceedsRemaining = Line '%s': invoiced quantity (%s) exceeds available remaining (%s) — check invoices already issued for this order before validating.
-DiamantutilsLineUpdateError = Error updating invoice line (id=%s)
 DiamantutilsLineDeleteError = Error deleting invoice line (id=%s)

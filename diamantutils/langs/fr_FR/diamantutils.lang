@@ -7,14 +7,12 @@ DiamantutilsFeature = Fonctionnalité
 DiamantutilsSetting = Réglage
 DiamantutilsConfigUpdated = Configuration mise à jour
 DiamantutilsInvoiceCheckLabel = Contrôle du déjà-facturé sur les lignes de commande
-DiamantutilsInvoiceCheckDesc = Appliqué à chaque création de facture depuis une ou plusieurs commandes (unitaire ou groupée)
+DiamantutilsInvoiceCheckDesc = Appliqué à chaque création de facture depuis une ou plusieurs commandes (unitaire ou groupée). Les factures liées sont affichées dans le champ complémentaire "Factures".
 DiamantutilsModeDisabled = Désactivé — aucun contrôle
 DiamantutilsModeHide = Masquer — retire silencieusement les lignes déjà entièrement facturées
-DiamantutilsModeShow = Afficher — ajoute une note "déjà facturé" sur la ligne, sans bloquer
-DiamantutilsModeShowBlock = Afficher + Bloquer — ajoute la note et refuse la création si une ligne dépasse le reliquat
+DiamantutilsModeShow = Afficher — liste les factures liées dans le champ complémentaire, sans bloquer
+DiamantutilsModeShowBlock = Afficher + Bloquer — liste les factures liées et refuse la création si une ligne dépasse le reliquat
 
 # Messages du trigger
-DiamantutilsAlreadyInvoiced = [Déjà facturé : %s/%s]
 DiamantutilsLineExceedsRemaining = Ligne '%s' : quantité facturée (%s) supérieure au reliquat disponible (%s) — vérifiez les factures déjà émises pour cette commande avant de valider.
-DiamantutilsLineUpdateError = Erreur lors de la mise à jour de la ligne de facture (id=%s)
 DiamantutilsLineDeleteError = Erreur lors de la suppression de la ligne de facture (id=%s)
