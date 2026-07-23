@@ -23,18 +23,16 @@ class InterfaceDiamantutilsTriggers extends DolibarrTriggers
 	public $picto = 'generic';
 
 	/**
-	 * Fonction appelée pour chaque trigger géré
-	 *
 	 * @param string       $action Code du trigger
 	 * @param CommonObject $object Objet concerné (Facture)
 	 * @param User         $user   Utilisateur
 	 * @param Translate    $langs  Langue
 	 * @param Conf         $conf   Configuration
-	 * @return int Return integer <0 si erreur (annule la transaction), 0 si rien fait, >0 si OK
+	 * @return int <0 si erreur, 0 si rien fait, >0 si OK
 	 */
 	public function runTrigger($action, $object, User $user, Translate $langs, Conf $conf)
 	{
-		if (!$this->isModuleActivated('diamantutils')) {
+		if (!isModEnabled('diamantutils')) {
 			return 0;
 		}
 
@@ -42,17 +40,18 @@ class InterfaceDiamantutilsTriggers extends DolibarrTriggers
 			return 0;
 		}
 
-		$mode = !empty($conf->global->DIAMANTUTILS_INVOICE_CHECK_MODE) ? $conf->global->DIAMANTUTILS_INVOICE_CHECK_MODE : 'AFFICHER';
+		$mode = getDolGlobalString('DIAMANTUTILS_INVOICE_CHECK_MODE', 'AFFICHER');
 
 		if ($mode == 'DESACTIVE' || empty($object->lines)) {
 			return 0;
 		}
 
+		$langs->load('diamantutils@diamantutils');
+
 		$db = $this->db;
 		$linesToDelete = array();
 
 		foreach ($object->lines as $line) {
-			// On ne traite que les lignes issues d'une ligne de commande (fk_origin_line = commandedet.rowid)
 			if (empty($line->fk_origin_line) || $line->id <= 0) {
 				continue;
 			}
@@ -61,27 +60,31 @@ class InterfaceDiamantutilsTriggers extends DolibarrTriggers
 			$sql = "SELECT qty FROM ".MAIN_DB_PREFIX."commandedet WHERE rowid = ".((int) $line->fk_origin_line);
 			$resql = $db->query($sql);
 			if (!$resql || !$db->num_rows($resql)) {
+				$db->free($resql);
 				continue;
 			}
 			$objQty = $db->fetch_object($resql);
 			$qtyOrigin = (float) $objQty->qty;
+			$db->free($resql);
 
-			// Quantité déjà facturée sur cette ligne de commande, toutes AUTRES factures confondues (hors facture en cours de création)
+			// Quantité déjà facturée sur cette ligne de commande (hors facture en cours, hors factures annulées)
 			$sql = "SELECT SUM(fd.qty) as qty_invoiced";
 			$sql .= " FROM ".MAIN_DB_PREFIX."facturedet as fd";
+			$sql .= " INNER JOIN ".MAIN_DB_PREFIX."facture as f ON f.rowid = fd.fk_facture";
 			$sql .= " WHERE fd.fk_origin_line = ".((int) $line->fk_origin_line);
 			$sql .= " AND fd.fk_facture <> ".((int) $object->id);
+			$sql .= " AND f.fk_statut <> 3";
 			$resql = $db->query($sql);
 			$qtyInvoicedElsewhere = 0.0;
 			if ($resql) {
 				$objSum = $db->fetch_object($resql);
 				$qtyInvoicedElsewhere = (float) $objSum->qty_invoiced;
+				$db->free($resql);
 			}
 
 			$remaining = $qtyOrigin - $qtyInvoicedElsewhere;
 
 			if ($qtyInvoicedElsewhere <= 0) {
-				// Rien de facturé ailleurs sur cette ligne, pas d'action nécessaire
 				continue;
 			}
 
@@ -92,36 +95,34 @@ class InterfaceDiamantutilsTriggers extends DolibarrTriggers
 				continue;
 			}
 
-			// Modes AFFICHER et AFFICHER_BLOQUER : on annote la ligne
-			$note = "[Déjà facturé : ".$qtyInvoicedElsewhere."/".$qtyOrigin."]";
+			// Modes AFFICHER et AFFICHER_BLOQUER : annotation de la ligne
+			$note = $langs->trans('DiamantutilsAlreadyInvoiced', $qtyInvoicedElsewhere, $qtyOrigin);
 			if (strpos($line->desc, $note) === false) {
 				$line->desc = trim($line->desc)."\n".$note;
-				$line->update($user, 1); // 1 = notrigger pour éviter une boucle
+				$result = $line->update($user, 1);
+				if ($result < 0) {
+					$this->errors[] = $langs->trans('DiamantutilsLineUpdateError', $line->id);
+					return -1;
+				}
 			}
 
 			if ($mode == 'AFFICHER_BLOQUER' && $line->qty > $remaining) {
-				$this->errors[] = "Ligne '".$line->desc."' : quantité facturée (".$line->qty.") supérieure au reliquat disponible (".max($remaining, 0).") — vérifiez les factures déjà émises pour cette commande avant de valider.";
+				$this->errors[] = $langs->trans('DiamantutilsLineExceedsRemaining', $line->desc, $line->qty, max($remaining, 0));
 			}
 		}
 
 		if ($mode == 'AFFICHER_BLOQUER' && !empty($this->errors)) {
-			return -1; // Annule la création de la facture, erreurs affichées à l'utilisateur
+			return -1;
 		}
 
-		// Suppression silencieuse des lignes déjà entièrement facturées (mode MASQUER)
 		foreach ($linesToDelete as $line) {
-			$line->delete($user, 1); // 1 = notrigger
+			$result = $line->delete($user, 1);
+			if ($result < 0) {
+				$this->errors[] = $langs->trans('DiamantutilsLineDeleteError', $line->id);
+				return -1;
+			}
 		}
 
 		return 1;
-	}
-
-	/**
-	 * Vérifie que le module diamantutils est bien activé (sécurité si le trigger reste après désactivation)
-	 */
-	protected function isModuleActivated($moduleName)
-	{
-		global $conf;
-		return !empty($conf->{$moduleName}->enabled);
 	}
 }

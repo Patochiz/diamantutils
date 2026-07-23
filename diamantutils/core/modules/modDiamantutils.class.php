@@ -13,7 +13,7 @@ class modDiamantutils extends DolibarrModules
 		global $langs, $conf;
 		$this->db = $db;
 
-		$this->numero = 500000; // Numéro réservé custom, à ajuster si collision
+		$this->numero = 510125;
 		$this->rights_class = 'diamantutils';
 		$this->family = 'custom';
 		$this->module_position = '90';
@@ -21,19 +21,17 @@ class modDiamantutils extends DolibarrModules
 		$this->description = "Module interne Diamant Industrie : fonctionnalités diverses regroupées et activables individuellement";
 		$this->descriptionlong = "Regroupe les développements internes Diamant Industrie (ex. contrôle de facturation multi-commandes) sous un seul module avec options activables.";
 		$this->editor_name = 'Diamant Industrie';
-		$this->version = '1.0';
+		$this->version = '1.1';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'generic';
 
-		// Pas de nouvelles tables SQL pour cette première fonctionnalité
 		$this->module_parts = array(
 			'triggers' => 1,
-			'hooks' => array(), // réservé pour de futures fonctionnalités hookées
+			'hooks' => array(),
 		);
 
 		$this->dirs = array();
 
-		// Constantes de configuration créées/supprimées à l'activation/désactivation
 		$this->const = array(
 			0 => array(
 				'DIAMANTUTILS_INVOICE_CHECK_MODE',

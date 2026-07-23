@@ -1,0 +1,20 @@
+Module510125Name = DiamantUtils
+Module510125Desc = Internal Diamant Industrie utilities bundled and individually activatable
+
+# Setup page
+DiamantutilsSetupTitle = DiamantUtils - Configuration
+DiamantutilsFeature = Feature
+DiamantutilsSetting = Setting
+DiamantutilsConfigUpdated = Configuration updated
+DiamantutilsInvoiceCheckLabel = Already-invoiced check on order lines
+DiamantutilsInvoiceCheckDesc = Applied on each invoice creation from one or more orders (single or grouped)
+DiamantutilsModeDisabled = Disabled — no check
+DiamantutilsModeHide = Hide — silently removes fully invoiced lines
+DiamantutilsModeShow = Show — adds an "already invoiced" note on the line, no blocking
+DiamantutilsModeShowBlock = Show + Block — adds the note and refuses creation if a line exceeds the remaining quantity
+
+# Trigger messages
+DiamantutilsAlreadyInvoiced = [Already invoiced: %s/%s]
+DiamantutilsLineExceedsRemaining = Line '%s': invoiced quantity (%s) exceeds available remaining (%s) — check invoices already issued for this order before validating.
+DiamantutilsLineUpdateError = Error updating invoice line (id=%s)
+DiamantutilsLineDeleteError = Error deleting invoice line (id=%s)

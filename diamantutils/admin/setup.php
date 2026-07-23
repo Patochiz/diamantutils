@@ -1,9 +1,12 @@
 <?php
 // Page de configuration du module DiamantUtils
 
-require '../../main.inc.php';
+$res = @include "../../main.inc.php";
+if (!$res) {
+	$res = @include "../../../main.inc.php";
+}
 
-if (!$user->hasRight('diamantutils', 'lire') && !$user->admin) {
+if (!$user->admin) {
 	accessforbidden();
 }
 
@@ -16,46 +19,46 @@ if ($action == 'update') {
 	$allowed = array('DESACTIVE', 'MASQUER', 'AFFICHER', 'AFFICHER_BLOQUER');
 	if (in_array($mode, $allowed)) {
 		dolibarr_set_const($db, 'DIAMANTUTILS_INVOICE_CHECK_MODE', $mode, 'chaine', 0, '', $conf->entity);
-		setEventMessages("Configuration mise à jour", null);
+		setEventMessages($langs->trans('DiamantutilsConfigUpdated'), null);
 	}
 }
 
-llxHeader('', "DiamantUtils - Configuration");
+llxHeader('', $langs->trans('DiamantutilsSetupTitle'));
 
-print load_fiche_titre("Configuration DiamantUtils", '', 'title_setup');
+print load_fiche_titre($langs->trans('DiamantutilsSetupTitle'), '', 'title_setup');
 
-print '<form method="POST" action="'.$_SERVER["PHP_SELF"].'">';
+print '<form method="POST" action="'.dol_escape_htmltag($_SERVER["PHP_SELF"]).'">';
 print '<input type="hidden" name="token" value="'.newToken().'">';
 print '<input type="hidden" name="action" value="update">';
 
 print '<table class="noborder centpercent">';
-print '<tr class="liste_titre"><td>Fonctionnalité</td><td>Réglage</td></tr>';
+print '<tr class="liste_titre"><td>'.$langs->trans('DiamantutilsFeature').'</td><td>'.$langs->trans('DiamantutilsSetting').'</td></tr>';
 
 print '<tr class="oddeven"><td>';
-print 'Contrôle du déjà-facturé sur les lignes de commande<br>';
-print '<span class="opacitymedium">Appliqué à chaque création de facture depuis une ou plusieurs commandes (unitaire ou groupée)</span>';
+print $langs->trans('DiamantutilsInvoiceCheckLabel').'<br>';
+print '<span class="opacitymedium">'.$langs->trans('DiamantutilsInvoiceCheckDesc').'</span>';
 print '</td><td>';
 
-$mode = !empty($conf->global->DIAMANTUTILS_INVOICE_CHECK_MODE) ? $conf->global->DIAMANTUTILS_INVOICE_CHECK_MODE : 'AFFICHER';
+$mode = getDolGlobalString('DIAMANTUTILS_INVOICE_CHECK_MODE', 'AFFICHER');
 
 $options = array(
-	'DESACTIVE' => 'Désactivé — aucun contrôle',
-	'MASQUER' => 'Masquer — retire silencieusement les lignes déjà entièrement facturées',
-	'AFFICHER' => 'Afficher — ajoute une note "déjà facturé" sur la ligne, sans bloquer',
-	'AFFICHER_BLOQUER' => 'Afficher + Bloquer — ajoute la note et refuse la création si une ligne dépasse le reliquat',
+	'DESACTIVE' => $langs->trans('DiamantutilsModeDisabled'),
+	'MASQUER' => $langs->trans('DiamantutilsModeHide'),
+	'AFFICHER' => $langs->trans('DiamantutilsModeShow'),
+	'AFFICHER_BLOQUER' => $langs->trans('DiamantutilsModeShowBlock'),
 );
 
 print '<select name="DIAMANTUTILS_INVOICE_CHECK_MODE" class="flat">';
 foreach ($options as $key => $label) {
 	$sel = ($key == $mode) ? ' selected' : '';
-	print '<option value="'.$key.'"'.$sel.'>'.$label.'</option>';
+	print '<option value="'.dol_escape_htmltag($key).'"'.$sel.'>'.dol_escape_htmltag($label).'</option>';
 }
 print '</select>';
 
 print '</td></tr>';
 print '</table>';
 
-print '<div class="center"><input type="submit" class="button button-save" value="Enregistrer"></div>';
+print '<div class="center"><input type="submit" class="button button-save" value="'.$langs->trans('Save').'"></div>';
 
 print '</form>';
 
