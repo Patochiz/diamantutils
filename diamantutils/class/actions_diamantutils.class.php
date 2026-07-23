@@ -3,7 +3,7 @@
  * Hook sur la page facture (invoicecard)
  *
  * Pré-remplit l'extrafield "factures" avec la liste des factures déjà liées
- * aux mêmes lignes de commande, avant l'affichage du formulaire de création.
+ * aux mêmes lignes de commande, sur le formulaire de création de facture.
  */
 
 class ActionsDiamantutils
@@ -20,13 +20,16 @@ class ActionsDiamantutils
 	}
 
 	/**
-	 * @param array       $parameters Paramètres du hook
-	 * @param CommonObject $object    Objet Facture
-	 * @param string      $action    Action en cours
-	 * @param HookManager $hookmanager
-	 * @return int 0=OK, <0=erreur
+	 * Appelé pendant le rendu du formulaire, juste avant showOptionals.
+	 * Pré-remplit l'extrafield "factures" et injecte du JS pour le CKEditor.
+	 *
+	 * @param array        $parameters Paramètres du hook
+	 * @param CommonObject $object     Objet Facture
+	 * @param string       $action     Action en cours
+	 * @param HookManager  $hookmanager
+	 * @return int 0=OK
 	 */
-	public function doActions($parameters, &$object, &$action, $hookmanager)
+	public function formObjectOptions($parameters, &$object, &$action, $hookmanager)
 	{
 		global $conf, $langs;
 
@@ -49,8 +52,6 @@ class ActionsDiamantutils
 		if ($origin != 'commande' || $originid <= 0) {
 			return 0;
 		}
-
-		$langs->load('diamantutils@diamantutils');
 
 		$db = $this->db;
 
@@ -89,6 +90,26 @@ class ActionsDiamantutils
 			$object->array_options = array();
 		}
 		$object->array_options['options_factures'] = $html;
+
+		$jsHtml = json_encode($html);
+		$this->resprints = '<script type="text/javascript">'."\n";
+		$this->resprints .= 'jQuery(document).ready(function() {'."\n";
+		$this->resprints .= '  var htmlVal = '.$jsHtml.';'."\n";
+		$this->resprints .= '  var el = document.getElementById("options_factures");'."\n";
+		$this->resprints .= '  if (el) { el.value = htmlVal; el.innerHTML = htmlVal; }'."\n";
+		$this->resprints .= '  if (typeof CKEDITOR !== "undefined") {'."\n";
+		$this->resprints .= '    if (CKEDITOR.instances && CKEDITOR.instances["options_factures"]) {'."\n";
+		$this->resprints .= '      CKEDITOR.instances["options_factures"].setData(htmlVal);'."\n";
+		$this->resprints .= '    } else {'."\n";
+		$this->resprints .= '      CKEDITOR.on("instanceReady", function(evt) {'."\n";
+		$this->resprints .= '        if (evt.editor.name === "options_factures") {'."\n";
+		$this->resprints .= '          evt.editor.setData(htmlVal);'."\n";
+		$this->resprints .= '        }'."\n";
+		$this->resprints .= '      });'."\n";
+		$this->resprints .= '    }'."\n";
+		$this->resprints .= '  }'."\n";
+		$this->resprints .= '});'."\n";
+		$this->resprints .= '</script>'."\n";
 
 		return 0;
 	}
