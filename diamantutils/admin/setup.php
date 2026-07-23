@@ -1,10 +1,16 @@
 <?php
 // Page de configuration du module DiamantUtils
 
+$res = 0;
 $res = @include "../../main.inc.php";
 if (!$res) {
 	$res = @include "../../../main.inc.php";
 }
+if (!$res) {
+	die("Include of main fails");
+}
+
+require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
 
 if (!$user->admin) {
 	accessforbidden();
