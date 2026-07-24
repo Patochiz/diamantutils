@@ -13,7 +13,7 @@ class modDiamantutils extends DolibarrModules
 		global $langs, $conf;
 		$this->db = $db;
 
-		$this->numero = 500000; // Numéro réservé custom, à ajuster si collision
+		$this->numero = 510125;
 		$this->rights_class = 'diamantutils';
 		$this->family = 'custom';
 		$this->module_position = '90';
@@ -21,19 +21,17 @@ class modDiamantutils extends DolibarrModules
 		$this->description = "Module interne Diamant Industrie : fonctionnalités diverses regroupées et activables individuellement";
 		$this->descriptionlong = "Regroupe les développements internes Diamant Industrie (ex. contrôle de facturation multi-commandes) sous un seul module avec options activables.";
 		$this->editor_name = 'Diamant Industrie';
-		$this->version = '1.0';
+		$this->version = '1.4';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'generic';
 
-		// Pas de nouvelles tables SQL pour cette première fonctionnalité
 		$this->module_parts = array(
 			'triggers' => 1,
-			'hooks' => array(), // réservé pour de futures fonctionnalités hookées
+			'hooks' => array('invoicecard'),
 		);
 
 		$this->dirs = array();
 
-		// Constantes de configuration créées/supprimées à l'activation/désactivation
 		$this->const = array(
 			0 => array(
 				'DIAMANTUTILS_INVOICE_CHECK_MODE',
@@ -57,11 +55,29 @@ class modDiamantutils extends DolibarrModules
 
 	public function init($options = '')
 	{
+		global $conf;
+
+		require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
+
+		// Nettoyage des anciennes constantes de hook (entity=0 et entity courante)
+		// pour éviter qu'une valeur périmée écrase la nouvelle lors du chargement
+		$sql = "DELETE FROM ".MAIN_DB_PREFIX."const WHERE name IN ("
+			."'".$this->db->escape('DIAMANTUTILS_HOOKS')."',"
+			."'".$this->db->escape('MAIN_MODULE_DIAMANTUTILS_HOOKS')."'"
+			.")";
+		$this->db->query($sql);
+
 		return $this->_init(array(), $options);
 	}
 
 	public function remove($options = '')
 	{
+		$sql = "DELETE FROM ".MAIN_DB_PREFIX."const WHERE name IN ("
+			."'".$this->db->escape('DIAMANTUTILS_HOOKS')."',"
+			."'".$this->db->escape('MAIN_MODULE_DIAMANTUTILS_HOOKS')."'"
+			.")";
+		$this->db->query($sql);
+
 		return $this->_remove(array(), $options);
 	}
 }
