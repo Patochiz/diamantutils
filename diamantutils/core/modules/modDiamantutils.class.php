@@ -21,13 +21,16 @@ class modDiamantutils extends DolibarrModules
 		$this->description = "Module interne Diamant Industrie : fonctionnalités diverses regroupées et activables individuellement";
 		$this->descriptionlong = "Regroupe les développements internes Diamant Industrie (ex. contrôle de facturation multi-commandes) sous un seul module avec options activables.";
 		$this->editor_name = 'Diamant Industrie';
-		$this->version = '1.1';
+		$this->version = '1.2';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'generic';
 
 		$this->module_parts = array(
 			'triggers' => 1,
-			'hooks' => array('invoicecard'),
+			'hooks' => array(
+				'data' => array('invoicecard'),
+				'entity' => '0',
+			),
 		);
 
 		$this->dirs = array();
@@ -55,11 +58,19 @@ class modDiamantutils extends DolibarrModules
 
 	public function init($options = '')
 	{
-		return $this->_init(array(), $options);
+		$result = $this->_init(array(), $options);
+
+		require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
+		dolibarr_set_const($this->db, 'MAIN_MODULE_DIAMANTUTILS_HOOKS', json_encode(array('invoicecard')), 'chaine', 0, '', 0);
+
+		return $result;
 	}
 
 	public function remove($options = '')
 	{
+		require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
+		dolibarr_del_const($this->db, 'MAIN_MODULE_DIAMANTUTILS_HOOKS', 0);
+
 		return $this->_remove(array(), $options);
 	}
 }
