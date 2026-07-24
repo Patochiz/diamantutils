@@ -76,22 +76,23 @@ print '<table class="noborder centpercent">';
 print '<tr class="liste_titre"><td>Composant</td><td>Statut</td></tr>';
 
 // Check hook constant in database
-$hookOk = false;
-$hookConstNames = array('DIAMANTUTILS_HOOKS', 'MAIN_MODULE_DIAMANTUTILS_HOOKS');
-foreach ($hookConstNames as $constName) {
-	$sql = "SELECT value FROM ".MAIN_DB_PREFIX."const WHERE name = '".$db->escape($constName)."'";
-	$resql = $db->query($sql);
-	if ($resql && $db->num_rows($resql) > 0) {
-		$obj = $db->fetch_object($resql);
-		print '<tr class="oddeven"><td>Constante '.$constName.'</td>';
-		print '<td><span class="badge badge-status4">OK</span> = '.dol_escape_htmltag($obj->value).'</td></tr>';
-		$hookOk = true;
+$sql = "SELECT name, value, entity FROM ".MAIN_DB_PREFIX."const WHERE name LIKE '%DIAMANTUTILS%HOOKS%' ORDER BY name, entity";
+$resql = $db->query($sql);
+$hookRows = array();
+if ($resql) {
+	while ($obj = $db->fetch_object($resql)) {
+		$hookRows[] = $obj;
 	}
 	$db->free($resql);
 }
-if (!$hookOk) {
+if (!empty($hookRows)) {
+	foreach ($hookRows as $row) {
+		print '<tr class="oddeven"><td>Constante '.dol_escape_htmltag($row->name).' (entity='.((int) $row->entity).')</td>';
+		print '<td><span class="badge badge-status4">OK</span> = '.dol_escape_htmltag($row->value).'</td></tr>';
+	}
+} else {
 	print '<tr class="oddeven"><td>Hook invoicecard</td>';
-	print '<td><span class="badge badge-status8">NON ENREGISTRE</span> — Veuillez desactiver puis reactiver le module</td></tr>';
+	print '<td><span class="badge badge-status8">NON ENREGISTRE</span> — Desactivez puis reactivez le module</td></tr>';
 }
 
 // Check actions class file
@@ -104,28 +105,28 @@ if (file_exists($classFile)) {
 }
 print '</tr>';
 
-// Check modules_parts in $conf
+// Check modules_parts in $conf (module name is a KEY, not a value)
 print '<tr class="oddeven"><td>$conf->modules_parts[hooks]</td>';
 if (!empty($conf->modules_parts['hooks'])) {
-	$found = false;
-	foreach ($conf->modules_parts['hooks'] as $ctx => $mods) {
-		if (is_array($mods)) {
-			foreach ($mods as $mod) {
-				if (stripos($mod, 'diamantutils') !== false) {
-					$found = true;
-				}
-			}
-		} elseif (stripos($mods, 'diamantutils') !== false) {
-			$found = true;
-		}
-	}
-	if ($found) {
-		print '<td><span class="badge badge-status4">OK</span> diamantutils enregistre</td>';
+	if (isset($conf->modules_parts['hooks']['diamantutils'])) {
+		$val = $conf->modules_parts['hooks']['diamantutils'];
+		$display = is_array($val) ? implode(', ', $val) : $val;
+		print '<td><span class="badge badge-status4">OK</span> diamantutils = '.dol_escape_htmltag($display).'</td>';
 	} else {
-		print '<td><span class="badge badge-status1">ABSENT</span> diamantutils non trouve dans modules_parts — <pre>'.dol_escape_htmltag(print_r($conf->modules_parts['hooks'], true)).'</pre></td>';
+		print '<td><span class="badge badge-status1">ABSENT</span> diamantutils absent des cles modules_parts[hooks]<br>';
+		print '<pre>'.dol_escape_htmltag(print_r($conf->modules_parts['hooks'], true)).'</pre></td>';
 	}
 } else {
 	print '<td><span class="badge badge-status8">VIDE</span> Aucun hook enregistre</td>';
+}
+print '</tr>';
+
+// Check isModEnabled
+print '<tr class="oddeven"><td>isModEnabled(\'diamantutils\')</td>';
+if (isModEnabled('diamantutils')) {
+	print '<td><span class="badge badge-status4">OK</span> Module actif</td>';
+} else {
+	print '<td><span class="badge badge-status8">NON</span> Module non actif selon isModEnabled()</td>';
 }
 print '</tr>';
 

@@ -21,16 +21,13 @@ class modDiamantutils extends DolibarrModules
 		$this->description = "Module interne Diamant Industrie : fonctionnalités diverses regroupées et activables individuellement";
 		$this->descriptionlong = "Regroupe les développements internes Diamant Industrie (ex. contrôle de facturation multi-commandes) sous un seul module avec options activables.";
 		$this->editor_name = 'Diamant Industrie';
-		$this->version = '1.3';
+		$this->version = '1.4';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'generic';
 
 		$this->module_parts = array(
 			'triggers' => 1,
-			'hooks' => array(
-				'data' => array('invoicecard'),
-				'entity' => '0',
-			),
+			'hooks' => array('invoicecard'),
 		);
 
 		$this->dirs = array();
@@ -58,23 +55,28 @@ class modDiamantutils extends DolibarrModules
 
 	public function init($options = '')
 	{
-		$result = $this->_init(array(), $options);
+		global $conf;
 
 		require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
 
-		// Enregistrement explicite du hook avec les deux formats de constante possibles
-		$hookValue = json_encode(array('invoicecard'));
-		dolibarr_set_const($this->db, 'DIAMANTUTILS_HOOKS', $hookValue, 'chaine', 0, '', 0);
-		dolibarr_set_const($this->db, 'MAIN_MODULE_DIAMANTUTILS_HOOKS', $hookValue, 'chaine', 0, '', 0);
+		// Nettoyage des anciennes constantes de hook (entity=0 et entity courante)
+		// pour éviter qu'une valeur périmée écrase la nouvelle lors du chargement
+		$sql = "DELETE FROM ".MAIN_DB_PREFIX."const WHERE name IN ("
+			."'".$this->db->escape('DIAMANTUTILS_HOOKS')."',"
+			."'".$this->db->escape('MAIN_MODULE_DIAMANTUTILS_HOOKS')."'"
+			.")";
+		$this->db->query($sql);
 
-		return $result;
+		return $this->_init(array(), $options);
 	}
 
 	public function remove($options = '')
 	{
-		require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
-		dolibarr_del_const($this->db, 'DIAMANTUTILS_HOOKS', 0);
-		dolibarr_del_const($this->db, 'MAIN_MODULE_DIAMANTUTILS_HOOKS', 0);
+		$sql = "DELETE FROM ".MAIN_DB_PREFIX."const WHERE name IN ("
+			."'".$this->db->escape('DIAMANTUTILS_HOOKS')."',"
+			."'".$this->db->escape('MAIN_MODULE_DIAMANTUTILS_HOOKS')."'"
+			.")";
+		$this->db->query($sql);
 
 		return $this->_remove(array(), $options);
 	}
