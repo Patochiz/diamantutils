@@ -21,9 +21,10 @@ class ActionsDiamantutils
 
 	private function getRelatedInvoicesHtml($orderId)
 	{
+		global $langs, $conf;
 		$db = $this->db;
 
-		$sql = "SELECT DISTINCT f.rowid, f.ref, f.datef";
+		$sql = "SELECT DISTINCT f.rowid, f.ref, f.datef, f.total_ht";
 		$sql .= " FROM ".MAIN_DB_PREFIX."element_element as el";
 		$sql .= " INNER JOIN ".MAIN_DB_PREFIX."facture as f ON f.rowid = el.fk_target";
 		$sql .= " WHERE el.fk_source = ".((int) $orderId);
@@ -31,7 +32,7 @@ class ActionsDiamantutils
 		$sql .= " AND el.targettype = 'facture'";
 		$sql .= " AND f.fk_statut <> 3";
 
-		$sql .= " UNION SELECT DISTINCT f.rowid, f.ref, f.datef";
+		$sql .= " UNION SELECT DISTINCT f.rowid, f.ref, f.datef, f.total_ht";
 		$sql .= " FROM ".MAIN_DB_PREFIX."element_element as el";
 		$sql .= " INNER JOIN ".MAIN_DB_PREFIX."facture as f ON f.rowid = el.fk_source";
 		$sql .= " WHERE el.fk_target = ".((int) $orderId);
@@ -61,7 +62,8 @@ class ActionsDiamantutils
 			$url = DOL_URL_ROOT.'/compta/facture/card.php?facid='.((int) $inv->rowid);
 			$ref = dol_escape_htmltag($inv->ref);
 			$date = dol_print_date($db->jdate($inv->datef), 'day');
-			$html .= '<a href="'.$url.'">'.$ref.'</a> ('.$date.')<br>'."\n";
+			$ht = price($inv->total_ht, 0, '', 1, -1, 2);
+			$html .= '<a href="'.$url.'">'.$ref.'</a> ('.$date.' — '.$ht.' '.$langs->getCurrencySymbol($conf->currency).' HT)<br>'."\n";
 		}
 
 		return $html;

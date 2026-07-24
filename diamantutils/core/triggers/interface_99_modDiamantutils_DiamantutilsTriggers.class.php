@@ -109,7 +109,7 @@ class InterfaceDiamantutilsTriggers extends DolibarrTriggers
 		}
 
 		// Recherche des factures liées aux mêmes commandes via element_element
-		$sql = "SELECT DISTINCT f.rowid, f.ref, f.datef";
+		$sql = "SELECT DISTINCT f.rowid, f.ref, f.datef, f.total_ht";
 		$sql .= " FROM ".MAIN_DB_PREFIX."element_element as el1";
 		$sql .= " INNER JOIN ".MAIN_DB_PREFIX."element_element as el2 ON el2.fk_source = el1.fk_source AND el2.sourcetype = 'commande' AND el2.targettype = 'facture'";
 		$sql .= " INNER JOIN ".MAIN_DB_PREFIX."facture as f ON f.rowid = el2.fk_target";
@@ -133,7 +133,8 @@ class InterfaceDiamantutilsTriggers extends DolibarrTriggers
 					$url = DOL_URL_ROOT.'/compta/facture/card.php?facid='.((int) $inv->rowid);
 					$ref = dol_escape_htmltag($inv->ref);
 					$date = dol_print_date($db->jdate($inv->datef), 'day');
-					$html .= '<a href="'.$url.'">'.$ref.'</a> ('.$date.')<br>'."\n";
+					$ht = price($inv->total_ht, 0, '', 1, -1, 2);
+					$html .= '<a href="'.$url.'">'.$ref.'</a> ('.$date.' — '.$ht.' '.$langs->getCurrencySymbol($conf->currency).' HT)<br>'."\n";
 				}
 				$object->fetch_optionals();
 				$object->array_options['options_factures'] = $html;
