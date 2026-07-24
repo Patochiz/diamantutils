@@ -66,63 +66,68 @@ class ActionsDiamantutils
 	{
 		global $conf, $langs;
 
+		$origin = GETPOST('origin', 'alpha');
+		$originid = GETPOSTINT('originid');
+
+		$debug = 'DiamantUtils hook: action='.$action.', origin='.$origin.', originid='.$originid;
+		$debug .= ', modEnabled='.((int) isModEnabled('diamantutils'));
+		$debug .= ', mode='.getDolGlobalString('DIAMANTUTILS_INVOICE_CHECK_MODE', 'AFFICHER');
+
 		if (!isModEnabled('diamantutils')) {
+			$this->resprints = '<!-- '.$debug.' (skip: mod disabled) -->';
 			return 0;
 		}
 
 		$mode = getDolGlobalString('DIAMANTUTILS_INVOICE_CHECK_MODE', 'AFFICHER');
 		if ($mode == 'DESACTIVE') {
+			$this->resprints = '<!-- '.$debug.' (skip: DESACTIVE) -->';
 			return 0;
 		}
 
-		if ($action != 'create') {
-			return 0;
+		$html = '';
+		if ($origin == 'commande' && $originid > 0) {
+			$html = $this->getRelatedInvoicesHtml($originid);
 		}
-
-		$origin = GETPOST('origin', 'alpha');
-		$originid = GETPOSTINT('originid');
-
-		if ($origin != 'commande' || $originid <= 0) {
-			return 0;
-		}
-
-		$html = $this->getRelatedInvoicesHtml($originid);
-		if (empty($html)) {
-			return 0;
-		}
-
-		if (!isset($object->array_options)) {
-			$object->array_options = array();
-		}
-		$object->array_options['options_factures'] = $html;
 
 		$langs->load('diamantutils@diamantutils');
 
 		$this->resprints = '<tr class="oddeven"><td colspan="2">';
-		$this->resprints .= '<div class="warning">';
-		$this->resprints .= '<strong>'.$langs->trans('DiamantutilsInvoiceCheckLabel').'</strong><br>';
-		$this->resprints .= $html;
+		$this->resprints .= '<div class="info" style="padding:8px;background:#eef;border:1px solid #99c;margin:4px 0;">';
+		$this->resprints .= '<strong>DiamantUtils</strong> — '.$debug.'<br>';
+		if (!empty($html)) {
+			$this->resprints .= '<strong>'.$langs->trans('DiamantutilsInvoiceCheckLabel').'</strong><br>';
+			$this->resprints .= $html;
+		} else {
+			$this->resprints .= 'Aucune facture liee trouvee pour cette commande.';
+		}
 		$this->resprints .= '</div>';
 		$this->resprints .= '</td></tr>'."\n";
 
-		$jsHtml = json_encode($html);
-		$this->resprints .= '<script type="text/javascript">'."\n";
-		$this->resprints .= 'jQuery(document).ready(function() {'."\n";
-		$this->resprints .= '  var htmlVal = '.$jsHtml.';'."\n";
-		$this->resprints .= '  setTimeout(function() {'."\n";
-		$this->resprints .= '    var el = document.getElementById("options_factures");'."\n";
-		$this->resprints .= '    if (!el) el = document.querySelector("[name=\'options_factures\']");'."\n";
-		$this->resprints .= '    if (el) el.value = htmlVal;'."\n";
-		$this->resprints .= '    if (typeof CKEDITOR !== "undefined" && CKEDITOR.instances) {'."\n";
-		$this->resprints .= '      var inst = CKEDITOR.instances["options_factures"];'."\n";
-		$this->resprints .= '      if (inst) { inst.setData(htmlVal); return; }'."\n";
-		$this->resprints .= '      CKEDITOR.on("instanceReady", function(evt) {'."\n";
-		$this->resprints .= '        if (evt.editor.name === "options_factures") evt.editor.setData(htmlVal);'."\n";
-		$this->resprints .= '      });'."\n";
-		$this->resprints .= '    }'."\n";
-		$this->resprints .= '  }, 500);'."\n";
-		$this->resprints .= '});'."\n";
-		$this->resprints .= '</script>'."\n";
+		if (!empty($html)) {
+			if (!isset($object->array_options)) {
+				$object->array_options = array();
+			}
+			$object->array_options['options_factures'] = $html;
+
+			$jsHtml = json_encode($html);
+			$this->resprints .= '<script type="text/javascript">'."\n";
+			$this->resprints .= 'jQuery(document).ready(function() {'."\n";
+			$this->resprints .= '  var htmlVal = '.$jsHtml.';'."\n";
+			$this->resprints .= '  setTimeout(function() {'."\n";
+			$this->resprints .= '    var el = document.getElementById("options_factures");'."\n";
+			$this->resprints .= '    if (!el) el = document.querySelector("[name=\'options_factures\']");'."\n";
+			$this->resprints .= '    if (el) el.value = htmlVal;'."\n";
+			$this->resprints .= '    if (typeof CKEDITOR !== "undefined" && CKEDITOR.instances) {'."\n";
+			$this->resprints .= '      var inst = CKEDITOR.instances["options_factures"];'."\n";
+			$this->resprints .= '      if (inst) { inst.setData(htmlVal); return; }'."\n";
+			$this->resprints .= '      CKEDITOR.on("instanceReady", function(evt) {'."\n";
+			$this->resprints .= '        if (evt.editor.name === "options_factures") evt.editor.setData(htmlVal);'."\n";
+			$this->resprints .= '      });'."\n";
+			$this->resprints .= '    }'."\n";
+			$this->resprints .= '  }, 500);'."\n";
+			$this->resprints .= '});'."\n";
+			$this->resprints .= '</script>'."\n";
+		}
 
 		return 0;
 	}
