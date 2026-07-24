@@ -2,8 +2,8 @@
 /**
  * Hook sur la page facture (invoicecard)
  *
- * Pré-remplit l'extrafield "factures" avec la liste des factures déjà liées
- * aux mêmes lignes de commande, sur le formulaire de création de facture.
+ * Affiche les factures déjà liées aux mêmes lignes de commande
+ * sur le formulaire de création de facture.
  */
 
 class ActionsDiamantutils
@@ -19,12 +19,6 @@ class ActionsDiamantutils
 		$this->db = $db;
 	}
 
-	/**
-	 * Recherche les factures liées à une commande donnée.
-	 *
-	 * @param int $orderId ID de la commande
-	 * @return string HTML avec les liens vers les factures, vide si aucune
-	 */
 	private function getRelatedInvoicesHtml($orderId)
 	{
 		$db = $this->db;
@@ -63,50 +57,11 @@ class ActionsDiamantutils
 		return $html;
 	}
 
-	/**
-	 * Hook doActions — s'exécute au début du traitement de la page.
-	 */
 	public function doActions($parameters, &$object, &$action, $hookmanager)
 	{
-		global $conf, $langs;
-
-		if (!isModEnabled('diamantutils')) {
-			return 0;
-		}
-
-		$mode = getDolGlobalString('DIAMANTUTILS_INVOICE_CHECK_MODE', 'AFFICHER');
-		if ($mode == 'DESACTIVE') {
-			return 0;
-		}
-
-		if ($action != 'create') {
-			return 0;
-		}
-
-		$origin = GETPOST('origin', 'alpha');
-		$originid = GETPOSTINT('originid');
-
-		if ($origin != 'commande' || $originid <= 0) {
-			return 0;
-		}
-
-		$html = $this->getRelatedInvoicesHtml($originid);
-		if (empty($html)) {
-			return 0;
-		}
-
-		if (!isset($object->array_options)) {
-			$object->array_options = array();
-		}
-		$object->array_options['options_factures'] = $html;
-
 		return 0;
 	}
 
-	/**
-	 * Hook formObjectOptions — s'exécute pendant le rendu du formulaire,
-	 * juste avant showOptionals (extrafields).
-	 */
 	public function formObjectOptions($parameters, &$object, &$action, $hookmanager)
 	{
 		global $conf, $langs;
@@ -141,23 +96,31 @@ class ActionsDiamantutils
 		}
 		$object->array_options['options_factures'] = $html;
 
+		$langs->load('diamantutils@diamantutils');
+
+		$this->resprints = '<tr class="oddeven"><td colspan="2">';
+		$this->resprints .= '<div class="warning">';
+		$this->resprints .= '<strong>'.$langs->trans('DiamantutilsInvoiceCheckLabel').'</strong><br>';
+		$this->resprints .= $html;
+		$this->resprints .= '</div>';
+		$this->resprints .= '</td></tr>'."\n";
+
 		$jsHtml = json_encode($html);
-		$this->resprints = '<script type="text/javascript">'."\n";
+		$this->resprints .= '<script type="text/javascript">'."\n";
 		$this->resprints .= 'jQuery(document).ready(function() {'."\n";
 		$this->resprints .= '  var htmlVal = '.$jsHtml.';'."\n";
-		$this->resprints .= '  var el = document.getElementById("options_factures");'."\n";
-		$this->resprints .= '  if (el) { el.value = htmlVal; el.innerHTML = htmlVal; }'."\n";
-		$this->resprints .= '  if (typeof CKEDITOR !== "undefined") {'."\n";
-		$this->resprints .= '    if (CKEDITOR.instances && CKEDITOR.instances["options_factures"]) {'."\n";
-		$this->resprints .= '      CKEDITOR.instances["options_factures"].setData(htmlVal);'."\n";
-		$this->resprints .= '    } else {'."\n";
+		$this->resprints .= '  setTimeout(function() {'."\n";
+		$this->resprints .= '    var el = document.getElementById("options_factures");'."\n";
+		$this->resprints .= '    if (!el) el = document.querySelector("[name=\'options_factures\']");'."\n";
+		$this->resprints .= '    if (el) el.value = htmlVal;'."\n";
+		$this->resprints .= '    if (typeof CKEDITOR !== "undefined" && CKEDITOR.instances) {'."\n";
+		$this->resprints .= '      var inst = CKEDITOR.instances["options_factures"];'."\n";
+		$this->resprints .= '      if (inst) { inst.setData(htmlVal); return; }'."\n";
 		$this->resprints .= '      CKEDITOR.on("instanceReady", function(evt) {'."\n";
-		$this->resprints .= '        if (evt.editor.name === "options_factures") {'."\n";
-		$this->resprints .= '          evt.editor.setData(htmlVal);'."\n";
-		$this->resprints .= '        }'."\n";
+		$this->resprints .= '        if (evt.editor.name === "options_factures") evt.editor.setData(htmlVal);'."\n";
 		$this->resprints .= '      });'."\n";
 		$this->resprints .= '    }'."\n";
-		$this->resprints .= '  }'."\n";
+		$this->resprints .= '  }, 500);'."\n";
 		$this->resprints .= '});'."\n";
 		$this->resprints .= '</script>'."\n";
 
