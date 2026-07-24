@@ -108,35 +108,36 @@ class InterfaceDiamantutilsTriggers extends DolibarrTriggers
 			}
 		}
 
-		// Recherche des factures liées aux mêmes lignes de commande
-		if (!empty($originLineIds)) {
-			$sql = "SELECT DISTINCT f.rowid, f.ref, f.datef, f.fk_statut";
-			$sql .= " FROM ".MAIN_DB_PREFIX."facturedet as fd";
-			$sql .= " INNER JOIN ".MAIN_DB_PREFIX."facture as f ON f.rowid = fd.fk_facture";
-			$sql .= " WHERE fd.fk_origin_line IN (".implode(',', $originLineIds).")";
-			$sql .= " AND fd.fk_facture <> ".((int) $object->id);
-			$sql .= " AND f.fk_statut <> 3";
-			$sql .= " ORDER BY f.datef, f.ref";
-			$resql = $db->query($sql);
-			if ($resql) {
-				$relatedInvoices = array();
-				while ($row = $db->fetch_object($resql)) {
-					$relatedInvoices[] = $row;
-				}
-				$db->free($resql);
+		// Recherche des factures liées aux mêmes commandes via element_element
+		$sql = "SELECT DISTINCT f.rowid, f.ref, f.datef";
+		$sql .= " FROM ".MAIN_DB_PREFIX."element_element as el1";
+		$sql .= " INNER JOIN ".MAIN_DB_PREFIX."element_element as el2 ON el2.fk_source = el1.fk_source AND el2.sourcetype = 'commande' AND el2.targettype = 'facture'";
+		$sql .= " INNER JOIN ".MAIN_DB_PREFIX."facture as f ON f.rowid = el2.fk_target";
+		$sql .= " WHERE el1.fk_target = ".((int) $object->id);
+		$sql .= " AND el1.sourcetype = 'commande'";
+		$sql .= " AND el1.targettype = 'facture'";
+		$sql .= " AND el2.fk_target <> ".((int) $object->id);
+		$sql .= " AND f.fk_statut <> 3";
+		$sql .= " ORDER BY f.datef, f.ref";
+		$resql = $db->query($sql);
+		if ($resql) {
+			$relatedInvoices = array();
+			while ($row = $db->fetch_object($resql)) {
+				$relatedInvoices[] = $row;
+			}
+			$db->free($resql);
 
-				if (!empty($relatedInvoices)) {
-					$html = '';
-					foreach ($relatedInvoices as $inv) {
-						$url = DOL_URL_ROOT.'/compta/facture/card.php?facid='.((int) $inv->rowid);
-						$ref = dol_escape_htmltag($inv->ref);
-						$date = dol_print_date($db->jdate($inv->datef), 'day');
-						$html .= '<a href="'.$url.'">'.$ref.'</a> ('.$date.')<br>'."\n";
-					}
-					$object->fetch_optionals();
-					$object->array_options['options_factures'] = $html;
-					$object->updateExtraFields();
+			if (!empty($relatedInvoices)) {
+				$html = '';
+				foreach ($relatedInvoices as $inv) {
+					$url = DOL_URL_ROOT.'/compta/facture/card.php?facid='.((int) $inv->rowid);
+					$ref = dol_escape_htmltag($inv->ref);
+					$date = dol_print_date($db->jdate($inv->datef), 'day');
+					$html .= '<a href="'.$url.'">'.$ref.'</a> ('.$date.')<br>'."\n";
 				}
+				$object->fetch_optionals();
+				$object->array_options['options_factures'] = $html;
+				$object->updateExtraFields();
 			}
 		}
 

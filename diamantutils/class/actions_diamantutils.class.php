@@ -24,12 +24,22 @@ class ActionsDiamantutils
 		$db = $this->db;
 
 		$sql = "SELECT DISTINCT f.rowid, f.ref, f.datef";
-		$sql .= " FROM ".MAIN_DB_PREFIX."commandedet as cd";
-		$sql .= " INNER JOIN ".MAIN_DB_PREFIX."facturedet as fd ON fd.fk_origin_line = cd.rowid";
-		$sql .= " INNER JOIN ".MAIN_DB_PREFIX."facture as f ON f.rowid = fd.fk_facture";
-		$sql .= " WHERE cd.fk_commande = ".((int) $orderId);
+		$sql .= " FROM ".MAIN_DB_PREFIX."element_element as el";
+		$sql .= " INNER JOIN ".MAIN_DB_PREFIX."facture as f ON f.rowid = el.fk_target";
+		$sql .= " WHERE el.fk_source = ".((int) $orderId);
+		$sql .= " AND el.sourcetype = 'commande'";
+		$sql .= " AND el.targettype = 'facture'";
 		$sql .= " AND f.fk_statut <> 3";
-		$sql .= " ORDER BY f.datef, f.ref";
+
+		$sql .= " UNION SELECT DISTINCT f.rowid, f.ref, f.datef";
+		$sql .= " FROM ".MAIN_DB_PREFIX."element_element as el";
+		$sql .= " INNER JOIN ".MAIN_DB_PREFIX."facture as f ON f.rowid = el.fk_source";
+		$sql .= " WHERE el.fk_target = ".((int) $orderId);
+		$sql .= " AND el.sourcetype = 'facture'";
+		$sql .= " AND el.targettype = 'commande'";
+		$sql .= " AND f.fk_statut <> 3";
+
+		$sql .= " ORDER BY datef, ref";
 
 		$resql = $db->query($sql);
 		if (!$resql) {
