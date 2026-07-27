@@ -16,3 +16,5 @@ DiamantutilsModeShowBlock = Show + Block — lists related invoices and refuses 
 # Trigger messages
 DiamantutilsLineExceedsRemaining = Line '%s': invoiced quantity (%s) exceeds available remaining (%s) — check invoices already issued for this order before validating.
 DiamantutilsLineDeleteError = Error deleting invoice line (id=%s)
+DiamantutilsTotalInvoiced = TOTAL INVOICED = %s on %s
+DiamantutilsRemainingToInvoice = Remaining to invoice %s

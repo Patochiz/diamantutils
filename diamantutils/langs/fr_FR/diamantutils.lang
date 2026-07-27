@@ -16,3 +16,5 @@ DiamantutilsModeShowBlock = Afficher + Bloquer — liste les factures liées et 
 # Messages du trigger
 DiamantutilsLineExceedsRemaining = Ligne '%s' : quantité facturée (%s) supérieure au reliquat disponible (%s) — vérifiez les factures déjà émises pour cette commande avant de valider.
 DiamantutilsLineDeleteError = Erreur lors de la suppression de la ligne de facture (id=%s)
+DiamantutilsTotalInvoiced = MONTANT TOTAL FACTURÉ = %s sur %s
+DiamantutilsRemainingToInvoice = Reste à facturer %s

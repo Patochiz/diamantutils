@@ -57,14 +57,35 @@ class ActionsDiamantutils
 			return '';
 		}
 
+		$sqlOrder = "SELECT total_ht FROM ".MAIN_DB_PREFIX."commande WHERE rowid = ".((int) $orderId);
+		$resqlOrder = $db->query($sqlOrder);
+		$orderTotalHt = 0;
+		if ($resqlOrder) {
+			$objOrder = $db->fetch_object($resqlOrder);
+			if ($objOrder) {
+				$orderTotalHt = (float) $objOrder->total_ht;
+			}
+			$db->free($resqlOrder);
+		}
+
 		$html = '';
+		$totalInvoiced = 0;
+		$currency = $langs->getCurrencySymbol($conf->currency);
 		foreach ($invoices as $inv) {
 			$url = DOL_URL_ROOT.'/compta/facture/card.php?facid='.((int) $inv->rowid);
 			$ref = dol_escape_htmltag($inv->ref);
 			$date = dol_print_date($db->jdate($inv->datef), 'day');
 			$ht = price($inv->total_ht, 0, '', 1, -1, 2);
-			$html .= '<a href="'.$url.'">'.$ref.'</a> ('.$date.' — '.$ht.' '.$langs->getCurrencySymbol($conf->currency).' HT)<br>'."\n";
+			$html .= '<a href="'.$url.'">'.$ref.'</a> ('.$date.' — '.$ht.' '.$currency.' HT)<br>'."\n";
+			$totalInvoiced += (float) $inv->total_ht;
 		}
+
+		$remaining = $orderTotalHt - $totalInvoiced;
+		$amountStr = price($totalInvoiced, 0, '', 1, -1, 2).' '.$currency.' HT';
+		$orderStr = price($orderTotalHt, 0, '', 1, -1, 2).' '.$currency.' HT';
+		$remainStr = price($remaining, 0, '', 1, -1, 2).' '.$currency.' HT';
+		$html .= '<strong>=&gt; '.$langs->trans('DiamantutilsTotalInvoiced', $amountStr, $orderStr).'</strong><br>'."\n";
+		$html .= '<strong>'.$langs->trans('DiamantutilsRemainingToInvoice', $remainStr).'</strong>'."\n";
 
 		return $html;
 	}
@@ -81,39 +102,23 @@ class ActionsDiamantutils
 		$origin = GETPOST('origin', 'alpha');
 		$originid = GETPOSTINT('originid');
 
-		$debug = 'DiamantUtils hook: action='.$action.', origin='.$origin.', originid='.$originid;
-		$debug .= ', modEnabled='.((int) isModEnabled('diamantutils'));
-		$debug .= ', mode='.getDolGlobalString('DIAMANTUTILS_INVOICE_CHECK_MODE', 'AFFICHER');
-
 		if (!isModEnabled('diamantutils')) {
-			$this->resprints = '<!-- '.$debug.' (skip: mod disabled) -->';
 			return 0;
 		}
 
 		$mode = getDolGlobalString('DIAMANTUTILS_INVOICE_CHECK_MODE', 'AFFICHER');
 		if ($mode == 'DESACTIVE') {
-			$this->resprints = '<!-- '.$debug.' (skip: DESACTIVE) -->';
 			return 0;
 		}
+
+		$langs->load('diamantutils@diamantutils');
 
 		$html = '';
 		if ($origin == 'commande' && $originid > 0) {
 			$html = $this->getRelatedInvoicesHtml($originid);
 		}
 
-		$langs->load('diamantutils@diamantutils');
-
-		$this->resprints = '<tr class="oddeven"><td colspan="2">';
-		$this->resprints .= '<div class="info" style="padding:8px;background:#eef;border:1px solid #99c;margin:4px 0;">';
-		$this->resprints .= '<strong>DiamantUtils</strong> — '.$debug.'<br>';
-		if (!empty($html)) {
-			$this->resprints .= '<strong>'.$langs->trans('DiamantutilsInvoiceCheckLabel').'</strong><br>';
-			$this->resprints .= $html;
-		} else {
-			$this->resprints .= 'Aucune facture liee trouvee pour cette commande.';
-		}
-		$this->resprints .= '</div>';
-		$this->resprints .= '</td></tr>'."\n";
+		$this->resprints = '';
 
 		if (!empty($html)) {
 			if (!isset($object->array_options)) {
