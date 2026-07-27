@@ -108,37 +108,65 @@ class InterfaceDiamantutilsTriggers extends DolibarrTriggers
 			}
 		}
 
-		// Recherche des factures liées aux mêmes commandes via element_element
-		$sql = "SELECT DISTINCT f.rowid, f.ref, f.datef, f.total_ht";
-		$sql .= " FROM ".MAIN_DB_PREFIX."element_element as el1";
-		$sql .= " INNER JOIN ".MAIN_DB_PREFIX."element_element as el2 ON el2.fk_source = el1.fk_source AND el2.sourcetype = 'commande' AND el2.targettype = 'facture'";
-		$sql .= " INNER JOIN ".MAIN_DB_PREFIX."facture as f ON f.rowid = el2.fk_target";
-		$sql .= " WHERE el1.fk_target = ".((int) $object->id);
-		$sql .= " AND el1.sourcetype = 'commande'";
-		$sql .= " AND el1.targettype = 'facture'";
-		$sql .= " AND el2.fk_target <> ".((int) $object->id);
-		$sql .= " AND f.fk_statut <> 3";
-		$sql .= " ORDER BY f.datef, f.ref";
+		// Recherche des commandes liées et de leurs totaux
+		$orderIds = array();
+		$orderTotalHt = 0;
+		$sql = "SELECT DISTINCT c.rowid, c.total_ht";
+		$sql .= " FROM ".MAIN_DB_PREFIX."element_element as el";
+		$sql .= " INNER JOIN ".MAIN_DB_PREFIX."commande as c ON c.rowid = el.fk_source";
+		$sql .= " WHERE el.fk_target = ".((int) $object->id);
+		$sql .= " AND el.sourcetype = 'commande'";
+		$sql .= " AND el.targettype = 'facture'";
 		$resql = $db->query($sql);
 		if ($resql) {
-			$relatedInvoices = array();
 			while ($row = $db->fetch_object($resql)) {
-				$relatedInvoices[] = $row;
+				$orderIds[] = (int) $row->rowid;
+				$orderTotalHt += (float) $row->total_ht;
 			}
 			$db->free($resql);
+		}
 
-			if (!empty($relatedInvoices)) {
-				$html = '';
-				foreach ($relatedInvoices as $inv) {
-					$url = DOL_URL_ROOT.'/compta/facture/card.php?facid='.((int) $inv->rowid);
-					$ref = dol_escape_htmltag($inv->ref);
-					$date = dol_print_date($db->jdate($inv->datef), 'day');
-					$ht = price($inv->total_ht, 0, '', 1, -1, 2);
-					$html .= '<a href="'.$url.'">'.$ref.'</a> ('.$date.' — '.$ht.' '.$langs->getCurrencySymbol($conf->currency).' HT)<br>'."\n";
+		if (!empty($orderIds)) {
+			$sql = "SELECT DISTINCT f.rowid, f.ref, f.datef, f.total_ht";
+			$sql .= " FROM ".MAIN_DB_PREFIX."element_element as el";
+			$sql .= " INNER JOIN ".MAIN_DB_PREFIX."facture as f ON f.rowid = el.fk_target";
+			$sql .= " WHERE el.fk_source IN (".implode(',', $orderIds).")";
+			$sql .= " AND el.sourcetype = 'commande'";
+			$sql .= " AND el.targettype = 'facture'";
+			$sql .= " AND f.fk_statut <> 3";
+			$sql .= " ORDER BY f.datef, f.ref";
+			$resql = $db->query($sql);
+			if ($resql) {
+				$allInvoices = array();
+				while ($row = $db->fetch_object($resql)) {
+					$allInvoices[] = $row;
 				}
-				$object->fetch_optionals();
-				$object->array_options['options_factures'] = $html;
-				$object->updateExtraFields();
+				$db->free($resql);
+
+				if (!empty($allInvoices)) {
+					$html = '';
+					$totalInvoiced = 0;
+					$currency = $langs->getCurrencySymbol($conf->currency);
+					foreach ($allInvoices as $inv) {
+						$url = DOL_URL_ROOT.'/compta/facture/card.php?facid='.((int) $inv->rowid);
+						$ref = dol_escape_htmltag($inv->ref);
+						$date = dol_print_date($db->jdate($inv->datef), 'day');
+						$ht = price($inv->total_ht, 0, '', 1, -1, 2);
+						$html .= '<a href="'.$url.'">'.$ref.'</a> ('.$date.' — '.$ht.' '.$currency.' HT)<br>'."\n";
+						$totalInvoiced += (float) $inv->total_ht;
+					}
+
+					$remaining = $orderTotalHt - $totalInvoiced;
+					$amountStr = price($totalInvoiced, 0, '', 1, -1, 2).' '.$currency.' HT';
+					$orderStr = price($orderTotalHt, 0, '', 1, -1, 2).' '.$currency.' HT';
+					$remainStr = price($remaining, 0, '', 1, -1, 2).' '.$currency.' HT';
+					$html .= '<strong>=&gt; '.$langs->trans('DiamantutilsTotalInvoiced', $amountStr, $orderStr).'</strong><br>'."\n";
+					$html .= '<strong>'.$langs->trans('DiamantutilsRemainingToInvoice', $remainStr).'</strong>'."\n";
+
+					$object->fetch_optionals();
+					$object->array_options['options_factures'] = $html;
+					$object->updateExtraFields();
+				}
 			}
 		}
 
