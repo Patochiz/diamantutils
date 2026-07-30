@@ -210,8 +210,32 @@ class InterfaceDiamantutilsTriggers extends DolibarrTriggers
 				$ref = dol_escape_htmltag($inv->ref);
 				$date = dol_print_date($db->jdate($inv->datef), 'day');
 				$ht = price($inv->total_ht, 0, '', 1, -1, 2);
-				$html .= '<a href="'.$url.'">'.$ref.'</a> ('.$date.' — '.$ht.' '.$currency.' HT)<br>'."\n";
+				$html .= '<a href="'.$url.'">'.$ref.'</a> ('.$date.' &mdash; '.$ht.' '.$currency.' HT)<br>'."\n";
 				$totalInvoiced += (float) $inv->total_ht;
+
+				// Détail par commande
+				$sqlBk = "SELECT c.ref, SUM(fd.total_ht) as order_ht";
+				$sqlBk .= " FROM ".MAIN_DB_PREFIX."facturedet as fd";
+				$sqlBk .= " INNER JOIN ".MAIN_DB_PREFIX."commandedet as cd ON cd.rowid = fd.fk_origin_line";
+				$sqlBk .= " INNER JOIN ".MAIN_DB_PREFIX."commande as c ON c.rowid = cd.fk_commande";
+				$sqlBk .= " WHERE fd.fk_facture = ".((int) $inv->rowid);
+				$sqlBk .= " AND fd.fk_origin_line > 0";
+				$sqlBk .= " GROUP BY c.rowid, c.ref ORDER BY c.ref";
+				$resqlBk = $db->query($sqlBk);
+				$bkRows = array();
+				if ($resqlBk) {
+					while ($bkRow = $db->fetch_object($resqlBk)) {
+						$bkRows[] = $bkRow;
+					}
+					$db->free($resqlBk);
+				}
+				if (count($bkRows) >= 2) {
+					foreach ($bkRows as $bk) {
+						$bkRef = dol_escape_htmltag($bk->ref);
+						$bkHt = price($bk->order_ht, 0, '', 1, -1, 2);
+						$html .= '&nbsp;&nbsp;&nbsp;- Commande '.$bkRef.' &mdash; '.$bkHt.' '.$currency.' HT<br>'."\n";
+					}
+				}
 			}
 
 			$remaining = $orderTotalHt - $totalInvoiced;
