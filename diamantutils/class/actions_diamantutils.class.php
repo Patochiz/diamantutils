@@ -199,6 +199,8 @@ class ActionsDiamantutils
 		}
 
 		// Cas 2 : Facture existante dont l'extrafield est vide → rattrapage
+		// On calcule la valeur à la volée pour l'affichage sans écrire en base
+		// (écrire pendant le rendu peut bloquer la page).
 		if (empty($html) && is_object($object) && !empty($object->id)) {
 			if (!isset($object->array_options) || !is_array($object->array_options)) {
 				$object->fetch_optionals();
@@ -207,7 +209,6 @@ class ActionsDiamantutils
 				$html = $this->buildInvoiceSummaryFromLinkedOrders($object->id);
 				if (!empty($html)) {
 					$object->array_options['options_factures'] = $html;
-					$object->updateExtraFields('options_factures');
 				}
 			}
 		}
