@@ -213,7 +213,7 @@ class InterfaceDiamantutilsTriggers extends DolibarrTriggers
 				$html .= '<a href="'.$url.'">'.$ref.'</a> ('.$date.' &mdash; '.$ht.' '.$currency.' HT)<br>'."\n";
 				$totalInvoiced += (float) $inv->total_ht;
 
-				// Détail par commande
+				// Détail par commande (via fk_origin_line puis fallback element_element)
 				$sqlBk = "SELECT c.ref, SUM(fd.total_ht) as order_ht";
 				$sqlBk .= " FROM ".MAIN_DB_PREFIX."facturedet as fd";
 				$sqlBk .= " INNER JOIN ".MAIN_DB_PREFIX."commandedet as cd ON cd.rowid = fd.fk_origin_line";
@@ -229,6 +229,22 @@ class InterfaceDiamantutilsTriggers extends DolibarrTriggers
 					}
 					$db->free($resqlBk);
 				}
+				if (empty($bkRows)) {
+					$sqlBk = "SELECT c.ref, c.total_ht as order_ht";
+					$sqlBk .= " FROM ".MAIN_DB_PREFIX."element_element as el";
+					$sqlBk .= " INNER JOIN ".MAIN_DB_PREFIX."commande as c ON c.rowid = el.fk_source";
+					$sqlBk .= " WHERE el.fk_target = ".((int) $inv->rowid);
+					$sqlBk .= " AND el.sourcetype = 'commande'";
+					$sqlBk .= " AND el.targettype = 'facture'";
+					$sqlBk .= " ORDER BY c.ref";
+					$resqlBk = $db->query($sqlBk);
+					if ($resqlBk) {
+						while ($bkRow = $db->fetch_object($resqlBk)) {
+							$bkRows[] = $bkRow;
+						}
+						$db->free($resqlBk);
+					}
+				}
 				if (count($bkRows) >= 2) {
 					foreach ($bkRows as $bk) {
 						$bkRef = dol_escape_htmltag($bk->ref);
@@ -243,7 +259,11 @@ class InterfaceDiamantutilsTriggers extends DolibarrTriggers
 			$orderStr = price($orderTotalHt, 0, '', 1, -1, 2).' '.$currency.' HT';
 			$remainStr = price($remaining, 0, '', 1, -1, 2).' '.$currency.' HT';
 			$html .= '<strong>=&gt; '.$langs->trans('DiamantutilsTotalInvoiced', $amountStr, $orderStr).'</strong><br>'."\n";
-			$html .= '<strong>'.$langs->trans('DiamantutilsRemainingToInvoice', $remainStr).'</strong>'."\n";
+			if (round($remaining, 2) != 0) {
+				$html .= '<strong style="color: #cc0000;">'.$langs->trans('DiamantutilsRemainingToInvoice', $remainStr).'</strong>'."\n";
+			} else {
+				$html .= '<strong>'.$langs->trans('DiamantutilsRemainingToInvoice', $remainStr).'</strong>'."\n";
+			}
 
 			$object->fetch_optionals();
 			$object->array_options['options_factures'] = $html;

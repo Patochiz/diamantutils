@@ -23,11 +23,14 @@ class ActionsDiamantutils
 
 	/**
 	 * Retourne le détail par commande d'une facture donnée.
-	 * @return array [{ref, total_ht}, ...]
+	 * Essaie d'abord via fk_origin_line (montants exacts par commande),
+	 * puis fallback via element_element (total de chaque commande liée).
+	 * @return array [{ref, order_ht}, ...]
 	 */
 	private function getInvoiceOrderBreakdown($invoiceId)
 	{
 		$db = $this->db;
+
 		$sql = "SELECT c.ref, SUM(fd.total_ht) as order_ht";
 		$sql .= " FROM ".MAIN_DB_PREFIX."facturedet as fd";
 		$sql .= " INNER JOIN ".MAIN_DB_PREFIX."commandedet as cd ON cd.rowid = fd.fk_origin_line";
@@ -44,11 +47,33 @@ class ActionsDiamantutils
 			}
 			$db->free($resql);
 		}
+
+		if (!empty($breakdown)) {
+			return $breakdown;
+		}
+
+		// Fallback via element_element
+		$sql = "SELECT c.ref, c.total_ht as order_ht";
+		$sql .= " FROM ".MAIN_DB_PREFIX."element_element as el";
+		$sql .= " INNER JOIN ".MAIN_DB_PREFIX."commande as c ON c.rowid = el.fk_source";
+		$sql .= " WHERE el.fk_target = ".((int) $invoiceId);
+		$sql .= " AND el.sourcetype = 'commande'";
+		$sql .= " AND el.targettype = 'facture'";
+		$sql .= " ORDER BY c.ref";
+		$resql = $db->query($sql);
+		if ($resql) {
+			while ($row = $db->fetch_object($resql)) {
+				$breakdown[] = $row;
+			}
+			$db->free($resql);
+		}
+
 		return $breakdown;
 	}
 
 	/**
 	 * Génère le HTML du détail par commande sous une facture.
+	 * Affiché uniquement si 2+ commandes.
 	 */
 	private function formatOrderBreakdownHtml($breakdown, $currency)
 	{
@@ -137,7 +162,11 @@ class ActionsDiamantutils
 		$orderStr = price($orderTotalHt, 0, '', 1, -1, 2).' '.$currency.' HT';
 		$remainStr = price($remaining, 0, '', 1, -1, 2).' '.$currency.' HT';
 		$html .= '<strong>=&gt; '.$langs->trans('DiamantutilsTotalInvoiced', $amountStr, $orderStr).'</strong><br>'."\n";
-		$html .= '<strong>'.$langs->trans('DiamantutilsRemainingToInvoice', $remainStr).'</strong>'."\n";
+		if (round($remaining, 2) != 0) {
+			$html .= '<strong style="color: #cc0000;">'.$langs->trans('DiamantutilsRemainingToInvoice', $remainStr).'</strong>'."\n";
+		} else {
+			$html .= '<strong>'.$langs->trans('DiamantutilsRemainingToInvoice', $remainStr).'</strong>'."\n";
+		}
 
 		return $html;
 	}
@@ -211,7 +240,11 @@ class ActionsDiamantutils
 		$orderStr = price($orderTotalHt, 0, '', 1, -1, 2).' '.$currency.' HT';
 		$remainStr = price($remaining, 0, '', 1, -1, 2).' '.$currency.' HT';
 		$html .= '<strong>=&gt; '.$langs->trans('DiamantutilsTotalInvoiced', $amountStr, $orderStr).'</strong><br>'."\n";
-		$html .= '<strong>'.$langs->trans('DiamantutilsRemainingToInvoice', $remainStr).'</strong>'."\n";
+		if (round($remaining, 2) != 0) {
+			$html .= '<strong style="color: #cc0000;">'.$langs->trans('DiamantutilsRemainingToInvoice', $remainStr).'</strong>'."\n";
+		} else {
+			$html .= '<strong>'.$langs->trans('DiamantutilsRemainingToInvoice', $remainStr).'</strong>'."\n";
+		}
 
 		return $html;
 	}
