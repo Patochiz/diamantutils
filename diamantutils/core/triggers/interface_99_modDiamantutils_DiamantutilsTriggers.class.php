@@ -126,7 +126,27 @@ class InterfaceDiamantutilsTriggers extends DolibarrTriggers
 			$db->free($resql);
 		}
 
+		// Fallback : si element_element n'a rien retourné (cas de la création
+		// groupée depuis la liste des commandes où les liens ne sont pas encore
+		// insérés au moment du trigger), on retrouve les commandes source via
+		// les fk_origin_line des lignes de facture.
+		if (empty($orderIds) && !empty($originLineIds)) {
+			$sql = "SELECT DISTINCT c.rowid, c.total_ht";
+			$sql .= " FROM ".MAIN_DB_PREFIX."commandedet as cd";
+			$sql .= " INNER JOIN ".MAIN_DB_PREFIX."commande as c ON c.rowid = cd.fk_commande";
+			$sql .= " WHERE cd.rowid IN (".implode(',', $originLineIds).")";
+			$resql = $db->query($sql);
+			if ($resql) {
+				while ($row = $db->fetch_object($resql)) {
+					$orderIds[] = (int) $row->rowid;
+					$orderTotalHt += (float) $row->total_ht;
+				}
+				$db->free($resql);
+			}
+		}
+
 		if (!empty($orderIds)) {
+			// Factures liées via element_element
 			$sql = "SELECT DISTINCT f.rowid, f.ref, f.datef, f.total_ht";
 			$sql .= " FROM ".MAIN_DB_PREFIX."element_element as el";
 			$sql .= " INNER JOIN ".MAIN_DB_PREFIX."facture as f ON f.rowid = el.fk_target";
@@ -134,7 +154,16 @@ class InterfaceDiamantutilsTriggers extends DolibarrTriggers
 			$sql .= " AND el.sourcetype = 'commande'";
 			$sql .= " AND el.targettype = 'facture'";
 			$sql .= " AND f.fk_statut <> 3";
-			$sql .= " ORDER BY f.datef, f.ref";
+			if (!empty($originLineIds)) {
+				// Factures liées via fk_origin_line (fallback pour les factures
+				// créées en masse dont les liens element_element n'existent pas)
+				$sql .= " UNION SELECT DISTINCT f.rowid, f.ref, f.datef, f.total_ht";
+				$sql .= " FROM ".MAIN_DB_PREFIX."facturedet as fd";
+				$sql .= " INNER JOIN ".MAIN_DB_PREFIX."facture as f ON f.rowid = fd.fk_facture";
+				$sql .= " WHERE fd.fk_origin_line IN (".implode(',', $originLineIds).")";
+				$sql .= " AND f.fk_statut <> 3";
+			}
+			$sql .= " ORDER BY datef, ref";
 			$resql = $db->query($sql);
 			if ($resql) {
 				$allInvoices = array();
