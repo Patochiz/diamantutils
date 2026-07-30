@@ -200,42 +200,35 @@ class ActionsDiamantutils
 			return 0;
 		}
 
-		// Vérifie directement en base si l'extrafield est vide
 		$db = $this->db;
-		$sql = "SELECT options_factures FROM ".MAIN_DB_PREFIX."facture_extrafields";
-		$sql .= " WHERE fk_object = ".$invoiceId;
-		$resql = $db->query($sql);
-		$needsFill = true;
-		if ($resql) {
-			if ($db->num_rows($resql) > 0) {
-				$row = $db->fetch_object($resql);
-				if (!empty($row->options_factures)) {
-					$needsFill = false;
-				}
+
+		// Charge la facture via l'API Dolibarr (pas de SQL direct)
+		$invoice = null;
+		if (is_object($object) && !empty($object->id) && $object->id == $invoiceId) {
+			$invoice = $object;
+		} else {
+			require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
+			$invoice = new Facture($db);
+			if ($invoice->fetch($invoiceId) <= 0) {
+				return 0;
 			}
-			$db->free($resql);
 		}
 
-		if (!$needsFill) {
+		$invoice->fetch_optionals();
+		if (!empty($invoice->array_options['options_factures'])) {
 			return 0;
 		}
 
 		$langs->load('diamantutils@diamantutils');
 		$html = $this->buildInvoiceSummaryFromLinkedOrders($invoiceId);
 		if (!empty($html)) {
-			require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
-			$tmpInvoice = new Facture($db);
-			if ($tmpInvoice->fetch($invoiceId) > 0) {
-				$tmpInvoice->fetch_optionals();
-				$tmpInvoice->array_options['options_factures'] = $html;
-				$tmpInvoice->updateExtraFields();
-				// Met aussi à jour $object pour que l'affichage soit correct
-				if (is_object($object) && !empty($object->id) && $object->id == $invoiceId) {
-					if (!isset($object->array_options)) {
-						$object->array_options = array();
-					}
-					$object->array_options['options_factures'] = $html;
+			$invoice->array_options['options_factures'] = $html;
+			$invoice->updateExtraFields();
+			if ($invoice !== $object && is_object($object)) {
+				if (!isset($object->array_options)) {
+					$object->array_options = array();
 				}
+				$object->array_options['options_factures'] = $html;
 			}
 		}
 
