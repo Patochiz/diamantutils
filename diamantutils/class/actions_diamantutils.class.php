@@ -167,6 +167,21 @@ class ActionsDiamantutils
 		return $html;
 	}
 
+	/**
+	 * Récupère l'ID de la facture en cours, depuis $object ou les paramètres GET.
+	 */
+	private function getCurrentInvoiceId(&$object)
+	{
+		if (is_object($object) && !empty($object->id)) {
+			return (int) $object->id;
+		}
+		$id = GETPOSTINT('facid');
+		if (empty($id)) {
+			$id = GETPOSTINT('id');
+		}
+		return (int) $id;
+	}
+
 	public function doActions($parameters, &$object, &$action, $hookmanager)
 	{
 		global $conf, $langs;
@@ -180,18 +195,46 @@ class ActionsDiamantutils
 			return 0;
 		}
 
-		// Rattrapage : à l'ouverture d'une facture existante dont l'extrafield
-		// est vide, on le remplit à partir des liens element_element (qui
-		// existent maintenant, même si le trigger BILL_CREATE n'a pas pu les
-		// exploiter au moment de la création).
-		if (is_object($object) && !empty($object->id) && property_exists($object, 'element') && $object->element == 'facture') {
-			$object->fetch_optionals();
-			if (empty($object->array_options['options_factures'])) {
-				$langs->load('diamantutils@diamantutils');
-				$html = $this->buildInvoiceSummaryFromLinkedOrders($object->id);
-				if (!empty($html)) {
+		$invoiceId = $this->getCurrentInvoiceId($object);
+		if ($invoiceId <= 0) {
+			return 0;
+		}
+
+		// Vérifie directement en base si l'extrafield est vide
+		$db = $this->db;
+		$sql = "SELECT options_factures FROM ".MAIN_DB_PREFIX."facture_extrafields";
+		$sql .= " WHERE fk_object = ".$invoiceId;
+		$resql = $db->query($sql);
+		$needsFill = true;
+		if ($resql) {
+			if ($db->num_rows($resql) > 0) {
+				$row = $db->fetch_object($resql);
+				if (!empty($row->options_factures)) {
+					$needsFill = false;
+				}
+			}
+			$db->free($resql);
+		}
+
+		if (!$needsFill) {
+			return 0;
+		}
+
+		$langs->load('diamantutils@diamantutils');
+		$html = $this->buildInvoiceSummaryFromLinkedOrders($invoiceId);
+		if (!empty($html)) {
+			require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
+			$tmpInvoice = new Facture($db);
+			if ($tmpInvoice->fetch($invoiceId) > 0) {
+				$tmpInvoice->fetch_optionals();
+				$tmpInvoice->array_options['options_factures'] = $html;
+				$tmpInvoice->updateExtraFields();
+				// Met aussi à jour $object pour que l'affichage soit correct
+				if (is_object($object) && !empty($object->id) && $object->id == $invoiceId) {
+					if (!isset($object->array_options)) {
+						$object->array_options = array();
+					}
 					$object->array_options['options_factures'] = $html;
-					$object->updateExtraFields();
 				}
 			}
 		}
@@ -202,9 +245,6 @@ class ActionsDiamantutils
 	public function formObjectOptions($parameters, &$object, &$action, $hookmanager)
 	{
 		global $conf, $langs;
-
-		$origin = GETPOST('origin', 'alpha');
-		$originid = GETPOSTINT('originid');
 
 		if (!isModEnabled('diamantutils')) {
 			return 0;
@@ -217,12 +257,30 @@ class ActionsDiamantutils
 
 		$langs->load('diamantutils@diamantutils');
 
+		$origin = GETPOST('origin', 'alpha');
+		$originid = GETPOSTINT('originid');
+
+		$this->resprints = '';
 		$html = '';
+
+		// Cas 1 : Formulaire de création depuis une commande
 		if ($origin == 'commande' && $originid > 0) {
 			$html = $this->getRelatedInvoicesHtml($originid);
 		}
 
-		$this->resprints = '';
+		// Cas 2 : Facture existante dont l'extrafield est vide → rattrapage
+		if (empty($html) && !empty($object->id)) {
+			if (!isset($object->array_options)) {
+				$object->fetch_optionals();
+			}
+			if (empty($object->array_options['options_factures'])) {
+				$html = $this->buildInvoiceSummaryFromLinkedOrders($object->id);
+				if (!empty($html)) {
+					$object->array_options['options_factures'] = $html;
+					$object->updateExtraFields();
+				}
+			}
+		}
 
 		if (!empty($html)) {
 			if (!isset($object->array_options)) {
@@ -237,7 +295,9 @@ class ActionsDiamantutils
 			$this->resprints .= '  setTimeout(function() {'."\n";
 			$this->resprints .= '    var el = document.getElementById("options_factures");'."\n";
 			$this->resprints .= '    if (!el) el = document.querySelector("[name=\'options_factures\']");'."\n";
-			$this->resprints .= '    if (el) el.value = htmlVal;'."\n";
+			$this->resprints .= '    if (el) { el.value = htmlVal; }'."\n";
+			$this->resprints .= '    var tdEl = document.querySelector(".valuefieldcreate td.wordbreak, .fichecenter td.wordbreak");'."\n";
+			$this->resprints .= '    if (!tdEl) tdEl = document.querySelector("td.valuefieldcreate");'."\n";
 			$this->resprints .= '    if (typeof CKEDITOR !== "undefined" && CKEDITOR.instances) {'."\n";
 			$this->resprints .= '      var inst = CKEDITOR.instances["options_factures"];'."\n";
 			$this->resprints .= '      if (inst) { inst.setData(htmlVal); return; }'."\n";
