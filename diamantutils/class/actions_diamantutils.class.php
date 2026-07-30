@@ -2,8 +2,10 @@
 /**
  * Hook sur la page facture (invoicecard)
  *
- * Affiche les factures déjà liées aux mêmes lignes de commande
- * sur le formulaire de création de facture.
+ * - Pré-remplit l'extrafield "factures" sur le formulaire de création
+ *   (création depuis la fiche commande).
+ * - Rattrapage : remplit l'extrafield à l'ouverture d'une facture existante
+ *   dont le champ est vide (factures créées depuis la liste des commandes).
  */
 
 class ActionsDiamantutils
@@ -17,6 +19,81 @@ class ActionsDiamantutils
 	public function __construct($db)
 	{
 		$this->db = $db;
+	}
+
+	/**
+	 * Construit le HTML récapitulatif des factures liées aux commandes
+	 * d'une facture existante, en partant des liens element_element.
+	 */
+	private function buildInvoiceSummaryFromLinkedOrders($invoiceId)
+	{
+		global $langs, $conf;
+		$db = $this->db;
+
+		$orderIds = array();
+		$orderTotalHt = 0;
+		$sql = "SELECT DISTINCT c.rowid, c.total_ht";
+		$sql .= " FROM ".MAIN_DB_PREFIX."element_element as el";
+		$sql .= " INNER JOIN ".MAIN_DB_PREFIX."commande as c ON c.rowid = el.fk_source";
+		$sql .= " WHERE el.fk_target = ".((int) $invoiceId);
+		$sql .= " AND el.sourcetype = 'commande'";
+		$sql .= " AND el.targettype = 'facture'";
+		$resql = $db->query($sql);
+		if ($resql) {
+			while ($row = $db->fetch_object($resql)) {
+				$orderIds[] = (int) $row->rowid;
+				$orderTotalHt += (float) $row->total_ht;
+			}
+			$db->free($resql);
+		}
+
+		if (empty($orderIds)) {
+			return '';
+		}
+
+		$sql = "SELECT DISTINCT f.rowid, f.ref, f.datef, f.total_ht";
+		$sql .= " FROM ".MAIN_DB_PREFIX."element_element as el";
+		$sql .= " INNER JOIN ".MAIN_DB_PREFIX."facture as f ON f.rowid = el.fk_target";
+		$sql .= " WHERE el.fk_source IN (".implode(',', $orderIds).")";
+		$sql .= " AND el.sourcetype = 'commande'";
+		$sql .= " AND el.targettype = 'facture'";
+		$sql .= " AND f.fk_statut <> 3";
+		$sql .= " ORDER BY f.datef, f.ref";
+		$resql = $db->query($sql);
+		if (!$resql) {
+			return '';
+		}
+
+		$allInvoices = array();
+		while ($row = $db->fetch_object($resql)) {
+			$allInvoices[] = $row;
+		}
+		$db->free($resql);
+
+		if (empty($allInvoices)) {
+			return '';
+		}
+
+		$html = '';
+		$totalInvoiced = 0;
+		$currency = $langs->getCurrencySymbol($conf->currency);
+		foreach ($allInvoices as $inv) {
+			$url = DOL_URL_ROOT.'/compta/facture/card.php?facid='.((int) $inv->rowid);
+			$ref = dol_escape_htmltag($inv->ref);
+			$date = dol_print_date($db->jdate($inv->datef), 'day');
+			$ht = price($inv->total_ht, 0, '', 1, -1, 2);
+			$html .= '<a href="'.$url.'">'.$ref.'</a> ('.$date.' — '.$ht.' '.$currency.' HT)<br>'."\n";
+			$totalInvoiced += (float) $inv->total_ht;
+		}
+
+		$remaining = $orderTotalHt - $totalInvoiced;
+		$amountStr = price($totalInvoiced, 0, '', 1, -1, 2).' '.$currency.' HT';
+		$orderStr = price($orderTotalHt, 0, '', 1, -1, 2).' '.$currency.' HT';
+		$remainStr = price($remaining, 0, '', 1, -1, 2).' '.$currency.' HT';
+		$html .= '<strong>=&gt; '.$langs->trans('DiamantutilsTotalInvoiced', $amountStr, $orderStr).'</strong><br>'."\n";
+		$html .= '<strong>'.$langs->trans('DiamantutilsRemainingToInvoice', $remainStr).'</strong>'."\n";
+
+		return $html;
 	}
 
 	private function getRelatedInvoicesHtml($orderId)
@@ -92,6 +169,33 @@ class ActionsDiamantutils
 
 	public function doActions($parameters, &$object, &$action, $hookmanager)
 	{
+		global $conf, $langs;
+
+		if (!isModEnabled('diamantutils')) {
+			return 0;
+		}
+
+		$mode = getDolGlobalString('DIAMANTUTILS_INVOICE_CHECK_MODE', 'AFFICHER');
+		if ($mode == 'DESACTIVE') {
+			return 0;
+		}
+
+		// Rattrapage : à l'ouverture d'une facture existante dont l'extrafield
+		// est vide, on le remplit à partir des liens element_element (qui
+		// existent maintenant, même si le trigger BILL_CREATE n'a pas pu les
+		// exploiter au moment de la création).
+		if (is_object($object) && !empty($object->id) && property_exists($object, 'element') && $object->element == 'facture') {
+			$object->fetch_optionals();
+			if (empty($object->array_options['options_factures'])) {
+				$langs->load('diamantutils@diamantutils');
+				$html = $this->buildInvoiceSummaryFromLinkedOrders($object->id);
+				if (!empty($html)) {
+					$object->array_options['options_factures'] = $html;
+					$object->updateExtraFields();
+				}
+			}
+		}
+
 		return 0;
 	}
 
