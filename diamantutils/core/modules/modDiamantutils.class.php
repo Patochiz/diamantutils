@@ -26,20 +26,85 @@ class modDiamantutils extends DolibarrModules
 		$this->picto = 'generic';
 
 		$this->module_parts = array(
-			'hooks' => array(),
+			'hooks' => array('stockproductcard'),
 		);
 
 		$this->dirs = array();
 
-		$this->const = array();
+		$this->const = array(
+			0 => array(
+				'DIAMANTUTILS_TRANSFO_LOT_FORMAT',
+				'chaine',
+				'Longueur %dmm',
+				'Format du nom de lot généré par une transformation (sprintf avec la longueur en mm)',
+				0,
+				'current',
+				0
+			),
+		);
+
+		$this->depends = array('modStock');
 
 		$this->config_page_url = array('setup.php@diamantutils');
 
 		$this->langfiles = array('diamantutils@diamantutils');
 
+		// Droits
 		$this->rights = array();
+		$r = 0;
+		$this->rights[$r][0] = $this->numero.'01';
+		$this->rights[$r][1] = 'Lire les transformations de stock';
+		$this->rights[$r][2] = 'r';
+		$this->rights[$r][3] = 0;
+		$this->rights[$r][4] = 'transformation';
+		$this->rights[$r][5] = 'read';
+		$r++;
+		$this->rights[$r][0] = $this->numero.'02';
+		$this->rights[$r][1] = 'Créer et valider les transformations de stock';
+		$this->rights[$r][2] = 'w';
+		$this->rights[$r][3] = 0;
+		$this->rights[$r][4] = 'transformation';
+		$this->rights[$r][5] = 'write';
+		$r++;
+		$this->rights[$r][0] = $this->numero.'03';
+		$this->rights[$r][1] = 'Annuler une transformation de stock validée';
+		$this->rights[$r][2] = 'd';
+		$this->rights[$r][3] = 0;
+		$this->rights[$r][4] = 'transformation';
+		$this->rights[$r][5] = 'cancel';
+		$r++;
 
+		// Menus gauche sous Produits > Stocks (eldy : mainmenu=products, leftmenu=stock)
 		$this->menu = array();
+		$r = 0;
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=products,fk_leftmenu=stock',
+			'type' => 'left',
+			'titre' => 'DiamantutilsTransformations',
+			'mainmenu' => 'products',
+			'leftmenu' => 'diamantutils_transfo',
+			'url' => '/diamantutils/transformation_list.php?mainmenu=products&leftmenu=stock',
+			'langs' => 'diamantutils@diamantutils',
+			'position' => 1000 + $r,
+			'enabled' => 'isModEnabled("diamantutils")',
+			'perms' => '$user->hasRight("diamantutils", "transformation", "read")',
+			'target' => '',
+			'user' => 2,
+		);
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=products,fk_leftmenu=stock',
+			'type' => 'left',
+			'titre' => 'DiamantutilsNewTransformation',
+			'mainmenu' => 'products',
+			'leftmenu' => 'diamantutils_transfo_new',
+			'url' => '/diamantutils/transformation_card.php?action=create&mainmenu=products&leftmenu=stock',
+			'langs' => 'diamantutils@diamantutils',
+			'position' => 1000 + $r,
+			'enabled' => 'isModEnabled("diamantutils")',
+			'perms' => '$user->hasRight("diamantutils", "transformation", "write")',
+			'target' => '',
+			'user' => 2,
+		);
 	}
 
 	public function init($options = '')
