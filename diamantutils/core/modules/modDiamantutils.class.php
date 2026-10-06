@@ -50,6 +50,12 @@ class modDiamantutils extends DolibarrModules
 		$sql = "DELETE FROM ".MAIN_DB_PREFIX."const WHERE name = '".$this->db->escape('DIAMANTUTILS_INVOICE_CHECK_MODE')."'";
 		$this->db->query($sql);
 
+		// Création des tables de transformation (fichiers sql/ du module)
+		$result = $this->_load_tables('/diamantutils/sql/');
+		if ($result < 0) {
+			return -1;
+		}
+
 		return $this->_init(array(), $options);
 	}
 
