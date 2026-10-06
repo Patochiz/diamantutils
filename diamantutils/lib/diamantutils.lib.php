@@ -123,6 +123,22 @@ function diamantutils_product_info($db, $fk_product)
 		$info['width_m'] = $width * pow(10, (int) $width_units);
 	}
 
+	// Bases migrées : unit_type parfois vide, on le déduit du code de l'unité
+	if ($info['unit_type'] === '' && $info['unit_code'] !== '') {
+		$bycode = array(
+			'M2' => array('surface', 0), 'DM2' => array('surface', -2), 'CM2' => array('surface', -4), 'MM2' => array('surface', -6),
+			'M' => array('size', 0), 'DM' => array('size', -1), 'CM' => array('size', -2), 'MM' => array('size', -3),
+			'P' => array('qty', 0), 'SET' => array('qty', 0),
+		);
+		$code = strtoupper($info['unit_code']);
+		if (isset($bycode[$code])) {
+			$info['unit_type'] = $bycode[$code][0];
+			if ($info['unit_scale'] === null) {
+				$info['unit_scale'] = $bycode[$code][1];
+			}
+		}
+	}
+
 	// Échelles 88 à 99 = unités impériales, non gérées en saisie profilé
 	$scale = $info['unit_scale'];
 	$scaleok = ($scale !== null && $scale < 80);
