@@ -1,7 +1,7 @@
 <?php
 /**
  * Descripteur du module DiamantUtils
- * Module custom Diamant Industrie — fonctionnalités internes regroupées et activables individuellement
+ * Module custom Diamant Industrie — fonctionnalités internes regroupées
  */
 
 require_once DOL_DOCUMENT_ROOT.'/core/modules/DolibarrModules.class.php';
@@ -18,31 +18,20 @@ class modDiamantutils extends DolibarrModules
 		$this->family = 'custom';
 		$this->module_position = '90';
 		$this->name = preg_replace('/^mod/i', '', get_class($this));
-		$this->description = "Module interne Diamant Industrie : fonctionnalités diverses regroupées et activables individuellement";
-		$this->descriptionlong = "Regroupe les développements internes Diamant Industrie (ex. contrôle de facturation multi-commandes) sous un seul module avec options activables.";
+		$this->description = "Module interne Diamant Industrie : transformation de stock par lots (découpe, peinture, changement d'unité)";
+		$this->descriptionlong = "Transformation de stock par lots : consommation de N lots et production de M lots (découpe de profilés, peinture, changement d'unité), avec saisie en pièces × longueur, contrôle d'équilibre, gestion des restes et des pertes, calcul du coût et traçabilité des mouvements de stock.";
 		$this->editor_name = 'Diamant Industrie';
-		$this->version = '1.4';
+		$this->version = '2.0';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'generic';
 
 		$this->module_parts = array(
-			'triggers' => 1,
-			'hooks' => array('invoicecard'),
+			'hooks' => array(),
 		);
 
 		$this->dirs = array();
 
-		$this->const = array(
-			0 => array(
-				'DIAMANTUTILS_INVOICE_CHECK_MODE',
-				'chaine',
-				'AFFICHER',
-				'Mode de contrôle du déjà-facturé lors de la création de facture depuis commande(s) : MASQUER, AFFICHER, AFFICHER_BLOQUER, DESACTIVE',
-				0,
-				'current',
-				1
-			),
-		);
+		$this->const = array();
 
 		$this->config_page_url = array('setup.php@diamantutils');
 
@@ -55,16 +44,10 @@ class modDiamantutils extends DolibarrModules
 
 	public function init($options = '')
 	{
-		global $conf;
-
 		require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
 
-		// Nettoyage des anciennes constantes de hook (entity=0 et entity courante)
-		// pour éviter qu'une valeur périmée écrase la nouvelle lors du chargement
-		$sql = "DELETE FROM ".MAIN_DB_PREFIX."const WHERE name IN ("
-			."'".$this->db->escape('DIAMANTUTILS_HOOKS')."',"
-			."'".$this->db->escape('MAIN_MODULE_DIAMANTUTILS_HOOKS')."'"
-			.")";
+		// Purge de l'ancienne constante du contrôle de facturation (fonction abandonnée en v2.0)
+		$sql = "DELETE FROM ".MAIN_DB_PREFIX."const WHERE name = '".$this->db->escape('DIAMANTUTILS_INVOICE_CHECK_MODE')."'";
 		$this->db->query($sql);
 
 		return $this->_init(array(), $options);
@@ -72,12 +55,6 @@ class modDiamantutils extends DolibarrModules
 
 	public function remove($options = '')
 	{
-		$sql = "DELETE FROM ".MAIN_DB_PREFIX."const WHERE name IN ("
-			."'".$this->db->escape('DIAMANTUTILS_HOOKS')."',"
-			."'".$this->db->escape('MAIN_MODULE_DIAMANTUTILS_HOOKS')."'"
-			.")";
-		$this->db->query($sql);
-
 		return $this->_remove(array(), $options);
 	}
 }

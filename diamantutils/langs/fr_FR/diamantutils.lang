@@ -1,20 +1,13 @@
 Module510125Name = DiamantUtils
-Module510125Desc = Fonctionnalités internes Diamant Industrie regroupées et activables individuellement
+Module510125Desc = Transformation de stock par lots (découpe, peinture, changement d'unité)
 
 # Page de configuration
 DiamantutilsSetupTitle = DiamantUtils - Configuration
 DiamantutilsFeature = Fonctionnalité
 DiamantutilsSetting = Réglage
 DiamantutilsConfigUpdated = Configuration mise à jour
-DiamantutilsInvoiceCheckLabel = Contrôle du déjà-facturé sur les lignes de commande
-DiamantutilsInvoiceCheckDesc = Appliqué à chaque création de facture depuis une ou plusieurs commandes (unitaire ou groupée). Les factures liées sont affichées dans le champ complémentaire "Factures".
-DiamantutilsModeDisabled = Désactivé — aucun contrôle
-DiamantutilsModeHide = Masquer — retire silencieusement les lignes déjà entièrement facturées
-DiamantutilsModeShow = Afficher — liste les factures liées dans le champ complémentaire, sans bloquer
-DiamantutilsModeShowBlock = Afficher + Bloquer — liste les factures liées et refuse la création si une ligne dépasse le reliquat
-
-# Messages du trigger
-DiamantutilsLineExceedsRemaining = Ligne '%s' : quantité facturée (%s) supérieure au reliquat disponible (%s) — vérifiez les factures déjà émises pour cette commande avant de valider.
-DiamantutilsLineDeleteError = Erreur lors de la suppression de la ligne de facture (id=%s)
-DiamantutilsTotalInvoiced = MONTANT TOTAL FACTURÉ = %s sur %s
-DiamantutilsRemainingToInvoice = Reste à facturer %s
+DiamantutilsTransfoDefaultWarehouse = Entrepôt par défaut des transformations
+DiamantutilsTransfoDefaultWarehouseDesc = Proposé à la création d'une nouvelle transformation.
+DiamantutilsTransfoLotFormat = Format du nom de lot généré
+DiamantutilsTransfoLotFormatDesc = Doit contenir une seule fois %s, remplacé par la longueur en mm. Défaut : %s
+DiamantutilsLotFormatInvalid = Format de lot invalide : il doit contenir exactement un %s et aucun autre code de format.

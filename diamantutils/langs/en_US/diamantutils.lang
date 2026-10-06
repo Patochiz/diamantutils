@@ -1,20 +1,13 @@
 Module510125Name = DiamantUtils
-Module510125Desc = Internal Diamant Industrie utilities bundled and individually activatable
+Module510125Desc = Batch-based stock transformation (cutting, painting, unit change)
 
 # Setup page
 DiamantutilsSetupTitle = DiamantUtils - Configuration
 DiamantutilsFeature = Feature
 DiamantutilsSetting = Setting
 DiamantutilsConfigUpdated = Configuration updated
-DiamantutilsInvoiceCheckLabel = Already-invoiced check on order lines
-DiamantutilsInvoiceCheckDesc = Applied on each invoice creation from one or more orders (single or grouped). Related invoices are displayed in the "Invoices" extrafield.
-DiamantutilsModeDisabled = Disabled — no check
-DiamantutilsModeHide = Hide — silently removes fully invoiced lines
-DiamantutilsModeShow = Show — lists related invoices in the extrafield, no blocking
-DiamantutilsModeShowBlock = Show + Block — lists related invoices and refuses creation if a line exceeds the remaining quantity
-
-# Trigger messages
-DiamantutilsLineExceedsRemaining = Line '%s': invoiced quantity (%s) exceeds available remaining (%s) — check invoices already issued for this order before validating.
-DiamantutilsLineDeleteError = Error deleting invoice line (id=%s)
-DiamantutilsTotalInvoiced = TOTAL INVOICED = %s on %s
-DiamantutilsRemainingToInvoice = Remaining to invoice %s
+DiamantutilsTransfoDefaultWarehouse = Default warehouse for transformations
+DiamantutilsTransfoDefaultWarehouseDesc = Suggested when creating a new transformation.
+DiamantutilsTransfoLotFormat = Generated lot name format
+DiamantutilsTransfoLotFormatDesc = Must contain %s exactly once, replaced by the length in mm. Default: %s
+DiamantutilsLotFormatInvalid = Invalid lot format: it must contain exactly one %s and no other format code.
