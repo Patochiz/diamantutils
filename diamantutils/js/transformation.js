@@ -616,7 +616,7 @@
 
 		render();
 		if (placed < n) {
-			$msg.html('<span class="error">' + esc(t('DiamantutilsPlanShortage').replace('%s', String(n - placed))) + '</span>');
+			$msg.html('<span class="error">' + esc(t('DiamantutilsPlanShortage').replace('{n}', String(n - placed))) + '</span>');
 		} else {
 			$msg.html('<span class="ok">' + esc(t('DiamantutilsPlanDone')) + '</span>');
 		}
