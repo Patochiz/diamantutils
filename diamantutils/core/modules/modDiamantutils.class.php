@@ -26,7 +26,7 @@ class modDiamantutils extends DolibarrModules
 		$this->picto = 'generic';
 
 		$this->module_parts = array(
-			'hooks' => array('stockproductcard'),
+			'hooks' => array(),
 		);
 
 		$this->dirs = array();
@@ -43,7 +43,8 @@ class modDiamantutils extends DolibarrModules
 			),
 		);
 
-		$this->depends = array('modStock');
+		// Le menu GPAO n'est affiché que si le module MRP (ou BOM) est actif
+		$this->depends = array('modStock', 'modMrp');
 
 		$this->config_page_url = array('setup.php@diamantutils');
 
@@ -74,16 +75,17 @@ class modDiamantutils extends DolibarrModules
 		$this->rights[$r][5] = 'cancel';
 		$r++;
 
-		// Menus gauche sous Produits > Stocks (eldy : mainmenu=products, leftmenu=stock)
+		// Menus gauche dans le menu haut GPAO (eldy : mainmenu=mrp)
 		$this->menu = array();
 		$r = 0;
 		$this->menu[$r++] = array(
-			'fk_menu' => 'fk_mainmenu=products,fk_leftmenu=stock',
+			'fk_menu' => 'fk_mainmenu=mrp',
 			'type' => 'left',
 			'titre' => 'DiamantutilsTransformations',
-			'mainmenu' => 'products',
-			'leftmenu' => 'diamantutils_transfo',
-			'url' => '/diamantutils/transformation_list.php?mainmenu=products&leftmenu=stock',
+			'prefix' => img_picto('', 'stock', 'class="paddingright pictofixedwidth"'),
+			'mainmenu' => 'mrp',
+			'leftmenu' => 'diamantutils_ot',
+			'url' => '/diamantutils/transformation_list.php?mainmenu=mrp&leftmenu=diamantutils_ot',
 			'langs' => 'diamantutils@diamantutils',
 			'position' => 1000 + $r,
 			'enabled' => 'isModEnabled("diamantutils")',
@@ -92,16 +94,30 @@ class modDiamantutils extends DolibarrModules
 			'user' => 2,
 		);
 		$this->menu[$r++] = array(
-			'fk_menu' => 'fk_mainmenu=products,fk_leftmenu=stock',
+			'fk_menu' => 'fk_mainmenu=mrp,fk_leftmenu=diamantutils_ot',
 			'type' => 'left',
 			'titre' => 'DiamantutilsNewTransformation',
-			'mainmenu' => 'products',
-			'leftmenu' => 'diamantutils_transfo_new',
-			'url' => '/diamantutils/transformation_card.php?action=create&mainmenu=products&leftmenu=stock',
+			'mainmenu' => 'mrp',
+			'leftmenu' => 'diamantutils_ot_new',
+			'url' => '/diamantutils/transformation_card.php?action=create&mainmenu=mrp&leftmenu=diamantutils_ot',
 			'langs' => 'diamantutils@diamantutils',
 			'position' => 1000 + $r,
 			'enabled' => 'isModEnabled("diamantutils")',
 			'perms' => '$user->hasRight("diamantutils", "transformation", "write")',
+			'target' => '',
+			'user' => 2,
+		);
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=mrp,fk_leftmenu=diamantutils_ot',
+			'type' => 'left',
+			'titre' => 'List',
+			'mainmenu' => 'mrp',
+			'leftmenu' => 'diamantutils_ot_list',
+			'url' => '/diamantutils/transformation_list.php?mainmenu=mrp&leftmenu=diamantutils_ot',
+			'langs' => 'diamantutils@diamantutils',
+			'position' => 1000 + $r,
+			'enabled' => 'isModEnabled("diamantutils")',
+			'perms' => '$user->hasRight("diamantutils", "transformation", "read")',
 			'target' => '',
 			'user' => 2,
 		);

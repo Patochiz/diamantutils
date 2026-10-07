@@ -4,6 +4,12 @@
  * validation et annulation.
  */
 
+// Pages du module : garder le menu GPAO sélectionné quel que soit le lien d'arrivée
+if (!isset($_GET['mainmenu']) && !isset($_POST['mainmenu'])) {
+	$_GET['mainmenu'] = 'mrp';
+	$_GET['leftmenu'] = 'diamantutils_ot';
+}
+
 $res = 0;
 if (!$res && file_exists("../main.inc.php")) {
 	$res = @include "../main.inc.php";
