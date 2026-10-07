@@ -945,7 +945,8 @@
 		groups.push(newGroup(cfg.defaultProduct));
 	}
 	if (!rows.some(function (r) { return r.direction === 'OUT'; })) {
-		var out = newRow('OUT', {fk_product: firstInProduct()});
+		// Quantité à produire transmise par la ligne de commande d'origine, le cas échéant
+		var out = newRow('OUT', {fk_product: firstInProduct(), qty: cfg.defaultQty > 0 ? cfg.defaultQty : null});
 		proposeBatch(out);
 		rows.push(out);
 	}

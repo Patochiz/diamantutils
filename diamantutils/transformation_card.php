@@ -342,6 +342,27 @@ if ($editmode) {
 		$object->type = 'DECOUPE';
 	}
 
+	// Création pré-remplie depuis une ligne de commande (bouton du popup detailproduit) :
+	// commande, ligne de commande et quantité à produire
+	$qty_default = 0;
+	if (!($object->id > 0) && !is_array($postedlines)) {
+		$fk_commande_default = GETPOSTINT('fk_commande');
+		$fk_commandedet_default = GETPOSTINT('fk_commandedet');
+		if ($fk_commande_default > 0) {
+			$object->fk_commande = $fk_commande_default;
+		}
+		if ($fk_commandedet_default > 0) {
+			$sql = "SELECT fk_commande FROM ".MAIN_DB_PREFIX."commandedet WHERE rowid = ".((int) $fk_commandedet_default);
+			$resql = $db->query($sql);
+			$obj = ($resql ? $db->fetch_object($resql) : null);
+			if ($obj && (!($object->fk_commande > 0) || (int) $obj->fk_commande == (int) $object->fk_commande)) {
+				$object->fk_commande = (int) $obj->fk_commande;
+				$object->fk_commandedet = $fk_commandedet_default;
+			}
+		}
+		$qty_default = (float) price2num(GETPOST('qty', 'alpha'), 'MS');
+	}
+
 	// Lignes à afficher : saisie postée en erreur, sinon lignes en base
 	$jslines = array();
 	if (is_array($postedlines)) {
@@ -387,6 +408,7 @@ if ($editmode) {
 		'lotFormat' => (substr_count(getDolGlobalString('DIAMANTUTILS_TRANSFO_LOT_FORMAT', 'Longueur %dmm'), '%d') == 1 ? getDolGlobalString('DIAMANTUTILS_TRANSFO_LOT_FORMAT', 'Longueur %dmm') : 'Longueur %dmm'),
 		'batchEnabled' => isModEnabled('productbatch') ? 1 : 0,
 		'defaultProduct' => ($fk_product_default > 0 && isset($jsproducts[$fk_product_default]) ? $fk_product_default : 0),
+		'defaultQty' => ($qty_default > 0 ? $qty_default : 0),
 		'lines' => $jslines,
 		'products' => $jsproducts,
 		'deleteIcon' => img_delete(),

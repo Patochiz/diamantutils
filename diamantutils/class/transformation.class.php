@@ -908,10 +908,10 @@ class Transformation extends CommonObject
 
 				if ($direction == self::DIRECTION_IN) {
 					$line->unit_cost = $cost['pmp'][$line->fk_product];
-					$result = $mvt->livraison($user, $line->fk_product, $this->fk_warehouse, $line->qty, $line->unit_cost, $label, '', '', '', $batch, 0, $inventorycode);
+					$result = $this->createMovement($mvt, $user, $line, -1, $line->unit_cost, $label, $inventorycode, $batch);
 				} else {
 					$line->unit_cost = $cost['unit_out'];
-					$result = $mvt->reception($user, $line->fk_product, $this->fk_warehouse, $line->qty, $line->unit_cost, $label, '', '', $batch, '', 0, $inventorycode);
+					$result = $this->createMovement($mvt, $user, $line, 1, $line->unit_cost, $label, $inventorycode, $batch);
 				}
 
 				if ($result <= 0) {
@@ -959,6 +959,33 @@ class Transformation extends CommonObject
 
 		$this->db->commit();
 		return 1;
+	}
+
+	/**
+	 * Mouvement de stock d'une ligne, sans répercussion sur les sous-produits.
+	 *
+	 * livraison() / reception() de MouvementStock appellent _create() en laissant Dolibarr
+	 * mouvementer aussi les composants d'un produit kit (sous-produits « incdec »). Pour une
+	 * peinture BLANC → RAL où le RAL a le BLANC comme sous-produit, l'entrée du RAL remettait
+	 * alors le BLANC en stock. Un ordre de transformation porte lui-même tous ses mouvements :
+	 * on appelle _create() avec $disablestockchangeforsubproduct = 1.
+	 *
+	 * @param	MouvementStock		$mvt			Mouvement (origine déjà positionnée)
+	 * @param	User				$user			Utilisateur
+	 * @param	TransformationLine	$line			Ligne
+	 * @param	int					$sign			-1 sortie de stock (type 2), +1 entrée (type 3)
+	 * @param	float				$price			Prix unitaire du mouvement
+	 * @param	string				$label			Libellé
+	 * @param	string				$inventorycode	Code de mouvement
+	 * @param	string				$batch			Lot
+	 * @return	int									Id du mouvement si OK, <=0 si KO
+	 */
+	protected function createMovement($mvt, $user, $line, $sign, $price, $label, $inventorycode, $batch)
+	{
+		$skip_batch = !isModEnabled('productbatch');
+		$qty = ($sign < 0 ? -1 : 1) * (float) $line->qty;
+		$type = ($sign < 0 ? 2 : 3);
+		return $mvt->_create($user, $line->fk_product, $this->fk_warehouse, $qty, $type, $price, $label, $inventorycode, '', '', '', $batch, $skip_batch, 0, 1);
 	}
 
 	/**
@@ -1066,9 +1093,9 @@ class Transformation extends CommonObject
 				$mvt->setOrigin('transformation@diamantutils', $this->id);
 
 				if ($direction == self::DIRECTION_OUT) {
-					$result = $mvt->livraison($user, $line->fk_product, $this->fk_warehouse, $line->qty, (float) $line->unit_cost, $label, '', '', '', $batch, 0, $inventorycode);
+					$result = $this->createMovement($mvt, $user, $line, -1, (float) $line->unit_cost, $label, $inventorycode, $batch);
 				} else {
-					$result = $mvt->reception($user, $line->fk_product, $this->fk_warehouse, $line->qty, (float) $line->unit_cost, $label, '', '', $batch, '', 0, $inventorycode);
+					$result = $this->createMovement($mvt, $user, $line, 1, (float) $line->unit_cost, $label, $inventorycode, $batch);
 				}
 
 				if ($result <= 0) {
