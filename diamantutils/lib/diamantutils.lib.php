@@ -436,7 +436,7 @@ function diamantutils_transfo_prepare_head($object)
 	$head[$h][2] = 'card';
 	$h++;
 
-	if ($object->status > 0) {
+	if ($object->date_consume) {
 		$head[$h][0] = DOL_URL_ROOT.'/product/stock/movement_list.php?search_inventorycode='.urlencode($object->ref);
 		$head[$h][1] = $langs->trans('DiamantutilsStockMovements');
 		$head[$h][2] = 'movements';

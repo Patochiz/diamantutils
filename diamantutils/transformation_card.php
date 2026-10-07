@@ -505,7 +505,7 @@ if ($editmode) {
 	}
 } elseif ($object->id > 0) {
 	/*
-	 * Vue d'une transformation (validée, annulée, ou brouillon en lecture seule)
+	 * Vue d'un ordre (validé, consommé, annulé, ou brouillon en lecture seule)
 	 */
 	print '<div class="fichecenter">';
 	print '<div class="underbanner clearboth"></div>';
@@ -548,10 +548,20 @@ if ($editmode) {
 		}
 		print '</td></tr>';
 	}
+	if ($object->date_consume) {
+		print '<tr><td>'.$langs->trans('DiamantutilsDateConsume').'</td><td>'.dol_print_date($object->date_consume, 'dayhour');
+		if ($object->fk_user_consume > 0) {
+			$userconsume = new User($db);
+			if ($userconsume->fetch($object->fk_user_consume) > 0) {
+				print ' — '.$userconsume->getNomUrl(1);
+			}
+		}
+		print '</td></tr>';
+	}
 	if ($object->note) {
 		print '<tr><td class="tdtop">'.$langs->trans('Note').'</td><td>'.dol_nl2br(dol_escape_htmltag($object->note)).'</td></tr>';
 	}
-	if ($object->status > 0) {
+	if ($object->date_consume) {
 		print '<tr><td>'.$langs->trans('DiamantutilsStockMovements').'</td><td>';
 		print '<a href="'.DOL_URL_ROOT.'/product/stock/movement_list.php?search_inventorycode='.urlencode($object->ref).'">'.img_picto('', 'movement', 'class="pictofixedwidth"').$langs->trans('DiamantutilsSeeMovements', $object->ref).'</a>';
 		print '</td></tr>';
@@ -560,6 +570,123 @@ if ($editmode) {
 	print '</table>';
 	print '</div>';
 	print '<div class="clearboth"></div>';
+
+	// Résumé des modifications de stock : prévues (validé) ou effectuées (consommé)
+	$canconsume = true;
+	if ($object->status == Transformation::STATUS_VALIDATED) {
+		$planned = $object->getPlannedMovements();
+		print '<br>';
+		print load_fiche_titre($langs->trans('DiamantutilsPlannedMovements'), '', 'movement');
+		print '<div class="div-table-responsive-no-min"><table class="noborder centpercent">';
+		print '<tr class="liste_titre">';
+		print '<td>'.$langs->trans('Product').'</td>';
+		print '<td>'.$langs->trans('Batch').'</td>';
+		print '<td class="right">'.$langs->trans('DiamantutilsCurrentStock').'</td>';
+		print '<td class="right">'.$langs->trans('DiamantutilsMovement').'</td>';
+		print '<td class="right">'.$langs->trans('DiamantutilsStockAfter').'</td>';
+		print '<td>'.$langs->trans('Unit').'</td>';
+		print '<td>'.$langs->trans('DiamantutilsRemark').'</td>';
+		print '</tr>';
+		foreach ($planned as $row) {
+			if ($row['negative']) {
+				$canconsume = false;
+			}
+			print '<tr class="oddeven"'.($row['negative'] ? ' style="background: #fdd"' : '').'>';
+			print '<td><a href="'.DOL_URL_ROOT.'/product/card.php?id='.((int) $row['fk_product']).'">'.img_picto('', 'product', 'class="pictofixedwidth"').dol_escape_htmltag($row['ref']).'</a></td>';
+			print '<td>'.($row['loss'] ? '<span class="opacitymedium">— ('.$langs->trans('DiamantutilsLoss').')</span>' : dol_escape_htmltag($row['batch'])).'</td>';
+			print '<td class="right">'.($row['loss'] ? '' : diamantutils_qty_format($row['stock'])).'</td>';
+			print '<td class="right nowraponall">'.($row['delta'] > 0 ? '+' : '').diamantutils_qty_format($row['delta']).'</td>';
+			print '<td class="right">'.($row['loss'] ? '' : ($row['negative'] ? '<span class="error">'.diamantutils_qty_format($row['after']).'</span>' : diamantutils_qty_format($row['after']))).'</td>';
+			print '<td>'.dol_escape_htmltag($row['unit']).'</td>';
+			$remarks = array();
+			if ($row['loss']) {
+				$remarks[] = $langs->trans('DiamantutilsLoss');
+			}
+			if ($row['newlot']) {
+				$remarks[] = '<b>'.$langs->trans('DiamantutilsNewLotRemark').'</b>';
+			}
+			if ($row['negative']) {
+				$remarks[] = '<span class="error">'.$langs->trans('DiamantutilsStockInsufficientShort').'</span>';
+			}
+			print '<td>'.implode(', ', $remarks).'</td>';
+			print '</tr>';
+		}
+		print '</table></div>';
+
+		// Totaux et coût unitaire prévu des sorties
+		$balance = $object->checkBalance();
+		$cost = $object->computeCost();
+		print '<div class="margintoponly">';
+		if ($balance['sameunit']) {
+			print $langs->trans('DiamantutilsConsumed').' : <b>'.diamantutils_qty_format($balance['in']).'</b> '.dol_escape_htmltag($balance['unit']);
+			print ' — '.$langs->trans('DiamantutilsProduced').' : <b>'.diamantutils_qty_format($balance['out']).'</b> '.dol_escape_htmltag($balance['unit']);
+			print ' — '.$langs->trans('DiamantutilsLoss').' : <b>'.diamantutils_qty_format($balance['loss']).'</b> '.dol_escape_htmltag($balance['unit']);
+		} else {
+			print img_warning().' '.$langs->trans('DiamantutilsWarningUnitsDiffer');
+		}
+		print '<br>'.$langs->trans('DiamantutilsPlannedUnitCost').' : <b>'.price($cost['unit_out'], 0, $langs, 1, -1, 'MU', $conf->currency).'</b>';
+		print ' <span class="opacitymedium">('.$langs->trans('DiamantutilsPlannedUnitCostDesc').')</span>';
+		print '</div>';
+	} elseif ($object->date_consume) {
+		// Mouvements réellement effectués à la consommation
+		$mvtids = array();
+		foreach ($object->lines as $line) {
+			if ($line->fk_stock_mouvement > 0) {
+				$mvtids[] = (int) $line->fk_stock_mouvement;
+			}
+		}
+		print '<br>';
+		$listurl = DOL_URL_ROOT.'/product/stock/movement_list.php?search_inventorycode='.urlencode($object->ref);
+		print load_fiche_titre($langs->trans('DiamantutilsDoneMovements'), '<a href="'.$listurl.'">'.$langs->trans('DiamantutilsSeeMovements', $object->ref).'</a>', 'movement');
+		print '<div class="div-table-responsive-no-min"><table class="noborder centpercent">';
+		print '<tr class="liste_titre">';
+		print '<td>'.$langs->trans('Ref').'</td>';
+		print '<td>'.$langs->trans('Date').'</td>';
+		print '<td>'.$langs->trans('Product').'</td>';
+		print '<td>'.$langs->trans('Batch').'</td>';
+		print '<td class="right">'.$langs->trans('DiamantutilsMovement').'</td>';
+		print '<td>'.$langs->trans('Unit').'</td>';
+		print '<td class="right">'.$langs->trans('DiamantutilsUnitCost').'</td>';
+		print '</tr>';
+		if (!empty($mvtids)) {
+			$sql = "SELECT m.rowid, m.datem, m.fk_product, m.batch, m.value, m.price, p.ref";
+			$sql .= " FROM ".MAIN_DB_PREFIX."stock_mouvement as m";
+			$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."product as p ON p.rowid = m.fk_product";
+			$sql .= " WHERE m.rowid IN (".$db->sanitize(implode(',', $mvtids)).")";
+			$sql .= " ORDER BY m.rowid";
+			$resql = $db->query($sql);
+			if ($resql) {
+				while ($obj = $db->fetch_object($resql)) {
+					$info = diamantutils_product_info($db, $obj->fk_product);
+					print '<tr class="oddeven">';
+					print '<td><a href="'.DOL_URL_ROOT.'/product/stock/movement_list.php?search_ref='.((int) $obj->rowid).'">'.img_picto('', 'movement', 'class="pictofixedwidth"').((int) $obj->rowid).'</a></td>';
+					print '<td>'.dol_print_date($db->jdate($obj->datem), 'dayhour').'</td>';
+					print '<td><a href="'.DOL_URL_ROOT.'/product/card.php?id='.((int) $obj->fk_product).'">'.img_picto('', 'product', 'class="pictofixedwidth"').dol_escape_htmltag($obj->ref).'</a></td>';
+					print '<td>'.dol_escape_htmltag((string) $obj->batch).'</td>';
+					print '<td class="right nowraponall">'.($obj->value > 0 ? '+' : '').diamantutils_qty_format($obj->value).'</td>';
+					print '<td>'.dol_escape_htmltag(empty($info) ? '' : $info['unit_short']).'</td>';
+					print '<td class="right">'.price($obj->price, 0, $langs, 1, -1, 'MU').'</td>';
+					print '</tr>';
+				}
+				$db->free($resql);
+			}
+		}
+		foreach ($object->lines as $line) {
+			if ($line->direction != Transformation::DIRECTION_LOSS) {
+				continue;
+			}
+			$info = diamantutils_product_info($db, $line->fk_product);
+			print '<tr class="oddeven">';
+			print '<td colspan="2"><span class="opacitymedium">'.$langs->trans('DiamantutilsLoss').'</span></td>';
+			print '<td>'.dol_escape_htmltag(empty($info) ? '' : $info['ref']).'</td>';
+			print '<td><span class="opacitymedium">—</span></td>';
+			print '<td class="right">-'.diamantutils_qty_format($line->qty).'</td>';
+			print '<td>'.dol_escape_htmltag(empty($info) ? '' : $info['unit_short']).'</td>';
+			print '<td></td>';
+			print '</tr>';
+		}
+		print '</table></div>';
+	}
 
 	// Lignes
 	$directions = array(
@@ -622,9 +749,9 @@ if ($editmode) {
 		print '</table></div>';
 	}
 
-	// Équilibre
+	// Équilibre (déjà affiché dans le résumé d'un ordre validé)
 	$balance = $object->checkBalance();
-	print '<br><div>';
+	print '<br><div'.($object->status == Transformation::STATUS_VALIDATED ? ' style="display: none"' : '').'>';
 	if ($balance['sameunit']) {
 		print $langs->trans('DiamantutilsConsumed').' : <b>'.diamantutils_qty_format($balance['in']).'</b> '.dol_escape_htmltag($balance['unit']);
 		print ' — '.$langs->trans('DiamantutilsProduced').' : <b>'.diamantutils_qty_format($balance['out']).'</b>';
@@ -644,7 +771,11 @@ if ($editmode) {
 	if (empty($reshook)) {
 		$baseurl = $_SERVER['PHP_SELF'].'?id='.$object->id.'&token='.newToken();
 		if ($object->status == Transformation::STATUS_VALIDATED) {
-			print dolGetButtonAction('', $langs->trans('DiamantutilsConsume'), 'default', $baseurl.'&action=consume', 'diamantutils-consume', $permwrite);
+			if ($canconsume) {
+				print dolGetButtonAction('', $langs->trans('DiamantutilsConsume'), 'default', $baseurl.'&action=consume', 'diamantutils-consume', $permwrite);
+			} else {
+				print '<span class="butActionRefused classfortooltip" id="diamantutils-consume" title="'.dol_escape_htmltag($langs->trans('DiamantutilsCannotConsumeStock')).'">'.$langs->trans('DiamantutilsConsume').'</span>';
+			}
 			print dolGetButtonAction('', $langs->trans('SetToDraft'), 'default', $baseurl.'&action=setdraft', '', $permwrite);
 			print dolGetButtonAction('', $langs->trans('DiamantutilsCancelOrder'), 'danger', $baseurl.'&action=cancel', '', $permwrite);
 		}
