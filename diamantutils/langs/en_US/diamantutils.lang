@@ -115,3 +115,5 @@ DiamantutilsPlannedUnitCost = Planned unit cost of outputs
 DiamantutilsPlannedUnitCostDesc = current WAP of inputs spread over produced quantities, loss being carried by outputs
 DiamantutilsDateConsume = Consumption date
 DiamantutilsCannotConsumeStock = Cannot consume: at least one lot would go below zero (red line). Stock may have changed since validation.
+DiamantutilsConsumedProducts = Consumed product(s)
+DiamantutilsProducedProducts = Produced product(s)

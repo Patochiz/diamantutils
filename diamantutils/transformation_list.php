@@ -35,7 +35,8 @@ $action = GETPOST('action', 'aZ09');
 // Filtres
 $search_ref = GETPOST('search_ref', 'alpha');
 $search_type = GETPOST('search_type', 'aZ09');
-$search_product = GETPOST('search_product', 'alpha');
+$search_product_in = GETPOST('search_product_in', 'alpha');
+$search_product_out = GETPOST('search_product_out', 'alpha');
 $search_batch = GETPOST('search_batch', 'alpha');
 $search_order = GETPOST('search_order', 'alpha');
 $search_status = GETPOST('search_status', 'intcomma');
@@ -63,7 +64,7 @@ if (!$sortfield) {
 if (!$sortorder) {
 	$sortorder = 'DESC';
 }
-$allowedsort = array('t.ref', 't.date_creation', 't.date_valid', 't.type', 'e.ref', 'c.ref', 't.status', 't.label');
+$allowedsort = array('t.ref', 't.date_creation', 't.date_valid', 't.date_consume', 't.type', 'e.ref', 'c.ref', 't.status', 't.label');
 if (!in_array($sortfield, $allowedsort)) {
 	$sortfield = 't.date_creation';
 }
@@ -72,7 +73,8 @@ if (!in_array($sortfield, $allowedsort)) {
 if (GETPOST('button_removefilter_x', 'alpha') || GETPOST('button_removefilter.x', 'alpha') || GETPOST('button_removefilter', 'alpha')) {
 	$search_ref = '';
 	$search_type = '';
-	$search_product = '';
+	$search_product_in = '';
+	$search_product_out = '';
 	$search_batch = '';
 	$search_order = '';
 	$search_status = '';
@@ -89,7 +91,7 @@ $form = new Form($db);
  * Requête
  */
 
-$sql = "SELECT t.rowid, t.ref, t.label, t.type, t.status, t.date_creation, t.date_valid, t.fk_warehouse, t.fk_commande,";
+$sql = "SELECT t.rowid, t.ref, t.label, t.type, t.status, t.date_creation, t.date_valid, t.date_consume, t.fk_warehouse, t.fk_commande,";
 $sql .= " e.ref as warehouse_ref, c.ref as order_ref";
 $sql .= " FROM ".MAIN_DB_PREFIX."diamantutils_transfo as t";
 $sql .= " LEFT JOIN ".MAIN_DB_PREFIX."entrepot as e ON e.rowid = t.fk_warehouse";
@@ -113,10 +115,13 @@ if ($search_date_start) {
 if ($search_date_end) {
 	$sql .= " AND t.date_creation <= '".$db->idate($search_date_end)."'";
 }
-if ($search_product) {
-	$sql .= " AND EXISTS (SELECT 1 FROM ".MAIN_DB_PREFIX."diamantutils_transfo_det as dp";
-	$sql .= " INNER JOIN ".MAIN_DB_PREFIX."product as p ON p.rowid = dp.fk_product";
-	$sql .= " WHERE dp.fk_transfo = t.rowid".natural_search(array('p.ref', 'p.label'), $search_product).")";
+// Produit consommé / produit (recherche sur ref ou libellé)
+foreach (array('IN' => $search_product_in, 'OUT' => $search_product_out) as $direction => $search) {
+	if ($search) {
+		$sql .= " AND EXISTS (SELECT 1 FROM ".MAIN_DB_PREFIX."diamantutils_transfo_det as dp";
+		$sql .= " INNER JOIN ".MAIN_DB_PREFIX."product as p ON p.rowid = dp.fk_product";
+		$sql .= " WHERE dp.fk_transfo = t.rowid AND dp.direction = '".$db->escape($direction)."'".natural_search(array('p.ref', 'p.label'), $search).")";
+	}
 }
 if ($search_batch) {
 	$sql .= " AND EXISTS (SELECT 1 FROM ".MAIN_DB_PREFIX."diamantutils_transfo_det as dt";
@@ -161,7 +166,7 @@ $param = '';
 if ($limit > 0 && $limit != $conf->liste_limit) {
 	$param .= '&limit='.((int) $limit);
 }
-foreach (array('search_ref', 'search_type', 'search_product', 'search_batch', 'search_order', 'search_status') as $key) {
+foreach (array('search_ref', 'search_type', 'search_product_in', 'search_product_out', 'search_batch', 'search_order', 'search_status') as $key) {
 	if ($$key !== '' && $$key !== null) {
 		$param .= '&'.$key.'='.urlencode((string) $$key);
 	}
@@ -196,7 +201,8 @@ print '</div><div class="nowrapfordate">';
 print $form->selectDate($search_date_end ? $search_date_end : -1, 'search_date_end', 0, 0, 1, '', 1, 0, 0, '', '', '', '', 1, '', $langs->trans('to'));
 print '</div></td>';
 print '<td class="liste_titre">'.$form->selectarray('search_type', $types, $search_type, 1, 0, 0, '', 0, 0, 0, '', 'maxwidth100').'</td>';
-print '<td class="liste_titre"><input type="text" class="flat maxwidth100" name="search_product" value="'.dol_escape_htmltag($search_product).'"></td>';
+print '<td class="liste_titre"><input type="text" class="flat maxwidth100" name="search_product_in" value="'.dol_escape_htmltag($search_product_in).'"></td>';
+print '<td class="liste_titre"><input type="text" class="flat maxwidth100" name="search_product_out" value="'.dol_escape_htmltag($search_product_out).'"></td>';
 print '<td class="liste_titre"><input type="text" class="flat maxwidth100" name="search_batch" value="'.dol_escape_htmltag($search_batch).'"></td>';
 print '<td class="liste_titre"></td>';
 print '<td class="liste_titre"><input type="text" class="flat maxwidth100" name="search_order" value="'.dol_escape_htmltag($search_order).'"></td>';
@@ -204,6 +210,7 @@ print '<td class="liste_titre"></td>';
 $statuses = array(
 	Transformation::STATUS_DRAFT => $langs->trans('Draft'),
 	Transformation::STATUS_VALIDATED => $langs->trans('Validated'),
+	Transformation::STATUS_CONSUMED => $langs->trans('DiamantutilsStatusConsumed'),
 	Transformation::STATUS_CANCELED => $langs->trans('Canceled'),
 );
 print '<td class="liste_titre center">'.$form->selectarray('search_status', $statuses, $search_status, 1, 0, 0, '', 0, 0, 0, '', 'maxwidth100').'</td>';
@@ -215,11 +222,12 @@ print '<tr class="liste_titre">';
 print_liste_field_titre('Ref', $_SERVER['PHP_SELF'], 't.ref', '', $param, '', $sortfield, $sortorder);
 print_liste_field_titre('DateCreation', $_SERVER['PHP_SELF'], 't.date_creation', '', $param, '', $sortfield, $sortorder, 'center ');
 print_liste_field_titre('Type', $_SERVER['PHP_SELF'], 't.type', '', $param, '', $sortfield, $sortorder);
-print_liste_field_titre('Products', $_SERVER['PHP_SELF'], '', '', $param, '', $sortfield, $sortorder);
+print_liste_field_titre('DiamantutilsConsumedProducts', $_SERVER['PHP_SELF'], '', '', $param, '', $sortfield, $sortorder);
+print_liste_field_titre('DiamantutilsProducedProducts', $_SERVER['PHP_SELF'], '', '', $param, '', $sortfield, $sortorder);
 print_liste_field_titre('Batch', $_SERVER['PHP_SELF'], '', '', $param, '', $sortfield, $sortorder);
 print_liste_field_titre('Warehouse', $_SERVER['PHP_SELF'], 'e.ref', '', $param, '', $sortfield, $sortorder);
 print_liste_field_titre('DiamantutilsCustomerOrder', $_SERVER['PHP_SELF'], 'c.ref', '', $param, '', $sortfield, $sortorder);
-print_liste_field_titre('DateValidation', $_SERVER['PHP_SELF'], 't.date_valid', '', $param, '', $sortfield, $sortorder, 'center ');
+print_liste_field_titre('DiamantutilsDateConsume', $_SERVER['PHP_SELF'], 't.date_consume', '', $param, '', $sortfield, $sortorder, 'center ');
 print_liste_field_titre('Status', $_SERVER['PHP_SELF'], 't.status', '', $param, '', $sortfield, $sortorder, 'center ');
 print_liste_field_titre('', $_SERVER['PHP_SELF'], '', '', $param, '', $sortfield, $sortorder, 'maxwidthsearch ');
 print '</tr>';
@@ -269,13 +277,15 @@ foreach ($records as $obj) {
 	print '<td class="center">'.dol_print_date($db->jdate($obj->date_creation), 'dayhour').'</td>';
 	print '<td>'.dol_escape_htmltag($types[$obj->type] ?? $obj->type).'</td>';
 
-	// Produits et lots : consommés → produits
-	foreach (array('products', 'batches') as $kind) {
-		$in = (isset($details[$obj->rowid][$kind]['IN']) ? implode(', ', $details[$obj->rowid][$kind]['IN']) : '');
-		$out = (isset($details[$obj->rowid][$kind]['OUT']) ? implode(', ', $details[$obj->rowid][$kind]['OUT']) : '');
-		$text = $in.($out !== '' ? ' → '.$out : '');
+	// Produits consommés, produits produits, puis lots : consommés → produits
+	foreach (array('IN', 'OUT') as $direction) {
+		$text = (isset($details[$obj->rowid]['products'][$direction]) ? implode(', ', $details[$obj->rowid]['products'][$direction]) : '');
 		print '<td class="tdoverflowmax200" title="'.dol_escape_htmltag($text).'">'.dol_escape_htmltag($text).'</td>';
 	}
+	$in = (isset($details[$obj->rowid]['batches']['IN']) ? implode(', ', $details[$obj->rowid]['batches']['IN']) : '');
+	$out = (isset($details[$obj->rowid]['batches']['OUT']) ? implode(', ', $details[$obj->rowid]['batches']['OUT']) : '');
+	$text = $in.($out !== '' ? ' → '.$out : '');
+	print '<td class="tdoverflowmax200" title="'.dol_escape_htmltag($text).'">'.dol_escape_htmltag($text).'</td>';
 
 	print '<td class="tdoverflowmax150">';
 	if ($obj->fk_warehouse > 0) {
@@ -290,14 +300,14 @@ foreach ($records as $obj) {
 		print '<a href="'.DOL_URL_ROOT.'/commande/card.php?id='.((int) $obj->fk_commande).'">'.img_picto('', 'order', 'class="pictofixedwidth"').dol_escape_htmltag($obj->order_ref).'</a>';
 	}
 	print '</td>';
-	print '<td class="center">'.dol_print_date($db->jdate($obj->date_valid), 'dayhour').'</td>';
+	print '<td class="center">'.dol_print_date($db->jdate($obj->date_consume), 'dayhour').'</td>';
 	print '<td class="center">'.$object->getLibStatut(5).'</td>';
 	print '<td></td>';
 	print '</tr>';
 }
 
 if (empty($records)) {
-	print '<tr><td colspan="10"><span class="opacitymedium">'.$langs->trans('NoRecordFound').'</span></td></tr>';
+	print '<tr><td colspan="11"><span class="opacitymedium">'.$langs->trans('NoRecordFound').'</span></td></tr>';
 }
 
 print '</table>';

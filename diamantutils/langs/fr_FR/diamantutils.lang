@@ -115,3 +115,5 @@ DiamantutilsPlannedUnitCost = Coût unitaire prévu des sorties
 DiamantutilsPlannedUnitCostDesc = PMP actuel des entrées réparti sur les quantités produites, la perte étant portée par les sorties
 DiamantutilsDateConsume = Date de consommation
 DiamantutilsCannotConsumeStock = Consommation impossible : au moins un lot passerait en stock négatif (ligne en rouge). Le stock a pu bouger depuis la validation.
+DiamantutilsConsumedProducts = Produit(s) consommé(s)
+DiamantutilsProducedProducts = Produit(s) produit(s)
