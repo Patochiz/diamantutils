@@ -142,6 +142,18 @@ class modDiamantutils extends DolibarrModules
 			$this->db->query("ALTER TABLE ".MAIN_DB_PREFIX."diamantutils_transfo ADD COLUMN ".$column);
 		}
 
+		// Option produit « Lot = longueur » : active la saisie pièces × longueur
+		require_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
+		$extrafields = new ExtraFields($this->db);
+		$extrafields->fetch_name_optionals_label('product');
+		if (empty($extrafields->attributes['product']['label']['diamantutils_lotlongueur'])) {
+			$result = $extrafields->addExtraField('diamantutils_lotlongueur', 'DiamantutilsLotLongueur', 'boolean', 1000, '', 'product', 0, 0, '', '', 1, '', '1', 'DiamantutilsLotLongueurHelp', '', '', 'diamantutils@diamantutils', 'isModEnabled("diamantutils")');
+			if ($result < 0) {
+				$this->error = $extrafields->error;
+				return -1;
+			}
+		}
+
 		return $this->_init(array(), $options);
 	}
 

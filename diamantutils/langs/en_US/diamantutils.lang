@@ -89,3 +89,8 @@ DiamantutilsCancelOrder = Cancel order
 DiamantutilsConfirmCancelOrder = Cancel order %s? No stock movement was made.
 DiamantutilsConfirmCancelConsumed = Cancel order %s? Reverse stock movements will be created.
 DiamantutilsErrorCannotCancel = This order cannot be canceled.
+DiamantutilsLotLongueur = Lot = length (DiamantUtils)
+DiamantutilsLotLongueurHelp = Check if the lot names of this product carry the piece length (e.g. Longueur 4000mm). Transformation orders are then entered as pieces × length. Leave unchecked for a delivery, bath or shade lot.
+DiamantutilsLotLongueurProducts = Products entered as pieces × length
+DiamantutilsLotLongueurProductsDesc = Products whose « Lot = length (DiamantUtils) » option is checked on the product card. For a surface unit, the width must also be filled in.
+DiamantutilsNoWidthShort = Missing width

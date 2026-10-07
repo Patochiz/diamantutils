@@ -360,8 +360,8 @@ class Transformation extends CommonObject
 
 		$batch = trim((string) $batch);
 		if ($direction == self::DIRECTION_IN) {
-			// Ligne consommée : la longueur vient du lot
-			$length_mm = diamantutils_lot_length($batch);
+			// Ligne consommée : la longueur vient du lot, seulement en mode longueur
+			$length_mm = (diamantutils_is_profile($info) ? diamantutils_lot_length($batch) : null);
 		}
 		$computed = diamantutils_compute_line($info, $nb_pieces, $length_mm, $qty);
 
@@ -466,7 +466,11 @@ class Transformation extends CommonObject
 			if (empty($info)) {
 				continue;
 			}
-			$length = ($line->direction == self::DIRECTION_IN ? diamantutils_lot_length($line->batch) : $line->length_mm);
+			if ($line->direction == self::DIRECTION_IN) {
+				$length = (diamantutils_is_profile($info) ? diamantutils_lot_length($line->batch) : null);
+			} else {
+				$length = $line->length_mm;
+			}
 			$computed = diamantutils_compute_line($info, $line->nb_pieces, $length, $line->qty);
 			if ((string) price2num($computed['qty'], 'MS') !== (string) price2num($line->qty, 'MS')
 				|| $computed['length_mm'] != $line->length_mm || $computed['nb_pieces'] != $line->nb_pieces) {

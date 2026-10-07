@@ -56,13 +56,17 @@ function diamantutils_lot_name($length_mm)
  * et mode de saisie.
  *
  * Modes de saisie :
- * - 'surface' : unité de surface + largeur renseignée → nb × longueur mm ;
- * - 'size'    : unité de longueur → nb × longueur mm ;
+ * - 'surface' : option « Lot = longueur » cochée + unité de surface + largeur renseignée
+ *               → nb × longueur mm ;
+ * - 'size'    : option « Lot = longueur » cochée + unité de longueur → nb × longueur mm ;
  * - 'qty'     : unité de type quantité (pièce…) → nb pièces ;
  * - 'direct'  : saisie directe de la quantité.
  *
  * 'factor' = quantité (dans l'unité du produit) d'une pièce de 1 mm, pour les modes
  * 'surface' et 'size'. Quantité d'une ligne = nb × longueur × factor.
+ *
+ * Hors option « Lot = longueur », le nom du lot est libre (livraison, bain, teinte…) :
+ * il n'est jamais interprété comme une longueur.
  *
  * @param	DoliDB	$db				Base de données
  * @param	int		$fk_product		Id produit
@@ -114,6 +118,7 @@ function diamantutils_product_info($db, $fk_product)
 		'mode' => 'direct',
 		'factor' => null,
 		'nowidth' => false,
+		'lotlength' => diamantutils_product_lotlength($db, $fk_product),
 	);
 
 	// Largeur utile en mètres (champs natifs width + width_units, scale -3 = mm, -2 = cm, 0 = m)
@@ -143,7 +148,7 @@ function diamantutils_product_info($db, $fk_product)
 	$scale = $info['unit_scale'];
 	$scaleok = ($scale !== null && $scale < 80);
 
-	if ($info['unit_type'] == 'surface' && $scaleok) {
+	if ($info['lotlength'] && $info['unit_type'] == 'surface' && $scaleok) {
 		if ($info['width_m'] > 0) {
 			// m² d'une pièce de 1 mm, converti dans l'unité du produit (m², dm²…)
 			$info['mode'] = 'surface';
@@ -151,7 +156,7 @@ function diamantutils_product_info($db, $fk_product)
 		} else {
 			$info['nowidth'] = true;
 		}
-	} elseif ($info['unit_type'] == 'size' && $scaleok) {
+	} elseif ($info['lotlength'] && $info['unit_type'] == 'size' && $scaleok) {
 		$info['mode'] = 'size';
 		$info['factor'] = 0.001 / pow(10, $scale);
 	} elseif ($info['unit_type'] == 'qty') {
@@ -160,6 +165,42 @@ function diamantutils_product_info($db, $fk_product)
 
 	$cache[$fk_product] = $info;
 	return $info;
+}
+
+/**
+ * Option produit « Lot = longueur » (extrafield diamantutils_lotlongueur)
+ *
+ * @param	DoliDB	$db				Base de données
+ * @param	int		$fk_product		Id produit
+ * @return	bool
+ */
+function diamantutils_product_lotlength($db, $fk_product)
+{
+	static $hasfield = null;
+
+	if ($hasfield === null) {
+		$hasfield = false;
+		$sql = "SELECT COUNT(*) as nb FROM ".MAIN_DB_PREFIX."extrafields";
+		$sql .= " WHERE name = 'diamantutils_lotlongueur' AND elementtype = 'product'";
+		$resql = $db->query($sql);
+		if ($resql) {
+			$obj = $db->fetch_object($resql);
+			$hasfield = ($obj && $obj->nb > 0);
+			$db->free($resql);
+		}
+	}
+	if (!$hasfield) {
+		return false;
+	}
+
+	$sql = "SELECT diamantutils_lotlongueur FROM ".MAIN_DB_PREFIX."product_extrafields WHERE fk_object = ".((int) $fk_product);
+	$resql = $db->query($sql);
+	if (!$resql) {
+		return false;
+	}
+	$obj = $db->fetch_object($resql);
+	$db->free($resql);
+	return ($obj && !empty($obj->diamantutils_lotlongueur));
 }
 
 /**
@@ -234,18 +275,15 @@ function diamantutils_compute_line($info, $nb_pieces, $length_mm, $qty)
 function diamantutils_lot_pieces($info, $batch, $qty)
 {
 	$res = array('pieces' => null, 'length' => null, 'multiple' => true);
-	if (empty($info)) {
+	// Hors mode longueur, le nom du lot n'est jamais lu comme une longueur
+	if (!diamantutils_is_profile($info)) {
 		return $res;
 	}
-	if ($info['mode'] == 'qty') {
-		$res['pieces'] = (float) $qty;
-	} elseif (diamantutils_is_profile($info)) {
-		$length = diamantutils_lot_length($batch);
-		$res['length'] = $length;
-		$pieceqty = diamantutils_piece_qty($info, $length);
-		if ($pieceqty > 0) {
-			$res['pieces'] = (float) $qty / $pieceqty;
-		}
+	$length = diamantutils_lot_length($batch);
+	$res['length'] = $length;
+	$pieceqty = diamantutils_piece_qty($info, $length);
+	if ($pieceqty > 0) {
+		$res['pieces'] = (float) $qty / $pieceqty;
 	}
 	if ($res['pieces'] !== null) {
 		$res['multiple'] = (abs($res['pieces'] - round($res['pieces'])) <= 0.01);
@@ -259,7 +297,7 @@ function diamantutils_lot_pieces($info, $batch, $qty)
  * @param	DoliDB	$db				Base de données
  * @param	int		$fk_product		Id produit
  * @param	int		$fk_warehouse	Id entrepôt
- * @return	array					Liste de array('batch', 'qty', 'pieces', 'length', 'multiple')
+ * @return	array					Liste de array('batch', 'qty', 'eatby', 'sellby', 'pieces', 'length', 'multiple')
  */
 function diamantutils_product_lots($db, $fk_product, $fk_warehouse)
 {
@@ -269,9 +307,10 @@ function diamantutils_product_lots($db, $fk_product, $fk_warehouse)
 		return $lots;
 	}
 
-	$sql = "SELECT pb.batch, SUM(pb.qty) as qty";
+	$sql = "SELECT pb.batch, SUM(pb.qty) as qty, MAX(pl.eatby) as eatby, MAX(pl.sellby) as sellby";
 	$sql .= " FROM ".MAIN_DB_PREFIX."product_batch as pb";
 	$sql .= " INNER JOIN ".MAIN_DB_PREFIX."product_stock as ps ON ps.rowid = pb.fk_product_stock";
+	$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."product_lot as pl ON pl.fk_product = ps.fk_product AND pl.batch = pb.batch";
 	$sql .= " WHERE ps.fk_product = ".((int) $fk_product);
 	$sql .= " AND ps.fk_entrepot = ".((int) $fk_warehouse);
 	$sql .= " GROUP BY pb.batch";
@@ -289,6 +328,8 @@ function diamantutils_product_lots($db, $fk_product, $fk_warehouse)
 		$lots[] = array(
 			'batch' => $obj->batch,
 			'qty' => $qty,
+			'eatby' => ($obj->eatby ? dol_print_date($db->jdate($obj->eatby), 'day') : ''),
+			'sellby' => ($obj->sellby ? dol_print_date($db->jdate($obj->sellby), 'day') : ''),
 			'pieces' => ($pieces['pieces'] === null ? null : (float) price2num($pieces['pieces'], 2)),
 			'length' => $pieces['length'],
 			'multiple' => $pieces['multiple'],
@@ -304,6 +345,41 @@ function diamantutils_product_lots($db, $fk_product, $fk_warehouse)
 		return $a['length'] <=> $b['length'];
 	});
 
+	return $lots;
+}
+
+/**
+ * Tous les lots connus d'un produit (llx_product_lot), en stock ou non
+ *
+ * @param	DoliDB	$db				Base de données
+ * @param	int		$fk_product		Id produit
+ * @return	array					Liste de array('batch', 'length') ; length seulement en mode longueur
+ */
+function diamantutils_product_all_lots($db, $fk_product)
+{
+	$lots = array();
+	$info = diamantutils_product_info($db, $fk_product);
+	if (empty($info)) {
+		return $lots;
+	}
+
+	$sql = "SELECT pl.batch FROM ".MAIN_DB_PREFIX."product_lot as pl";
+	$sql .= " WHERE pl.fk_product = ".((int) $fk_product);
+	$sql .= " AND pl.entity IN (".getEntity('productlot').")";
+	$sql .= " ORDER BY pl.batch";
+	$resql = $db->query($sql);
+	if (!$resql) {
+		dol_syslog(__FUNCTION__.' '.$db->lasterror(), LOG_ERR);
+		return $lots;
+	}
+	$profile = diamantutils_is_profile($info);
+	while ($obj = $db->fetch_object($resql)) {
+		$lots[] = array(
+			'batch' => $obj->batch,
+			'length' => ($profile ? diamantutils_lot_length($obj->batch) : null),
+		);
+	}
+	$db->free($resql);
 	return $lots;
 }
 

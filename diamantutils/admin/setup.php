@@ -12,6 +12,7 @@ if (!$res) {
 
 require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/product/class/html.formproduct.class.php';
+require_once DOL_DOCUMENT_ROOT.'/core/lib/product.lib.php';
 
 if (!$user->admin) {
 	accessforbidden();
@@ -89,6 +90,37 @@ print '</table>';
 print '<div class="center"><input type="submit" class="button button-save" value="'.$langs->trans('Save').'"></div>';
 
 print '</form>';
+
+// Produits saisis en pièces × longueur (option « Lot = longueur » cochée)
+print '<br>';
+print load_fiche_titre($langs->trans('DiamantutilsLotLongueurProducts'), '', 'product');
+print '<span class="opacitymedium">'.$langs->trans('DiamantutilsLotLongueurProductsDesc').'</span><br><br>';
+print '<table class="noborder centpercent">';
+print '<tr class="liste_titre"><td>'.$langs->trans('Product').'</td><td>'.$langs->trans('Unit').'</td><td>'.$langs->trans('Width').'</td></tr>';
+$nbproducts = 0;
+$sql = "SELECT p.rowid, p.ref, p.label, p.width, p.width_units, u.short_label as unit";
+$sql .= " FROM ".MAIN_DB_PREFIX."product as p";
+$sql .= " INNER JOIN ".MAIN_DB_PREFIX."product_extrafields as ef ON ef.fk_object = p.rowid";
+$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."c_units as u ON u.rowid = p.fk_unit";
+$sql .= " WHERE ef.diamantutils_lotlongueur = 1";
+$sql .= " AND p.entity IN (".getEntity('product').")";
+$sql .= " ORDER BY p.ref";
+$resql = $db->query($sql);
+if ($resql) {
+	while ($obj = $db->fetch_object($resql)) {
+		$nbproducts++;
+		print '<tr class="oddeven">';
+		print '<td><a href="'.DOL_URL_ROOT.'/product/card.php?id='.((int) $obj->rowid).'">'.img_picto('', 'product', 'class="pictofixedwidth"').dol_escape_htmltag($obj->ref).'</a> <span class="opacitymedium">'.dol_escape_htmltag($obj->label).'</span></td>';
+		print '<td>'.dol_escape_htmltag((string) $obj->unit).'</td>';
+		print '<td>'.($obj->width > 0 ? dol_escape_htmltag(price2num($obj->width).' '.measuringUnitString(0, 'size', $obj->width_units, 1)) : '<span class="warning">'.$langs->trans('DiamantutilsNoWidthShort').'</span>').'</td>';
+		print '</tr>';
+	}
+	$db->free($resql);
+}
+if (!$nbproducts) {
+	print '<tr class="oddeven"><td colspan="3"><span class="opacitymedium">'.$langs->trans('None').'</span></td></tr>';
+}
+print '</table>';
 
 llxFooter();
 $db->close();

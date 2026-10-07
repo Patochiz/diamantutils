@@ -89,3 +89,8 @@ DiamantutilsCancelOrder = Annuler l'ordre
 DiamantutilsConfirmCancelOrder = Annuler l'ordre %s ? Aucun mouvement de stock n'a été fait.
 DiamantutilsConfirmCancelConsumed = Annuler l'ordre %s ? Les mouvements de stock inverses seront créés.
 DiamantutilsErrorCannotCancel = Cet ordre ne peut pas être annulé.
+DiamantutilsLotLongueur = Lot = longueur (DiamantUtils)
+DiamantutilsLotLongueurHelp = Cochez si le nom des lots de ce produit porte la longueur de la pièce (ex. Longueur 4000mm). Les ordres de transformation se saisissent alors en pièces × longueur. Laissez décoché pour un lot de livraison, de bain ou de teinte.
+DiamantutilsLotLongueurProducts = Produits saisis en pièces × longueur
+DiamantutilsLotLongueurProductsDesc = Produits dont l'option « Lot = longueur (DiamantUtils) » est cochée sur la fiche produit. Pour une unité de surface, la largeur doit aussi être renseignée.
+DiamantutilsNoWidthShort = Largeur manquante
