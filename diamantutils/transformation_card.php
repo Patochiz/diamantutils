@@ -375,6 +375,7 @@ if ($editmode) {
 		if (!empty($info)) {
 			$info['lots'] = ($object->fk_warehouse > 0 ? diamantutils_product_lots($db, $pid, $object->fk_warehouse) : array());
 			$info['stock'] = ($object->fk_warehouse > 0 ? diamantutils_stock_qty($db, $pid, $object->fk_warehouse) : 0);
+			$info['alllots'] = diamantutils_product_all_lots($db, $pid);
 			$jsproducts[$pid] = $info;
 		}
 	}
@@ -394,13 +395,15 @@ if ($editmode) {
 	);
 	$jslangkeys = array(
 		'Product', 'Batch', 'Qty', 'Unit',
-		'DiamantutilsPieces', 'DiamantutilsLengthMm', 'DiamantutilsSearchProduct', 'DiamantutilsChooseLot',
-		'DiamantutilsLotNotMultiple', 'DiamantutilsStockOfLot', 'DiamantutilsNoLot', 'DiamantutilsNoWidth',
+		'DiamantutilsPieces', 'DiamantutilsLengthMm', 'DiamantutilsSearchProduct', 'DiamantutilsNoWidth',
+		'DiamantutilsLotNotMultiple', 'DiamantutilsNoLot', 'DiamantutilsNoBatch', 'DiamantutilsStock',
+		'DiamantutilsPiecesEq', 'DiamantutilsQtyToConsume', 'DiamantutilsNbToConsume', 'DiamantutilsEatSellBy',
+		'DiamantutilsNewLot', 'DiamantutilsNewLotName', 'DiamantutilsRemoveProduct', 'DiamantutilsChooseProductFirst',
 		'DiamantutilsToLoss', 'DiamantutilsToStock', 'DiamantutilsBalanceOk', 'DiamantutilsBalanceKo',
 		'DiamantutilsUnitsDiffer', 'DiamantutilsRemaining', 'DiamantutilsConsumed', 'DiamantutilsProduced',
-		'DiamantutilsLoss', 'DiamantutilsNeedInOut', 'DiamantutilsStockExceeded', 'DiamantutilsConfirmValidate',
+		'DiamantutilsLoss', 'DiamantutilsNeedInOut', 'DiamantutilsStockExceeded',
 		'DiamantutilsPlanReplace', 'DiamantutilsPlanNotProfile', 'DiamantutilsPlanShortage', 'DiamantutilsPlanDone',
-		'DiamantutilsPlanNoProduct', 'DiamantutilsLengthFromLot', 'DiamantutilsStockNone',
+		'DiamantutilsPlanNoProduct', 'DiamantutilsLengthFromLot',
 	);
 	foreach ($jslangkeys as $key) {
 		$jsconfig['lang'][$key] = $langs->transnoentitiesnoconv($key);
@@ -448,27 +451,29 @@ if ($editmode) {
 	}
 	print '<br>';
 
-	// Bloc Consommé
-	print load_fiche_titre($langs->trans('DiamantutilsConsumed'), '<a href="#" class="button smallpaddingimp" id="transfo-add-in">'.img_picto('', 'add', 'class="pictofixedwidth"').$langs->trans('DiamantutilsAddLine').'</a>', '');
-	print '<div class="div-table-responsive-no-min"><table class="noborder centpercent" id="transfo-table-IN"><thead></thead><tbody></tbody></table></div>';
+	// Bloc « À consommer » : produit → tableau de ses lots en stock → cocher
+	print load_fiche_titre($langs->trans('DiamantutilsToConsume'), '', '');
+	print '<div id="transfo-in-groups"></div>';
+	print '<a href="#" id="transfo-add-in">'.img_picto('', 'add', 'class="pictofixedwidth"').$langs->trans('DiamantutilsAddProductToConsume').'</a>';
 
-	// Bloc Produit + assistant de découpe
-	print '<br>';
-	print load_fiche_titre($langs->trans('DiamantutilsProduced'), '<a href="#" class="button smallpaddingimp" id="transfo-add-out">'.img_picto('', 'add', 'class="pictofixedwidth"').$langs->trans('DiamantutilsAddLine').'</a>', '');
-	print '<div class="div-table-responsive-no-min"><table class="noborder centpercent" id="transfo-table-OUT"><thead></thead><tbody></tbody></table></div>';
-
-	print '<div id="transfo-assistant" class="marginbottomonly margintoponly" style="display: none">';
+	// Bloc « À produire » + assistant de découpe
+	print '<br><br>';
+	print load_fiche_titre($langs->trans('DiamantutilsToProduce'), '', '');
+	print '<div id="transfo-assistant" class="marginbottomonly" style="display: none">';
 	print '<span class="opacitymedium">'.$langs->trans('DiamantutilsCutAssistant').' :</span> ';
 	print '<input type="text" class="flat width50 right" id="transfo-plan-nb" placeholder="N"> '.$langs->trans('DiamantutilsPiecesOf').' ';
 	print '<input type="text" class="flat width75 right" id="transfo-plan-len" placeholder="mm"> mm ';
 	print '<a href="#" class="button smallpaddingimp" id="transfo-plan-go">'.$langs->trans('DiamantutilsProposePlan').'</a>';
 	print ' <span id="transfo-plan-msg"></span>';
 	print '</div>';
+	print '<div class="div-table-responsive-no-min"><table class="noborder centpercent" id="transfo-table-OUT"><thead></thead><tbody></tbody></table></div>';
+	print '<a href="#" id="transfo-add-out">'.img_picto('', 'add', 'class="pictofixedwidth"').$langs->trans('DiamantutilsAddLineToProduce').'</a>';
 
 	// Bloc Reste / perte
-	print '<br>';
-	print load_fiche_titre($langs->trans('DiamantutilsRemainingLoss'), '<a href="#" class="button smallpaddingimp" id="transfo-add-loss">'.img_picto('', 'add', 'class="pictofixedwidth"').$langs->trans('DiamantutilsAddLine').'</a>', '');
+	print '<br><br>';
+	print load_fiche_titre($langs->trans('DiamantutilsRemainingLoss'), '', '');
 	print '<div class="div-table-responsive-no-min"><table class="noborder centpercent" id="transfo-table-LOSS"><thead></thead><tbody></tbody></table></div>';
+	print '<a href="#" id="transfo-add-loss">'.img_picto('', 'add', 'class="pictofixedwidth"').$langs->trans('DiamantutilsAddLoss').'</a>';
 
 	print '<div class="margintoponly" id="transfo-balance-block">';
 	print '<span id="transfo-balance"></span> ';
@@ -476,23 +481,27 @@ if ($editmode) {
 	print '<a href="#" class="button smallpaddingimp" id="transfo-rest-stock">'.$langs->trans('DiamantutilsRestToStock').'</a>';
 	print '</div>';
 
-	// Boutons
+	// Lignes envoyées : construites par le JS à l'envoi du formulaire
+	print '<div id="transfo-posted"></div>';
+
+	// Boutons du brouillon
 	print '<div class="center margintoponly">';
-	print '<input type="submit" class="button button-save" name="save" value="'.$langs->trans('DiamantutilsSaveDraft').'">';
-	print ' <input type="submit" class="button" name="dovalidate" id="transfo-validate" value="'.$langs->trans('Validate').'">';
-	print ' <input type="submit" class="button button-cancel" name="cancel" value="'.$langs->trans('Cancel').'" formnovalidate>';
+	print '<input type="submit" class="button button-save" name="save" value="'.$langs->trans('Save').'">';
+	print ' <input type="submit" class="button" name="dovalidate" id="transfo-validate" value="'.$langs->trans('DiamantutilsSaveAndValidate').'">';
+	if ($object->id > 0) {
+		print ' <a class="button butActionDelete" href="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'&action=delete&token='.newToken().'">'.$langs->trans('Delete').'</a>';
+	} else {
+		print ' <input type="submit" class="button button-cancel" name="cancel" value="'.$langs->trans('Cancel').'" formnovalidate>';
+	}
 	print '</div>';
 
 	print '</form>';
 
 	print '<script>window.diamantutilsTransfo = '.json_encode($jsconfig, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT).';</script>';
-	print '<script src="'.dol_buildpath('/diamantutils/js/transformation.js', 1).'?v=2.0"></script>';
+	print '<script src="'.dol_buildpath('/diamantutils/js/transformation.js', 1).'?v=2.1"></script>';
 
 	if ($object->id > 0) {
 		print dol_get_fiche_end();
-		print '<div class="tabsAction">';
-		print dolGetButtonAction('', $langs->trans('Delete'), 'delete', $_SERVER['PHP_SELF'].'?id='.$object->id.'&action=delete&token='.newToken(), '', $permwrite);
-		print '</div>';
 	}
 } elseif ($object->id > 0) {
 	/*

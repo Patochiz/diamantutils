@@ -3,7 +3,7 @@
  * Endpoint AJAX de l'écran de transformation (lecture seule, réponses JSON)
  *
  * action=searchproduct&term=...                    → produits correspondants
- * action=product&id=...&fk_warehouse=...           → infos produit + lots disponibles
+ * action=product&id=...&fk_warehouse=...           → infos produit, lots en stock, tous les lots connus
  * action=orderlines&fk_commande=...                → lignes d'une commande client
  */
 
@@ -85,6 +85,7 @@ if ($action == 'searchproduct') {
 		$out = $info;
 		$out['lots'] = ($fk_warehouse > 0 ? diamantutils_product_lots($db, $fk_product, $fk_warehouse) : array());
 		$out['stock'] = ($fk_warehouse > 0 ? diamantutils_stock_qty($db, $fk_product, $fk_warehouse) : 0);
+		$out['alllots'] = diamantutils_product_all_lots($db, $fk_product);
 	}
 } elseif ($action == 'orderlines') {
 	// Lignes de produit d'une commande client
