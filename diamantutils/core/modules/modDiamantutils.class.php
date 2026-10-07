@@ -18,10 +18,10 @@ class modDiamantutils extends DolibarrModules
 		$this->family = 'custom';
 		$this->module_position = '90';
 		$this->name = preg_replace('/^mod/i', '', get_class($this));
-		$this->description = "Module interne Diamant Industrie : transformation de stock par lots (découpe, peinture, changement d'unité)";
+		$this->description = "Module interne Diamant Industrie : ordres de transformation de stock par lots (découpe, peinture, changement d'unité), dans le menu GPAO";
 		$this->descriptionlong = "Transformation de stock par lots : consommation de N lots et production de M lots (découpe de profilés, peinture, changement d'unité), avec saisie en pièces × longueur, contrôle d'équilibre, gestion des restes et des pertes, calcul du coût et traçabilité des mouvements de stock.";
 		$this->editor_name = 'Diamant Industrie';
-		$this->version = '2.0';
+		$this->version = '2.1';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'generic';
 
