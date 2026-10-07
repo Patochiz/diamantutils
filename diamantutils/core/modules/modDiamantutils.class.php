@@ -1,7 +1,7 @@
 <?php
 /**
  * Descripteur du module DiamantUtils
- * Module custom Diamant Industrie — fonctionnalités internes regroupées et activables individuellement
+ * Module custom Diamant Industrie — fonctionnalités internes regroupées
  */
 
 require_once DOL_DOCUMENT_ROOT.'/core/modules/DolibarrModules.class.php';
@@ -18,66 +18,147 @@ class modDiamantutils extends DolibarrModules
 		$this->family = 'custom';
 		$this->module_position = '90';
 		$this->name = preg_replace('/^mod/i', '', get_class($this));
-		$this->description = "Module interne Diamant Industrie : fonctionnalités diverses regroupées et activables individuellement";
-		$this->descriptionlong = "Regroupe les développements internes Diamant Industrie (ex. contrôle de facturation multi-commandes) sous un seul module avec options activables.";
+		$this->description = "Module interne Diamant Industrie : ordres de transformation de stock par lots (découpe, peinture, changement d'unité), dans le menu GPAO";
+		$this->descriptionlong = "Transformation de stock par lots : consommation de N lots et production de M lots (découpe de profilés, peinture, changement d'unité), avec saisie en pièces × longueur, contrôle d'équilibre, gestion des restes et des pertes, calcul du coût et traçabilité des mouvements de stock.";
 		$this->editor_name = 'Diamant Industrie';
-		$this->version = '1.4';
+		$this->version = '2.1';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'generic';
 
 		$this->module_parts = array(
-			'triggers' => 1,
-			'hooks' => array('invoicecard'),
+			'hooks' => array(),
 		);
 
 		$this->dirs = array();
 
 		$this->const = array(
 			0 => array(
-				'DIAMANTUTILS_INVOICE_CHECK_MODE',
+				'DIAMANTUTILS_TRANSFO_LOT_FORMAT',
 				'chaine',
-				'AFFICHER',
-				'Mode de contrôle du déjà-facturé lors de la création de facture depuis commande(s) : MASQUER, AFFICHER, AFFICHER_BLOQUER, DESACTIVE',
+				'Longueur %dmm',
+				'Format du nom de lot généré par une transformation (sprintf avec la longueur en mm)',
 				0,
 				'current',
-				1
+				0
 			),
 		);
+
+		// Le menu GPAO n'est affiché que si le module MRP (ou BOM) est actif
+		$this->depends = array('modStock', 'modMrp');
 
 		$this->config_page_url = array('setup.php@diamantutils');
 
 		$this->langfiles = array('diamantutils@diamantutils');
 
+		// Droits
 		$this->rights = array();
+		$r = 0;
+		$this->rights[$r][0] = $this->numero.'01';
+		$this->rights[$r][1] = 'Lire les transformations de stock';
+		$this->rights[$r][2] = 'r';
+		$this->rights[$r][3] = 0;
+		$this->rights[$r][4] = 'transformation';
+		$this->rights[$r][5] = 'read';
+		$r++;
+		$this->rights[$r][0] = $this->numero.'02';
+		$this->rights[$r][1] = 'Créer et valider les transformations de stock';
+		$this->rights[$r][2] = 'w';
+		$this->rights[$r][3] = 0;
+		$this->rights[$r][4] = 'transformation';
+		$this->rights[$r][5] = 'write';
+		$r++;
+		$this->rights[$r][0] = $this->numero.'03';
+		$this->rights[$r][1] = 'Annuler une transformation de stock validée';
+		$this->rights[$r][2] = 'd';
+		$this->rights[$r][3] = 0;
+		$this->rights[$r][4] = 'transformation';
+		$this->rights[$r][5] = 'cancel';
+		$r++;
 
+		// Menus gauche dans le menu haut GPAO (eldy : mainmenu=mrp)
 		$this->menu = array();
+		$r = 0;
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=mrp',
+			'type' => 'left',
+			'titre' => 'DiamantutilsTransformations',
+			'prefix' => img_picto('', 'stock', 'class="paddingright pictofixedwidth"'),
+			'mainmenu' => 'mrp',
+			'leftmenu' => 'diamantutils_ot',
+			'url' => '/diamantutils/transformation_list.php?mainmenu=mrp&leftmenu=diamantutils_ot',
+			'langs' => 'diamantutils@diamantutils',
+			'position' => 1000 + $r,
+			'enabled' => 'isModEnabled("diamantutils")',
+			'perms' => '$user->hasRight("diamantutils", "transformation", "read")',
+			'target' => '',
+			'user' => 2,
+		);
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=mrp,fk_leftmenu=diamantutils_ot',
+			'type' => 'left',
+			'titre' => 'DiamantutilsNewTransformation',
+			'mainmenu' => 'mrp',
+			'leftmenu' => 'diamantutils_ot_new',
+			'url' => '/diamantutils/transformation_card.php?action=create&mainmenu=mrp&leftmenu=diamantutils_ot',
+			'langs' => 'diamantutils@diamantutils',
+			'position' => 1000 + $r,
+			'enabled' => 'isModEnabled("diamantutils")',
+			'perms' => '$user->hasRight("diamantutils", "transformation", "write")',
+			'target' => '',
+			'user' => 2,
+		);
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=mrp,fk_leftmenu=diamantutils_ot',
+			'type' => 'left',
+			'titre' => 'List',
+			'mainmenu' => 'mrp',
+			'leftmenu' => 'diamantutils_ot_list',
+			'url' => '/diamantutils/transformation_list.php?mainmenu=mrp&leftmenu=diamantutils_ot',
+			'langs' => 'diamantutils@diamantutils',
+			'position' => 1000 + $r,
+			'enabled' => 'isModEnabled("diamantutils")',
+			'perms' => '$user->hasRight("diamantutils", "transformation", "read")',
+			'target' => '',
+			'user' => 2,
+		);
 	}
 
 	public function init($options = '')
 	{
-		global $conf;
-
 		require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
 
-		// Nettoyage des anciennes constantes de hook (entity=0 et entity courante)
-		// pour éviter qu'une valeur périmée écrase la nouvelle lors du chargement
-		$sql = "DELETE FROM ".MAIN_DB_PREFIX."const WHERE name IN ("
-			."'".$this->db->escape('DIAMANTUTILS_HOOKS')."',"
-			."'".$this->db->escape('MAIN_MODULE_DIAMANTUTILS_HOOKS')."'"
-			.")";
+		// Purge de l'ancienne constante du contrôle de facturation (fonction abandonnée en v2.0)
+		$sql = "DELETE FROM ".MAIN_DB_PREFIX."const WHERE name = '".$this->db->escape('DIAMANTUTILS_INVOICE_CHECK_MODE')."'";
 		$this->db->query($sql);
+
+		// Création des tables de transformation (fichiers sql/ du module)
+		$result = $this->_load_tables('/diamantutils/sql/');
+		if ($result < 0) {
+			return -1;
+		}
+
+		// Table créée en v2.0 : colonnes ajoutées en v2.1 (erreur « colonne existante » ignorée)
+		foreach (array('date_consume datetime NULL', 'fk_user_consume integer NULL') as $column) {
+			$this->db->query("ALTER TABLE ".MAIN_DB_PREFIX."diamantutils_transfo ADD COLUMN ".$column);
+		}
+
+		// Option produit « Lot = longueur » : active la saisie pièces × longueur
+		require_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
+		$extrafields = new ExtraFields($this->db);
+		$extrafields->fetch_name_optionals_label('product');
+		if (empty($extrafields->attributes['product']['label']['diamantutils_lotlongueur'])) {
+			$result = $extrafields->addExtraField('diamantutils_lotlongueur', 'DiamantutilsLotLongueur', 'boolean', 1000, '', 'product', 0, 0, '', '', 1, '', '1', 'DiamantutilsLotLongueurHelp', '', '', 'diamantutils@diamantutils', 'isModEnabled("diamantutils")');
+			if ($result < 0) {
+				$this->error = $extrafields->error;
+				return -1;
+			}
+		}
 
 		return $this->_init(array(), $options);
 	}
 
 	public function remove($options = '')
 	{
-		$sql = "DELETE FROM ".MAIN_DB_PREFIX."const WHERE name IN ("
-			."'".$this->db->escape('DIAMANTUTILS_HOOKS')."',"
-			."'".$this->db->escape('MAIN_MODULE_DIAMANTUTILS_HOOKS')."'"
-			.")";
-		$this->db->query($sql);
-
 		return $this->_remove(array(), $options);
 	}
 }

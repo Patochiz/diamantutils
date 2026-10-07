@@ -1,20 +1,119 @@
 Module510125Name = DiamantUtils
-Module510125Desc = Fonctionnalités internes Diamant Industrie regroupées et activables individuellement
+Module510125Desc = Ordres de transformation de stock par lots (découpe, peinture, changement d'unité)
 
 # Page de configuration
 DiamantutilsSetupTitle = DiamantUtils - Configuration
 DiamantutilsFeature = Fonctionnalité
 DiamantutilsSetting = Réglage
 DiamantutilsConfigUpdated = Configuration mise à jour
-DiamantutilsInvoiceCheckLabel = Contrôle du déjà-facturé sur les lignes de commande
-DiamantutilsInvoiceCheckDesc = Appliqué à chaque création de facture depuis une ou plusieurs commandes (unitaire ou groupée). Les factures liées sont affichées dans le champ complémentaire "Factures".
-DiamantutilsModeDisabled = Désactivé — aucun contrôle
-DiamantutilsModeHide = Masquer — retire silencieusement les lignes déjà entièrement facturées
-DiamantutilsModeShow = Afficher — liste les factures liées dans le champ complémentaire, sans bloquer
-DiamantutilsModeShowBlock = Afficher + Bloquer — liste les factures liées et refuse la création si une ligne dépasse le reliquat
+DiamantutilsTransfoDefaultWarehouse = Entrepôt par défaut des transformations
+DiamantutilsTransfoDefaultWarehouseDesc = Proposé à la création d'une nouvelle transformation.
+DiamantutilsTransfoLotFormat = Format du nom de lot généré
+DiamantutilsTransfoLotFormatDesc = Doit contenir une seule fois %s, remplacé par la longueur en mm. Défaut : %s
+DiamantutilsLotFormatInvalid = Format de lot invalide : il doit contenir exactement un %s et aucun autre code de format.
 
-# Messages du trigger
-DiamantutilsLineExceedsRemaining = Ligne '%s' : quantité facturée (%s) supérieure au reliquat disponible (%s) — vérifiez les factures déjà émises pour cette commande avant de valider.
-DiamantutilsLineDeleteError = Erreur lors de la suppression de la ligne de facture (id=%s)
-DiamantutilsTotalInvoiced = MONTANT TOTAL FACTURÉ = %s sur %s
-DiamantutilsRemainingToInvoice = Reste à facturer %s
+# Transformations
+DiamantutilsTransformation = Ordre de transformation
+DiamantutilsTransformations = Ordres de transformation
+DiamantutilsNewTransformation = Nouvel ordre
+DiamantutilsTypeDECOUPE = Découpe
+DiamantutilsTypePEINTURE = Peinture
+DiamantutilsTypeAUTRE = Autre
+DiamantutilsCustomerOrder = Commande client
+DiamantutilsConsumed = Consommé
+DiamantutilsProduced = Produit
+DiamantutilsLoss = Perte
+DiamantutilsRemainingLoss = Reste / perte
+DiamantutilsRemaining = Reste
+DiamantutilsPieces = Pièces
+DiamantutilsPiecesOf = pièces de
+DiamantutilsLengthMm = Longueur (mm)
+DiamantutilsLengthFromLot = Longueur lue sur le nom du lot
+DiamantutilsUnitCost = Coût unitaire
+DiamantutilsMovement = Mouvement
+DiamantutilsStockMovements = Mouvements de stock
+DiamantutilsSeeMovements = Voir les mouvements de stock %s
+DiamantutilsSearchProduct = Rechercher un produit…
+DiamantutilsNoLot = Aucun lot en stock dans cet entrepôt
+DiamantutilsLotNotMultiple = stock du lot non multiple de la pièce
+DiamantutilsNoWidth = Produit en m² sans largeur : saisie directe. Renseignez la largeur sur la fiche produit pour saisir en pièces × longueur.
+DiamantutilsStockExceeded = Quantité supérieure au stock du lot
+DiamantutilsToLoss = Déclarer cette ligne en perte
+DiamantutilsToStock = Remettre cette ligne en stock
+DiamantutilsRestToLoss = Déclarer le reste en perte
+DiamantutilsRestToStock = Remettre le reste en stock
+DiamantutilsBalanceOk = Équilibré
+DiamantutilsBalanceKo = Non équilibré
+DiamantutilsUnitsDiffer = Unités différentes : pas de contrôle de somme.
+DiamantutilsWarningUnitsDiffer = Les produits consommés et produits n'ont pas la même unité : l'équilibre des quantités n'est pas contrôlé.
+DiamantutilsNeedInOut = Il faut au moins une ligne consommée et une ligne produite.
+DiamantutilsCutAssistant = Assistant de découpe
+DiamantutilsProposePlan = Proposer un plan
+DiamantutilsPlanReplace = Le plan remplace toutes les lignes saisies. Continuer ?
+DiamantutilsPlanNotProfile = L'assistant nécessite un produit en mode « Lot = longueur ».
+DiamantutilsPlanNoProduct = Choisissez d'abord le produit consommé.
+DiamantutilsPlanShortage = Stock insuffisant : {n} pièce(s) non placée(s).
+DiamantutilsPlanDone = Plan proposé : ajustez les lignes si besoin (restes en stock ou en perte).
+DiamantutilsDeleteTransfo = Supprimer l'ordre
+DiamantutilsConfirmDeleteTransfo = Supprimer le brouillon %s ?
+DiamantutilsCancellationOf = Annulation %s
+
+# Erreurs
+DiamantutilsErrorNotDraft = L'ordre n'est plus en brouillon.
+DiamantutilsErrorNotValidated = L'ordre doit être au statut validé.
+DiamantutilsErrorProductNotFound = Produit introuvable (id %s).
+DiamantutilsErrorLineQty = Ligne %s (%s) : la quantité doit être strictement positive.
+DiamantutilsErrorBatchRequired = Ligne %s (%s) : le lot est obligatoire pour ce produit.
+DiamantutilsErrorNoLineIn = Il faut au moins une ligne consommée.
+DiamantutilsErrorNoLineOut = Il faut au moins une ligne produite.
+DiamantutilsErrorBalance = Ordre non équilibré : consommé %s ≠ produit %s + perte %s (%s).
+DiamantutilsErrorStockInsufficient = Stock insuffisant pour %s, lot %s : %s en stock, %s à consommer.
+DiamantutilsErrorCancelStock = Annulation impossible : le lot %s / %s n'a plus que %s en stock pour %s à retirer (lot déjà expédié ou retransformé).
+DiamantutilsErrorMovement = Erreur lors du mouvement de stock du produit %s, lot %s.
+
+# Ordres de transformation (v2.1)
+DiamantutilsOrder = Ordre de transformation
+DiamantutilsStatusConsumed = Consommé
+DiamantutilsOrderValidated = Ordre %s validé : aucun mouvement de stock tant qu'il n'est pas consommé.
+DiamantutilsOrderConsumed = Ordre %s consommé : mouvements de stock effectués.
+DiamantutilsOrderCanceled = Ordre %s annulé.
+DiamantutilsConsume = Consommer
+DiamantutilsConfirmConsume = Consommer l'ordre %s ? Les mouvements de stock seront effectués.
+DiamantutilsCancelOrder = Annuler l'ordre
+DiamantutilsConfirmCancelOrder = Annuler l'ordre %s ? Aucun mouvement de stock n'a été fait.
+DiamantutilsConfirmCancelConsumed = Annuler l'ordre %s ? Les mouvements de stock inverses seront créés.
+DiamantutilsErrorCannotCancel = Cet ordre ne peut pas être annulé.
+DiamantutilsLotLongueur = Lot = longueur (DiamantUtils)
+DiamantutilsLotLongueurHelp = Cochez si le nom des lots de ce produit porte la longueur de la pièce (ex. Longueur 4000mm). Les ordres de transformation se saisissent alors en pièces × longueur. Laissez décoché pour un lot de livraison, de bain ou de teinte.
+DiamantutilsLotLongueurProducts = Produits saisis en pièces × longueur
+DiamantutilsLotLongueurProductsDesc = Produits dont l'option « Lot = longueur (DiamantUtils) » est cochée sur la fiche produit. Pour une unité de surface, la largeur doit aussi être renseignée.
+DiamantutilsNoWidthShort = Largeur manquante
+DiamantutilsToConsume = À consommer
+DiamantutilsToProduce = À produire
+DiamantutilsAddProductToConsume = Autre produit à consommer
+DiamantutilsAddLineToProduce = Ligne à produire
+DiamantutilsAddLoss = Ligne de perte
+DiamantutilsSaveAndValidate = Enregistrer et valider
+DiamantutilsNoBatch = sans lot
+DiamantutilsStock = Stock
+DiamantutilsPiecesEq = Pièces éq.
+DiamantutilsQtyToConsume = Quantité à consommer
+DiamantutilsNbToConsume = Nb de pièces
+DiamantutilsEatSellBy = DLC / DLUO
+DiamantutilsNewLot = + Nouveau lot
+DiamantutilsNewLotName = Nom du nouveau lot
+DiamantutilsRemoveProduct = Retirer ce produit
+DiamantutilsChooseProductFirst = Choisissez d'abord un produit
+DiamantutilsPlannedMovements = Mouvements prévus
+DiamantutilsDoneMovements = Mouvements effectués
+DiamantutilsCurrentStock = Stock actuel
+DiamantutilsStockAfter = Stock après
+DiamantutilsRemark = Remarque
+DiamantutilsNewLotRemark = Nouveau lot
+DiamantutilsStockInsufficientShort = Stock insuffisant
+DiamantutilsPlannedUnitCost = Coût unitaire prévu des sorties
+DiamantutilsPlannedUnitCostDesc = PMP actuel des entrées réparti sur les quantités produites, la perte étant portée par les sorties
+DiamantutilsDateConsume = Date de consommation
+DiamantutilsCannotConsumeStock = Consommation impossible : au moins un lot passerait en stock négatif (ligne en rouge). Le stock a pu bouger depuis la validation.
+DiamantutilsConsumedProducts = Produit(s) consommé(s)
+DiamantutilsProducedProducts = Produit(s) produit(s)
