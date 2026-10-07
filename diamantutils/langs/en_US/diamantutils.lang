@@ -1,5 +1,5 @@
 Module510125Name = DiamantUtils
-Module510125Desc = Batch-based stock transformation (cutting, painting, unit change)
+Module510125Desc = Batch-based stock transformation orders (cutting, painting, unit change)
 
 # Setup page
 DiamantutilsSetupTitle = DiamantUtils - Configuration
@@ -13,10 +13,9 @@ DiamantutilsTransfoLotFormatDesc = Must contain %s exactly once, replaced by the
 DiamantutilsLotFormatInvalid = Invalid lot format: it must contain exactly one %s and no other format code.
 
 # Transformations
-DiamantutilsTransformation = Stock transformation
-DiamantutilsTransformations = Transformations
-DiamantutilsNewTransformation = New transformation
-DiamantutilsTransform = Transform
+DiamantutilsTransformation = Transformation order
+DiamantutilsTransformations = Transformation orders
+DiamantutilsNewTransformation = New order
 DiamantutilsTypeDECOUPE = Cutting
 DiamantutilsTypePEINTURE = Painting
 DiamantutilsTypeAUTRE = Other
@@ -61,17 +60,13 @@ DiamantutilsPlanNotProfile = The assistant requires a product entered as pieces 
 DiamantutilsPlanNoProduct = Choose the consumed product first.
 DiamantutilsPlanShortage = Not enough stock: {n} piece(s) not placed.
 DiamantutilsPlanDone = Plan proposed: adjust lines if needed (remainders to stock or loss).
-DiamantutilsTransfoValidated = Transformation %s validated
-DiamantutilsTransfoCanceled = Transformation %s canceled
-DiamantutilsDeleteTransfo = Delete transformation
+DiamantutilsDeleteTransfo = Delete order
 DiamantutilsConfirmDeleteTransfo = Delete draft %s?
-DiamantutilsCancelTransfo = Cancel transformation
-DiamantutilsConfirmCancelTransfo = Cancel transformation %s? Reverse stock movements will be created.
 DiamantutilsCancellationOf = Cancellation %s
 
 # Errors
-DiamantutilsErrorNotDraft = The transformation is no longer a draft.
-DiamantutilsErrorNotValidated = Only a validated transformation can be canceled.
+DiamantutilsErrorNotDraft = The order is no longer a draft.
+DiamantutilsErrorNotValidated = The order must be validated.
 DiamantutilsErrorProductNotFound = Product not found (id %s).
 DiamantutilsErrorLineQty = Line %s (%s): quantity must be strictly positive.
 DiamantutilsErrorBatchRequired = Line %s (%s): lot is mandatory for this product.
@@ -81,3 +76,16 @@ DiamantutilsErrorBalance = Transformation not balanced: consumed %s ≠ produced
 DiamantutilsErrorStockInsufficient = Not enough stock for %s, lot %s: %s in stock, %s to consume.
 DiamantutilsErrorCancelStock = Cannot cancel: lot %s / %s only has %s in stock for %s to remove (lot already shipped or transformed again).
 DiamantutilsErrorMovement = Error during stock movement of product %s, lot %s.
+
+# Ordres de transformation (v2.1)
+DiamantutilsOrder = Transformation order
+DiamantutilsStatusConsumed = Consumed
+DiamantutilsOrderValidated = Order %s validated: no stock movement until it is consumed.
+DiamantutilsOrderConsumed = Order %s consumed: stock movements done.
+DiamantutilsOrderCanceled = Order %s canceled.
+DiamantutilsConsume = Consume
+DiamantutilsConfirmConsume = Consume order %s? Stock movements will be made.
+DiamantutilsCancelOrder = Cancel order
+DiamantutilsConfirmCancelOrder = Cancel order %s? No stock movement was made.
+DiamantutilsConfirmCancelConsumed = Cancel order %s? Reverse stock movements will be created.
+DiamantutilsErrorCannotCancel = This order cannot be canceled.

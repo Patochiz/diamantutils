@@ -170,7 +170,7 @@ if (empty($reshook)) {
 
 		if (!$error && GETPOST('dovalidate', 'alpha')) {
 			if ($object->validate($user) > 0) {
-				setEventMessages($langs->trans('DiamantutilsTransfoValidated', $object->ref), null, 'mesgs');
+				setEventMessages($langs->trans('DiamantutilsOrderValidated', $object->ref), null, 'mesgs');
 			} else {
 				setEventMessages(null, $object->errors, 'errors');
 			}
@@ -203,10 +203,32 @@ if (empty($reshook)) {
 		$action = '';
 	}
 
-	// Annulation d'une transformation validée
-	if ($action == 'confirm_cancel' && $confirm == 'yes' && $permcancel && $object->id > 0) {
+	// Consommation : mouvements de stock
+	if ($action == 'confirm_consume' && $confirm == 'yes' && $permwrite && $object->id > 0) {
+		if ($object->consume($user) > 0) {
+			setEventMessages($langs->trans('DiamantutilsOrderConsumed', $object->ref), null, 'mesgs');
+			header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
+			exit;
+		}
+		setEventMessages(null, $object->errors, 'errors');
+		$action = '';
+	}
+
+	// Retour en brouillon d'un ordre validé
+	if ($action == 'setdraft' && $permwrite && $object->id > 0) {
+		if ($object->setDraft($user) > 0) {
+			header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
+			exit;
+		}
+		setEventMessages(null, $object->errors, 'errors');
+		$action = '';
+	}
+
+	// Annulation : abandon d'un brouillon / validé (droit write), mouvements inverses d'un consommé (droit cancel)
+	$permcancelthis = ($object->status == Transformation::STATUS_CONSUMED ? $permcancel : $permwrite);
+	if ($action == 'confirm_cancel' && $confirm == 'yes' && $permcancelthis && $object->id > 0) {
 		if ($object->cancel($user) > 0) {
-			setEventMessages($langs->trans('DiamantutilsTransfoCanceled', $object->ref), null, 'mesgs');
+			setEventMessages($langs->trans('DiamantutilsOrderCanceled', $object->ref), null, 'mesgs');
 			header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
 			exit;
 		}
@@ -242,7 +264,11 @@ if ($action == 'delete' && $object->id > 0) {
 	$formconfirm = $form->formconfirm($_SERVER['PHP_SELF'].'?id='.$object->id, $langs->trans('DiamantutilsDeleteTransfo'), $langs->trans('DiamantutilsConfirmDeleteTransfo', $object->ref), 'confirm_delete', '', 0, 1);
 }
 if ($action == 'cancel' && $object->id > 0) {
-	$formconfirm = $form->formconfirm($_SERVER['PHP_SELF'].'?id='.$object->id, $langs->trans('DiamantutilsCancelTransfo'), $langs->trans('DiamantutilsConfirmCancelTransfo', $object->ref), 'confirm_cancel', '', 0, 1);
+	$question = ($object->status == Transformation::STATUS_CONSUMED ? 'DiamantutilsConfirmCancelConsumed' : 'DiamantutilsConfirmCancelOrder');
+	$formconfirm = $form->formconfirm($_SERVER['PHP_SELF'].'?id='.$object->id, $langs->trans('DiamantutilsCancelOrder'), $langs->trans($question, $object->ref), 'confirm_cancel', '', 0, 1);
+}
+if ($action == 'consume' && $object->id > 0) {
+	$formconfirm = $form->formconfirm($_SERVER['PHP_SELF'].'?id='.$object->id, $langs->trans('DiamantutilsConsume'), $langs->trans('DiamantutilsConfirmConsume', $object->ref), 'confirm_consume', '', 0, 1);
 }
 print $formconfirm;
 
@@ -607,8 +633,14 @@ if ($editmode) {
 	$parameters = array();
 	$reshook = $hookmanager->executeHooks('addMoreActionsButtons', $parameters, $object, $action);
 	if (empty($reshook)) {
+		$baseurl = $_SERVER['PHP_SELF'].'?id='.$object->id.'&token='.newToken();
 		if ($object->status == Transformation::STATUS_VALIDATED) {
-			print dolGetButtonAction('', $langs->trans('DiamantutilsCancelTransfo'), 'danger', $_SERVER['PHP_SELF'].'?id='.$object->id.'&action=cancel&token='.newToken(), '', $permcancel);
+			print dolGetButtonAction('', $langs->trans('DiamantutilsConsume'), 'default', $baseurl.'&action=consume', 'diamantutils-consume', $permwrite);
+			print dolGetButtonAction('', $langs->trans('SetToDraft'), 'default', $baseurl.'&action=setdraft', '', $permwrite);
+			print dolGetButtonAction('', $langs->trans('DiamantutilsCancelOrder'), 'danger', $baseurl.'&action=cancel', '', $permwrite);
+		}
+		if ($object->status == Transformation::STATUS_CONSUMED) {
+			print dolGetButtonAction('', $langs->trans('DiamantutilsCancelOrder'), 'danger', $baseurl.'&action=cancel', '', $permcancel);
 		}
 		if ($object->status == Transformation::STATUS_DRAFT) {
 			print dolGetButtonAction('', $langs->trans('Delete'), 'delete', $_SERVER['PHP_SELF'].'?id='.$object->id.'&action=delete&token='.newToken(), '', $permwrite);

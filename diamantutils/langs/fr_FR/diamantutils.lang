@@ -1,5 +1,5 @@
 Module510125Name = DiamantUtils
-Module510125Desc = Transformation de stock par lots (découpe, peinture, changement d'unité)
+Module510125Desc = Ordres de transformation de stock par lots (découpe, peinture, changement d'unité)
 
 # Page de configuration
 DiamantutilsSetupTitle = DiamantUtils - Configuration
@@ -13,10 +13,9 @@ DiamantutilsTransfoLotFormatDesc = Doit contenir une seule fois %s, remplacé pa
 DiamantutilsLotFormatInvalid = Format de lot invalide : il doit contenir exactement un %s et aucun autre code de format.
 
 # Transformations
-DiamantutilsTransformation = Transformation de stock
-DiamantutilsTransformations = Transformations
-DiamantutilsNewTransformation = Nouvelle transformation
-DiamantutilsTransform = Transformer
+DiamantutilsTransformation = Ordre de transformation
+DiamantutilsTransformations = Ordres de transformation
+DiamantutilsNewTransformation = Nouvel ordre
 DiamantutilsTypeDECOUPE = Découpe
 DiamantutilsTypePEINTURE = Peinture
 DiamantutilsTypeAUTRE = Autre
@@ -61,17 +60,13 @@ DiamantutilsPlanNotProfile = L'assistant nécessite un produit saisi en pièces 
 DiamantutilsPlanNoProduct = Choisissez d'abord le produit consommé.
 DiamantutilsPlanShortage = Stock insuffisant : {n} pièce(s) non placée(s).
 DiamantutilsPlanDone = Plan proposé : ajustez les lignes si besoin (restes en stock ou en perte).
-DiamantutilsTransfoValidated = Transformation %s validée
-DiamantutilsTransfoCanceled = Transformation %s annulée
-DiamantutilsDeleteTransfo = Supprimer la transformation
+DiamantutilsDeleteTransfo = Supprimer l'ordre
 DiamantutilsConfirmDeleteTransfo = Supprimer le brouillon %s ?
-DiamantutilsCancelTransfo = Annuler la transformation
-DiamantutilsConfirmCancelTransfo = Annuler la transformation %s ? Les mouvements de stock inverses seront créés.
 DiamantutilsCancellationOf = Annulation %s
 
 # Erreurs
-DiamantutilsErrorNotDraft = La transformation n'est plus en brouillon.
-DiamantutilsErrorNotValidated = Seule une transformation validée peut être annulée.
+DiamantutilsErrorNotDraft = L'ordre n'est plus en brouillon.
+DiamantutilsErrorNotValidated = L'ordre doit être au statut validé.
 DiamantutilsErrorProductNotFound = Produit introuvable (id %s).
 DiamantutilsErrorLineQty = Ligne %s (%s) : la quantité doit être strictement positive.
 DiamantutilsErrorBatchRequired = Ligne %s (%s) : le lot est obligatoire pour ce produit.
@@ -81,3 +76,16 @@ DiamantutilsErrorBalance = Transformation non équilibrée : consommé %s ≠ pr
 DiamantutilsErrorStockInsufficient = Stock insuffisant pour %s, lot %s : %s en stock, %s à consommer.
 DiamantutilsErrorCancelStock = Annulation impossible : le lot %s / %s n'a plus que %s en stock pour %s à retirer (lot déjà expédié ou retransformé).
 DiamantutilsErrorMovement = Erreur lors du mouvement de stock du produit %s, lot %s.
+
+# Ordres de transformation (v2.1)
+DiamantutilsOrder = Ordre de transformation
+DiamantutilsStatusConsumed = Consommé
+DiamantutilsOrderValidated = Ordre %s validé : aucun mouvement de stock tant qu'il n'est pas consommé.
+DiamantutilsOrderConsumed = Ordre %s consommé : mouvements de stock effectués.
+DiamantutilsOrderCanceled = Ordre %s annulé.
+DiamantutilsConsume = Consommer
+DiamantutilsConfirmConsume = Consommer l'ordre %s ? Les mouvements de stock seront effectués.
+DiamantutilsCancelOrder = Annuler l'ordre
+DiamantutilsConfirmCancelOrder = Annuler l'ordre %s ? Aucun mouvement de stock n'a été fait.
+DiamantutilsConfirmCancelConsumed = Annuler l'ordre %s ? Les mouvements de stock inverses seront créés.
+DiamantutilsErrorCannotCancel = Cet ordre ne peut pas être annulé.

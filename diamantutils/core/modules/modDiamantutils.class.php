@@ -137,6 +137,11 @@ class modDiamantutils extends DolibarrModules
 			return -1;
 		}
 
+		// Table créée en v2.0 : colonnes ajoutées en v2.1 (erreur « colonne existante » ignorée)
+		foreach (array('date_consume datetime NULL', 'fk_user_consume integer NULL') as $column) {
+			$this->db->query("ALTER TABLE ".MAIN_DB_PREFIX."diamantutils_transfo ADD COLUMN ".$column);
+		}
+
 		return $this->_init(array(), $options);
 	}
 

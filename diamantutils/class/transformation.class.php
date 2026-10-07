@@ -1,10 +1,11 @@
 <?php
 /**
- * Transformation de stock par lots
+ * Ordre de transformation (OT) de stock par lots
  *
- * Une transformation = N lignes consommées (IN) + M lignes produites (OUT)
- * + des pertes éventuelles (LOSS). La validation crée tous les mouvements de stock
- * dans une transaction unique : tout ou rien.
+ * Un ordre = N lignes consommées (IN) + M lignes produites (OUT)
+ * + des pertes éventuelles (LOSS).
+ * Workflow : brouillon → validé (lignes figées, aucun mouvement) → consommé (tous les
+ * mouvements de stock dans une transaction unique : tout ou rien) → annulé.
  */
 
 require_once DOL_DOCUMENT_ROOT.'/core/class/commonobject.class.php';
@@ -14,6 +15,7 @@ class Transformation extends CommonObject
 {
 	const STATUS_DRAFT = 0;
 	const STATUS_VALIDATED = 1;
+	const STATUS_CONSUMED = 2;
 	const STATUS_CANCELED = 9;
 
 	const DIRECTION_IN = 'IN';
@@ -39,6 +41,8 @@ class Transformation extends CommonObject
 	public $date_valid;
 	public $fk_user_creat;
 	public $fk_user_valid;
+	public $date_consume;
+	public $fk_user_consume;
 
 	/** @var TransformationLine[] */
 	public $lines = array();
@@ -70,7 +74,7 @@ class Transformation extends CommonObject
 	}
 
 	/**
-	 * Prochaine référence : TRANSFO-AAMM-NNNN, compteur par mois
+	 * Prochaine référence : OT-AAMM-NNNN, compteur par mois
 	 *
 	 * @return	string
 	 */
@@ -78,7 +82,7 @@ class Transformation extends CommonObject
 	{
 		global $conf;
 
-		$prefix = 'TRANSFO-'.dol_print_date(dol_now(), '%y%m').'-';
+		$prefix = 'OT-'.dol_print_date(dol_now(), '%y%m').'-';
 		$posnum = dol_strlen($prefix) + 1;
 
 		$sql = "SELECT MAX(CAST(SUBSTRING(ref FROM ".$posnum.") AS SIGNED)) as maxnum";
@@ -162,7 +166,7 @@ class Transformation extends CommonObject
 	public function fetch($id, $ref = '')
 	{
 		$sql = "SELECT t.rowid, t.entity, t.ref, t.label, t.type, t.fk_warehouse, t.fk_commandedet, t.fk_commande,";
-		$sql .= " t.status, t.note, t.date_creation, t.date_valid, t.fk_user_creat, t.fk_user_valid";
+		$sql .= " t.status, t.note, t.date_creation, t.date_valid, t.fk_user_creat, t.fk_user_valid, t.date_consume, t.fk_user_consume";
 		$sql .= " FROM ".MAIN_DB_PREFIX.$this->table_element." as t";
 		if ($id > 0) {
 			$sql .= " WHERE t.rowid = ".((int) $id);
@@ -197,6 +201,8 @@ class Transformation extends CommonObject
 		$this->date_valid = $this->db->jdate($obj->date_valid);
 		$this->fk_user_creat = (int) $obj->fk_user_creat;
 		$this->fk_user_valid = (int) $obj->fk_user_valid;
+		$this->date_consume = $this->db->jdate($obj->date_consume);
+		$this->fk_user_consume = (int) $obj->fk_user_consume;
 
 		if ($this->fetchLines() < 0) {
 			return -1;
@@ -517,77 +523,6 @@ class Transformation extends CommonObject
 	}
 
 	/**
-	 * Contrôles bloquants avant validation : lignes, R4, R5, R6
-	 *
-	 * @return	int		>0 si OK, <0 si KO (erreurs dans $this->errors)
-	 */
-	protected function checkBeforeValidate()
-	{
-		global $langs;
-
-		$nberrors = count($this->errors);
-		$nbin = 0;
-		$nbout = 0;
-		$needed = array();	// [fk_product][batch] => qty consommée cumulée
-
-		foreach ($this->lines as $i => $line) {
-			$info = diamantutils_product_info($this->db, $line->fk_product);
-			$numline = $i + 1;
-			if (empty($info)) {
-				$this->errors[] = $langs->trans('DiamantutilsErrorProductNotFound', $line->fk_product);
-				continue;
-			}
-			if (!($line->qty > 0)) {
-				$this->errors[] = $langs->trans('DiamantutilsErrorLineQty', $numline, $info['ref']);
-				continue;
-			}
-			// R5 : lot obligatoire sur les lignes qui créent un mouvement d'un produit géré en lot
-			if ($line->direction != self::DIRECTION_LOSS && isModEnabled('productbatch') && $info['status_batch'] > 0 && $line->batch === '') {
-				$this->errors[] = $langs->trans('DiamantutilsErrorBatchRequired', $numline, $info['ref']);
-			}
-			if ($line->direction == self::DIRECTION_IN) {
-				$nbin++;
-				$batchkey = (isModEnabled('productbatch') && $info['status_batch'] > 0 ? $line->batch : '');
-				if (!isset($needed[$line->fk_product][$batchkey])) {
-					$needed[$line->fk_product][$batchkey] = 0;
-				}
-				$needed[$line->fk_product][$batchkey] += $line->qty;
-			} elseif ($line->direction == self::DIRECTION_OUT) {
-				$nbout++;
-			}
-		}
-
-		// R3 : au moins une ligne consommée et une ligne produite
-		if ($nbin < 1) {
-			$this->errors[] = $langs->trans('DiamantutilsErrorNoLineIn');
-		}
-		if ($nbout < 1) {
-			$this->errors[] = $langs->trans('DiamantutilsErrorNoLineOut');
-		}
-
-		// R4 : équilibre si même unité
-		$balance = $this->checkBalance();
-		if (!$balance['ok']) {
-			$this->errors[] = $langs->trans('DiamantutilsErrorBalance', diamantutils_qty_format($balance['in']), diamantutils_qty_format($balance['out']), diamantutils_qty_format($balance['loss']), $balance['unit']);
-		} elseif (!$balance['sameunit']) {
-			$this->warnings[] = $langs->trans('DiamantutilsWarningUnitsDiffer');
-		}
-
-		// R6 : stock suffisant pour chaque couple (produit, entrepôt, lot) consommé
-		foreach ($needed as $fk_product => $batches) {
-			$info = diamantutils_product_info($this->db, $fk_product);
-			foreach ($batches as $batch => $qty) {
-				$stock = diamantutils_stock_qty($this->db, $fk_product, $this->fk_warehouse, (string) $batch);
-				if ((float) price2num($stock - $qty, 'MS') < 0) {
-					$this->errors[] = $langs->trans('DiamantutilsErrorStockInsufficient', $info['ref'], ((string) $batch !== '' ? $batch : '-'), diamantutils_qty_format($stock), diamantutils_qty_format($qty));
-				}
-			}
-		}
-
-		return (count($this->errors) > $nberrors ? -1 : 1);
-	}
-
-	/**
 	 * Libellé des mouvements de stock : ref + type + ref commande client si liée
 	 *
 	 * @return	string
@@ -661,17 +596,198 @@ class Transformation extends CommonObject
 	}
 
 	/**
-	 * Valide la transformation : contrôles, coût, mouvements de stock.
-	 * Tout se fait dans une transaction unique.
+	 * Contrôles bloquants de la validation : lignes, R3, R4, R5
+	 *
+	 * @return	int		>0 si OK, <0 si KO (erreurs dans $this->errors)
+	 */
+	protected function checkLines()
+	{
+		global $langs;
+
+		$nberrors = count($this->errors);
+		$nbin = 0;
+		$nbout = 0;
+
+		foreach ($this->lines as $i => $line) {
+			$info = diamantutils_product_info($this->db, $line->fk_product);
+			$numline = $i + 1;
+			if (empty($info)) {
+				$this->errors[] = $langs->trans('DiamantutilsErrorProductNotFound', $line->fk_product);
+				continue;
+			}
+			if (!($line->qty > 0)) {
+				$this->errors[] = $langs->trans('DiamantutilsErrorLineQty', $numline, $info['ref']);
+				continue;
+			}
+			// R5 : lot obligatoire sur les lignes qui créent un mouvement d'un produit géré en lot
+			if ($line->direction != self::DIRECTION_LOSS && isModEnabled('productbatch') && $info['status_batch'] > 0 && $line->batch === '') {
+				$this->errors[] = $langs->trans('DiamantutilsErrorBatchRequired', $numline, $info['ref']);
+			}
+			if ($line->direction == self::DIRECTION_IN) {
+				$nbin++;
+			} elseif ($line->direction == self::DIRECTION_OUT) {
+				$nbout++;
+			}
+		}
+
+		// R3 : au moins une ligne consommée et une ligne produite
+		if ($nbin < 1) {
+			$this->errors[] = $langs->trans('DiamantutilsErrorNoLineIn');
+		}
+		if ($nbout < 1) {
+			$this->errors[] = $langs->trans('DiamantutilsErrorNoLineOut');
+		}
+
+		// R4 : équilibre si même unité
+		$balance = $this->checkBalance();
+		if (!$balance['ok']) {
+			$this->errors[] = $langs->trans('DiamantutilsErrorBalance', diamantutils_qty_format($balance['in']), diamantutils_qty_format($balance['out']), diamantutils_qty_format($balance['loss']), $balance['unit']);
+		} elseif (!$balance['sameunit'] && count($this->lines)) {
+			$this->warnings[] = $langs->trans('DiamantutilsWarningUnitsDiffer');
+		}
+
+		return (count($this->errors) > $nberrors ? -1 : 1);
+	}
+
+	/**
+	 * R6 : stock disponible pour chaque couple (produit, entrepôt, lot) consommé,
+	 * en cumulant les lignes d'un même lot.
+	 *
+	 * @return	string[]	Messages, un par couple en défaut (vide si tout est disponible)
+	 */
+	public function checkStock()
+	{
+		global $langs;
+
+		$needed = array();	// [fk_product][batch] => qty consommée cumulée
+		foreach ($this->lines as $line) {
+			if ($line->direction != self::DIRECTION_IN) {
+				continue;
+			}
+			$batch = $this->getMovementBatch($line);
+			if (!isset($needed[$line->fk_product][$batch])) {
+				$needed[$line->fk_product][$batch] = 0;
+			}
+			$needed[$line->fk_product][$batch] += $line->qty;
+		}
+
+		$messages = array();
+		foreach ($needed as $fk_product => $batches) {
+			$info = diamantutils_product_info($this->db, $fk_product);
+			foreach ($batches as $batch => $qty) {
+				$stock = diamantutils_stock_qty($this->db, $fk_product, $this->fk_warehouse, (string) $batch);
+				if ((float) price2num($stock - $qty, 'MS') < 0) {
+					$messages[] = $langs->trans('DiamantutilsErrorStockInsufficient', (empty($info) ? $fk_product : $info['ref']), ((string) $batch !== '' ? $batch : '-'), diamantutils_qty_format($stock), diamantutils_qty_format($qty));
+				}
+			}
+		}
+		return $messages;
+	}
+
+	/**
+	 * Coût : Σ (qty IN × PMP actuel du produit IN), réparti au prorata des quantités OUT.
+	 * La perte n'absorbe pas de coût : elle est portée par les sorties.
+	 *
+	 * @return	array	array('pmp' => [fk_product => PMP], 'total' => coût total, 'unit_out' => coût unitaire des sorties)
+	 */
+	public function computeCost()
+	{
+		$pmps = array();
+		$totalcost = 0;
+		$totalout = 0;
+		foreach ($this->lines as $line) {
+			if ($line->direction == self::DIRECTION_IN) {
+				if (!isset($pmps[$line->fk_product])) {
+					$pmps[$line->fk_product] = $this->getCurrentPmp($line->fk_product);
+				}
+				$totalcost += $line->qty * $pmps[$line->fk_product];
+			} elseif ($line->direction == self::DIRECTION_OUT) {
+				$totalout += $line->qty;
+			}
+		}
+		return array(
+			'pmp' => $pmps,
+			'total' => $totalcost,
+			'unit_out' => ($totalout > 0 ? (float) price2num($totalcost / $totalout, 'MU') : 0),
+		);
+	}
+
+	/**
+	 * Indique si un lot existe déjà pour un produit (llx_product_lot)
+	 *
+	 * @param	int		$fk_product		Id produit
+	 * @param	string	$batch			Lot
+	 * @return	bool
+	 */
+	protected function lotExists($fk_product, $batch)
+	{
+		$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."product_lot";
+		$sql .= " WHERE fk_product = ".((int) $fk_product)." AND batch = '".$this->db->escape($batch)."'";
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			return false;
+		}
+		$exists = ($this->db->num_rows($resql) > 0);
+		$this->db->free($resql);
+		return $exists;
+	}
+
+	/**
+	 * Mouvements prévus, une ligne par couple (produit, lot), stock actuel lu en temps réel.
+	 * Les pertes forment des lignes à part, sans stock.
+	 *
+	 * @return	array	Liste de array('fk_product', 'ref', 'unit', 'batch', 'stock', 'delta', 'after', 'newlot', 'loss', 'negative')
+	 */
+	public function getPlannedMovements()
+	{
+		$rows = array();
+		foreach ($this->lines as $line) {
+			$info = diamantutils_product_info($this->db, $line->fk_product);
+			$batch = $this->getMovementBatch($line);
+			$loss = ($line->direction == self::DIRECTION_LOSS);
+			$key = ($loss ? 'LOSS|' : 'MVT|').$line->fk_product.'|'.$batch;
+			if (!isset($rows[$key])) {
+				$rows[$key] = array(
+					'fk_product' => $line->fk_product,
+					'ref' => (empty($info) ? '' : $info['ref']),
+					'unit' => (empty($info) ? '' : $info['unit_short']),
+					'batch' => ($loss ? '' : $batch),
+					'stock' => null,
+					'delta' => 0,
+					'after' => null,
+					'newlot' => false,
+					'loss' => $loss,
+					'negative' => false,
+				);
+			}
+			$rows[$key]['delta'] += ($line->direction == self::DIRECTION_OUT ? $line->qty : -$line->qty);
+		}
+
+		foreach ($rows as $key => $row) {
+			$rows[$key]['delta'] = (float) price2num($row['delta'], 'MS');
+			if ($row['loss']) {
+				continue;
+			}
+			$stock = diamantutils_stock_qty($this->db, $row['fk_product'], $this->fk_warehouse, $row['batch']);
+			$rows[$key]['stock'] = (float) price2num($stock, 'MS');
+			$rows[$key]['after'] = (float) price2num($stock + $rows[$key]['delta'], 'MS');
+			$rows[$key]['negative'] = ($rows[$key]['after'] < 0);
+			$rows[$key]['newlot'] = ($row['batch'] !== '' && !$this->lotExists($row['fk_product'], $row['batch']));
+		}
+
+		return array_values($rows);
+	}
+
+	/**
+	 * Valide l'ordre (brouillon → validé) : recalcul serveur, contrôles R3, R4, R5 bloquants.
+	 * R6 n'est qu'un avertissement à cette étape. Aucun mouvement de stock.
 	 *
 	 * @param	User	$user	Utilisateur
-	 * @return	int				>0 si OK, <0 si KO (erreurs dans $this->errors)
+	 * @return	int				>0 si OK, <0 si KO (erreurs dans $this->errors, avertissements dans $this->warnings)
 	 */
 	public function validate($user)
 	{
 		global $langs;
-
-		require_once DOL_DOCUMENT_ROOT.'/product/stock/class/mouvementstock.class.php';
 
 		if ($this->status != self::STATUS_DRAFT) {
 			$this->errors[] = $langs->trans('DiamantutilsErrorNotDraft');
@@ -680,41 +796,103 @@ class Transformation extends CommonObject
 
 		$this->db->begin();
 
-		// 1. Recharger les lignes et recalculer les quantités côté serveur
-		if ($this->fetchLines() < 0 || $this->recomputeLines() < 0) {
+		if ($this->fetchLines() < 0 || $this->recomputeLines() < 0 || $this->checkLines() < 0) {
+			$this->db->rollback();
+			$this->fetchLines();
+			return -1;
+		}
+		foreach ($this->checkStock() as $msg) {
+			$this->warnings[] = $msg;
+		}
+
+		$now = dol_now();
+		$sql = "UPDATE ".MAIN_DB_PREFIX.$this->table_element." SET";
+		$sql .= " status = ".self::STATUS_VALIDATED;
+		$sql .= ", date_valid = '".$this->db->idate($now)."'";
+		$sql .= ", fk_user_valid = ".((int) $user->id);
+		$sql .= " WHERE rowid = ".((int) $this->id)." AND status = ".self::STATUS_DRAFT;
+		if (!$this->db->query($sql)) {
+			$this->errors[] = $this->db->lasterror();
 			$this->db->rollback();
 			return -1;
 		}
 
-		// 2. Contrôles R3 à R6
-		if ($this->checkBeforeValidate() < 0) {
+		$this->db->commit();
+		$this->status = self::STATUS_VALIDATED;
+		$this->date_valid = $now;
+		$this->fk_user_valid = $user->id;
+		return 1;
+	}
+
+	/**
+	 * Remet un ordre validé en brouillon
+	 *
+	 * @param	User	$user	Utilisateur
+	 * @return	int				>0 si OK, <0 si KO
+	 */
+	public function setDraft($user)
+	{
+		global $langs;
+
+		if ($this->status != self::STATUS_VALIDATED) {
+			$this->errors[] = $langs->trans('DiamantutilsErrorNotValidated');
+			return -1;
+		}
+
+		$sql = "UPDATE ".MAIN_DB_PREFIX.$this->table_element." SET status = ".self::STATUS_DRAFT;
+		$sql .= ", date_valid = NULL, fk_user_valid = NULL";
+		$sql .= " WHERE rowid = ".((int) $this->id)." AND status = ".self::STATUS_VALIDATED;
+		if (!$this->db->query($sql)) {
+			$this->errors[] = $this->db->lasterror();
+			return -1;
+		}
+		$this->status = self::STATUS_DRAFT;
+		$this->date_valid = null;
+		$this->fk_user_valid = 0;
+		return 1;
+	}
+
+	/**
+	 * Consomme l'ordre (validé → consommé) : re-contrôle R6 bloquant, coût, mouvements de stock.
+	 * Tout se fait dans une transaction unique.
+	 *
+	 * @param	User	$user	Utilisateur
+	 * @return	int				>0 si OK, <0 si KO (erreurs dans $this->errors)
+	 */
+	public function consume($user)
+	{
+		global $langs;
+
+		require_once DOL_DOCUMENT_ROOT.'/product/stock/class/mouvementstock.class.php';
+
+		if ($this->status != self::STATUS_VALIDATED) {
+			$this->errors[] = $langs->trans('DiamantutilsErrorNotValidated');
+			return -1;
+		}
+
+		$this->db->begin();
+
+		if ($this->fetchLines() < 0) {
 			$this->db->rollback();
 			return -1;
 		}
 
-		// 3. Coût : Σ (qty IN × PMP IN), réparti au prorata des quantités OUT.
-		// La perte n'absorbe pas de coût : elle est portée par les sorties.
-		$totalcost = 0;
-		$totalout = 0;
-		$pmps = array();
-		foreach ($this->lines as $line) {
-			if ($line->direction == self::DIRECTION_IN) {
-				if (!isset($pmps[$line->fk_product])) {
-					$pmps[$line->fk_product] = $this->getCurrentPmp($line->fk_product);
-				}
-				$line->unit_cost = $pmps[$line->fk_product];
-				$totalcost += $line->qty * $line->unit_cost;
-			} elseif ($line->direction == self::DIRECTION_OUT) {
-				$totalout += $line->qty;
+		// R6 bloquant : le stock a pu bouger depuis la validation
+		$shortages = $this->checkStock();
+		if (!empty($shortages)) {
+			foreach ($shortages as $msg) {
+				$this->errors[] = $msg;
 			}
+			$this->db->rollback();
+			return -1;
 		}
-		$unitcostout = ($totalout > 0 ? $totalcost / $totalout : 0);
 
-		// 4. Mouvements : d'abord les consommations, puis les productions
+		$cost = $this->computeCost();
 		$label = $this->getMovementLabel();
 		$inventorycode = $this->ref;
 		$error = 0;
 
+		// Mouvements : d'abord les consommations, puis les productions
 		foreach (array(self::DIRECTION_IN, self::DIRECTION_OUT) as $direction) {
 			foreach ($this->lines as $line) {
 				if ($line->direction != $direction) {
@@ -725,24 +903,16 @@ class Transformation extends CommonObject
 				$mvt->setOrigin('transformation@diamantutils', $this->id);
 
 				if ($direction == self::DIRECTION_IN) {
+					$line->unit_cost = $cost['pmp'][$line->fk_product];
 					$result = $mvt->livraison($user, $line->fk_product, $this->fk_warehouse, $line->qty, $line->unit_cost, $label, '', '', '', $batch, 0, $inventorycode);
 				} else {
-					$line->unit_cost = (float) price2num($unitcostout, 'MU');
+					$line->unit_cost = $cost['unit_out'];
 					$result = $mvt->reception($user, $line->fk_product, $this->fk_warehouse, $line->qty, $line->unit_cost, $label, '', '', $batch, '', 0, $inventorycode);
 				}
 
 				if ($result <= 0) {
 					$error++;
-					$info = diamantutils_product_info($this->db, $line->fk_product);
-					$this->errors[] = $langs->trans('DiamantutilsErrorMovement', (empty($info) ? $line->fk_product : $info['ref']), ($batch !== '' ? $batch : '-'));
-					if (!empty($mvt->error)) {
-						$this->errors[] = $mvt->error;
-					}
-					foreach ((array) $mvt->errors as $err) {
-						if ($err != $mvt->error) {
-							$this->errors[] = $err;
-						}
-					}
+					$this->addMovementErrors($mvt, $line, $batch);
 					break 2;
 				}
 
@@ -759,21 +929,20 @@ class Transformation extends CommonObject
 			}
 		}
 
-		// 5. Statut validé
 		if (!$error) {
 			$now = dol_now();
 			$sql = "UPDATE ".MAIN_DB_PREFIX.$this->table_element." SET";
-			$sql .= " status = ".self::STATUS_VALIDATED;
-			$sql .= ", date_valid = '".$this->db->idate($now)."'";
-			$sql .= ", fk_user_valid = ".((int) $user->id);
-			$sql .= " WHERE rowid = ".((int) $this->id)." AND status = ".self::STATUS_DRAFT;
+			$sql .= " status = ".self::STATUS_CONSUMED;
+			$sql .= ", date_consume = '".$this->db->idate($now)."'";
+			$sql .= ", fk_user_consume = ".((int) $user->id);
+			$sql .= " WHERE rowid = ".((int) $this->id)." AND status = ".self::STATUS_VALIDATED;
 			if (!$this->db->query($sql)) {
 				$error++;
 				$this->errors[] = $this->db->lasterror();
 			} else {
-				$this->status = self::STATUS_VALIDATED;
-				$this->date_valid = $now;
-				$this->fk_user_valid = $user->id;
+				$this->status = self::STATUS_CONSUMED;
+				$this->date_consume = $now;
+				$this->fk_user_consume = $user->id;
 			}
 		}
 
@@ -789,8 +958,34 @@ class Transformation extends CommonObject
 	}
 
 	/**
-	 * Annule une transformation validée : mouvements inverses, avec le même
-	 * inventorycode suffixé -ANN. Refus si un lot produit n'a plus le stock suffisant.
+	 * Erreurs d'un mouvement de stock refusé
+	 *
+	 * @param	MouvementStock		$mvt	Mouvement
+	 * @param	TransformationLine	$line	Ligne
+	 * @param	string				$batch	Lot
+	 * @return	void
+	 */
+	protected function addMovementErrors($mvt, $line, $batch)
+	{
+		global $langs;
+
+		$info = diamantutils_product_info($this->db, $line->fk_product);
+		$this->errors[] = $langs->trans('DiamantutilsErrorMovement', (empty($info) ? $line->fk_product : $info['ref']), ($batch !== '' ? $batch : '-'));
+		if (!empty($mvt->error)) {
+			$this->errors[] = $mvt->error;
+		}
+		foreach ((array) $mvt->errors as $err) {
+			if ($err != $mvt->error) {
+				$this->errors[] = $err;
+			}
+		}
+	}
+
+	/**
+	 * Annule l'ordre.
+	 * - Brouillon ou validé : abandon, statut annulé sans mouvement.
+	 * - Consommé : mouvements inverses avec l'inventorycode ref-ANN, refus si un lot
+	 *   produit n'a plus le stock suffisant.
 	 *
 	 * @param	User	$user	Utilisateur
 	 * @return	int				>0 si OK, <0 si KO
@@ -801,9 +996,21 @@ class Transformation extends CommonObject
 
 		require_once DOL_DOCUMENT_ROOT.'/product/stock/class/mouvementstock.class.php';
 
-		if ($this->status != self::STATUS_VALIDATED) {
-			$this->errors[] = $langs->trans('DiamantutilsErrorNotValidated');
+		if (!in_array($this->status, array(self::STATUS_DRAFT, self::STATUS_VALIDATED, self::STATUS_CONSUMED))) {
+			$this->errors[] = $langs->trans('DiamantutilsErrorCannotCancel');
 			return -1;
+		}
+
+		// Abandon d'un ordre sans mouvement
+		if ($this->status != self::STATUS_CONSUMED) {
+			$sql = "UPDATE ".MAIN_DB_PREFIX.$this->table_element." SET status = ".self::STATUS_CANCELED;
+			$sql .= " WHERE rowid = ".((int) $this->id)." AND status = ".((int) $this->status);
+			if (!$this->db->query($sql)) {
+				$this->errors[] = $this->db->lasterror();
+				return -1;
+			}
+			$this->status = self::STATUS_CANCELED;
+			return 1;
 		}
 
 		$this->db->begin();
@@ -825,6 +1032,7 @@ class Transformation extends CommonObject
 			}
 			$needed[$line->fk_product][$batch] += $line->qty;
 		}
+		$nberrors = count($this->errors);
 		foreach ($needed as $fk_product => $batches) {
 			$info = diamantutils_product_info($this->db, $fk_product);
 			foreach ($batches as $batch => $qty) {
@@ -834,7 +1042,7 @@ class Transformation extends CommonObject
 				}
 			}
 		}
-		if (!empty($this->errors)) {
+		if (count($this->errors) > $nberrors) {
 			$this->db->rollback();
 			return -1;
 		}
@@ -861,16 +1069,7 @@ class Transformation extends CommonObject
 
 				if ($result <= 0) {
 					$error++;
-					$info = diamantutils_product_info($this->db, $line->fk_product);
-					$this->errors[] = $langs->trans('DiamantutilsErrorMovement', (empty($info) ? $line->fk_product : $info['ref']), ($batch !== '' ? $batch : '-'));
-					if (!empty($mvt->error)) {
-						$this->errors[] = $mvt->error;
-					}
-					foreach ((array) $mvt->errors as $err) {
-						if ($err != $mvt->error) {
-							$this->errors[] = $err;
-						}
-					}
+					$this->addMovementErrors($mvt, $line, $batch);
 					break 2;
 				}
 			}
@@ -878,7 +1077,7 @@ class Transformation extends CommonObject
 
 		if (!$error) {
 			$sql = "UPDATE ".MAIN_DB_PREFIX.$this->table_element." SET status = ".self::STATUS_CANCELED;
-			$sql .= " WHERE rowid = ".((int) $this->id)." AND status = ".self::STATUS_VALIDATED;
+			$sql .= " WHERE rowid = ".((int) $this->id)." AND status = ".self::STATUS_CONSUMED;
 			if (!$this->db->query($sql)) {
 				$error++;
 				$this->errors[] = $this->db->lasterror();
@@ -906,7 +1105,7 @@ class Transformation extends CommonObject
 		global $langs;
 
 		$url = dol_buildpath('/diamantutils/transformation_card.php', 1).'?id='.((int) $this->id);
-		$label = img_picto('', $this->picto).' <u>'.$langs->trans('DiamantutilsTransformation').'</u><br><b>'.$langs->trans('Ref').':</b> '.dol_escape_htmltag($this->ref);
+		$label = img_picto('', $this->picto).' <u>'.$langs->trans('DiamantutilsOrder').'</u><br><b>'.$langs->trans('Ref').':</b> '.dol_escape_htmltag($this->ref);
 
 		$result = '<a href="'.$url.'" title="'.dol_escape_htmltag($label, 1).'" class="classfortooltip">';
 		if ($withpicto) {
@@ -943,7 +1142,8 @@ class Transformation extends CommonObject
 
 		$labels = array(
 			self::STATUS_DRAFT => array($langs->transnoentitiesnoconv('Draft'), 'status0'),
-			self::STATUS_VALIDATED => array($langs->transnoentitiesnoconv('Validated'), 'status4'),
+			self::STATUS_VALIDATED => array($langs->transnoentitiesnoconv('Validated'), 'status1'),
+			self::STATUS_CONSUMED => array($langs->transnoentitiesnoconv('DiamantutilsStatusConsumed'), 'status6'),
 			self::STATUS_CANCELED => array($langs->transnoentitiesnoconv('Canceled'), 'status9'),
 		);
 		if (!isset($labels[$status])) {
