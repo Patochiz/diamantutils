@@ -139,3 +139,10 @@ DiamantutilsSTBannerReception = Direct delivery to customer: receive into the Su
 DiamantutilsSTErrorDirectWarehouse = Order %s is delivered directly to the customer: product %s must be received into the Subcontracting warehouse with lot %s.
 DiamantutilsSTErrorDirectBatch = Order %s is delivered directly to the customer: product %s must be received with lot %s (lot entered: "%s").
 DiamantutilsSTErrorNotDirect = Purchase order %s is not delivered directly to the customer: product %s cannot be received into the Subcontracting warehouse.
+DiamantutilsSTBannerShipment = Direct delivery to customer (linked purchase orders: %s): ship from the Subcontracting warehouse, lot = purchase order reference.
+DiamantutilsSTBannerShipmentStock = Available lots: %s.
+DiamantutilsSTBannerShipmentNoStock = No lot in stock in the Subcontracting warehouse: has the purchase order been received?
+DiamantutilsSTForeignLot = Lot %s not linked to this sales order
+DiamantutilsSTErrorShipNotLinked = Purchase order %s is not linked to this sales order: link it from the purchase order (Linked objects tab) then try again.
+DiamantutilsSTErrorShipBadLot = Shipment from the Subcontracting warehouse: lot "%s" of product %s does not match any direct-delivery purchase order linked to sales order %s. Expected lots: %s.
+DiamantutilsSTErrorShipNoDirect = Shipment of product %s from the Subcontracting warehouse: no direct-delivery purchase order is linked to sales order %s.

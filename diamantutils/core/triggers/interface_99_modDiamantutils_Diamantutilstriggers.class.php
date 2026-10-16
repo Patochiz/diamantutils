@@ -8,6 +8,11 @@
  *  - LINERECEPTION_CREATE : ligne créée hors Reception::create() (dans create(), les erreurs
  *    d'une ligne ne remontent pas à l'écran : le contrôle est fait par RECEPTION_CREATE) ;
  *  - LINEORDER_SUPPLIER_DISPATCH : ventilation directe sans module Réceptions.
+ * Contrôles bloquants des expéditions (lignes prélevées sur l'entrepôt Sous-traitance) :
+ *  - SHIPPING_CREATE (après insertion des lignes et des lots), SHIPPING_VALIDATE (après le
+ *    mouvement de stock) : toutes les lignes ;
+ *  - LINESHIPPING_MODIFY : ligne modifiée dans le brouillon. L'ajout d'une ligne de lot par
+ *    create_line_batch() n'a pas de trigger après l'insertion du lot : contrôlé à la validation.
  * Tous ces triggers sont appelés dans la transaction : un retour < 0 annule l'opération.
  */
 
@@ -38,7 +43,7 @@ class InterfaceDiamantutilstriggers extends DolibarrTriggers
 	 */
 	public function runTrigger($action, $object, User $user, Translate $langs, Conf $conf)
 	{
-		if (!in_array($action, array('RECEPTION_CREATE', 'RECEPTION_VALIDATE', 'LINERECEPTION_CREATE', 'LINERECEPTION_MODIFY', 'LINEORDER_SUPPLIER_DISPATCH'))) {
+		if (!in_array($action, array('RECEPTION_CREATE', 'RECEPTION_VALIDATE', 'LINERECEPTION_CREATE', 'LINERECEPTION_MODIFY', 'LINEORDER_SUPPLIER_DISPATCH', 'SHIPPING_CREATE', 'SHIPPING_VALIDATE', 'LINESHIPPING_MODIFY'))) {
 			return 0;
 		}
 
@@ -69,6 +74,15 @@ class InterfaceDiamantutilstriggers extends DolibarrTriggers
 
 			case 'LINEORDER_SUPPLIER_DISPATCH':
 				$errors = $st->checkDispatch($object->id);
+				break;
+
+			case 'SHIPPING_CREATE':
+			case 'SHIPPING_VALIDATE':
+				$errors = $st->checkShipment($object->id);
+				break;
+
+			case 'LINESHIPPING_MODIFY':
+				$errors = $st->checkShipmentLine($object->id);
 				break;
 		}
 

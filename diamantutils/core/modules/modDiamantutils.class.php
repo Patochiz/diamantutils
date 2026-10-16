@@ -27,7 +27,7 @@ class modDiamantutils extends DolibarrModules
 
 		// Format plat (le format imbriqué data/entity casse l'enregistrement en v20)
 		$this->module_parts = array(
-			'hooks' => array('ordersupplierdispatch', 'receptioncard'),
+			'hooks' => array('ordersupplierdispatch', 'receptioncard', 'ordershipmentcard', 'expeditioncard'),
 			'triggers' => 1,
 		);
 

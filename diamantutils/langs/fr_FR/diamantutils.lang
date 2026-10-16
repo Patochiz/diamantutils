@@ -139,3 +139,10 @@ DiamantutilsSTBannerReception = Livraison directe client : réception sur l'entr
 DiamantutilsSTErrorDirectWarehouse = Commande %s en livraison directe client : la réception du produit %s doit se faire sur l'entrepôt Sous-traitance avec le lot %s.
 DiamantutilsSTErrorDirectBatch = Commande %s en livraison directe client : le produit %s doit être réceptionné avec le lot %s (lot saisi : « %s »).
 DiamantutilsSTErrorNotDirect = La commande fournisseur %s n'est pas en livraison directe client : le produit %s ne peut pas être réceptionné sur l'entrepôt Sous-traitance.
+DiamantutilsSTBannerShipment = Livraison directe client (commandes fournisseur liées : %s) : expédier depuis l'entrepôt Sous-traitance, lot = ref de la commande fournisseur.
+DiamantutilsSTBannerShipmentStock = Lots disponibles : %s.
+DiamantutilsSTBannerShipmentNoStock = Aucun lot en stock dans l'entrepôt Sous-traitance : la commande fournisseur a-t-elle été réceptionnée ?
+DiamantutilsSTForeignLot = Lot %s non lié à cette commande client
+DiamantutilsSTErrorShipNotLinked = La commande fournisseur %s n'est pas liée à cette commande client : liez-la depuis la commande fournisseur (onglet Objets liés) puis recommencez.
+DiamantutilsSTErrorShipBadLot = Expédition depuis l'entrepôt Sous-traitance : le lot « %s » du produit %s ne correspond à aucune commande fournisseur en livraison directe liée à la commande client %s. Lots attendus : %s.
+DiamantutilsSTErrorShipNoDirect = Expédition du produit %s depuis l'entrepôt Sous-traitance : aucune commande fournisseur en livraison directe n'est liée à la commande client %s.
