@@ -25,8 +25,10 @@ class modDiamantutils extends DolibarrModules
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'generic';
 
+		// Format plat (le format imbriqué data/entity casse l'enregistrement en v20)
 		$this->module_parts = array(
-			'hooks' => array(),
+			'hooks' => array('ordersupplierdispatch', 'receptioncard'),
+			'triggers' => 1,
 		);
 
 		$this->dirs = array();

@@ -135,3 +135,7 @@ DiamantutilsSoustraitanceActive = Feature active
 DiamantutilsSoustraitanceInactive = Feature inactive
 DiamantutilsLivraisonDirecte = Direct delivery to customer
 DiamantutilsLivraisonDirecteHelp = YES: the subcontractor delivers the customer directly. The order is received into the Subcontracting warehouse with a lot equal to the purchase order reference.
+DiamantutilsSTBannerReception = Direct delivery to customer: receive into the Subcontracting warehouse, lot = %s
+DiamantutilsSTErrorDirectWarehouse = Order %s is delivered directly to the customer: product %s must be received into the Subcontracting warehouse with lot %s.
+DiamantutilsSTErrorDirectBatch = Order %s is delivered directly to the customer: product %s must be received with lot %s (lot entered: "%s").
+DiamantutilsSTErrorNotDirect = Purchase order %s is not delivered directly to the customer: product %s cannot be received into the Subcontracting warehouse.

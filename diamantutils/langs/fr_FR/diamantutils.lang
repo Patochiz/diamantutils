@@ -135,3 +135,7 @@ DiamantutilsSoustraitanceActive = Fonctionnalité active
 DiamantutilsSoustraitanceInactive = Fonctionnalité inactive
 DiamantutilsLivraisonDirecte = Livraison directe client
 DiamantutilsLivraisonDirecteHelp = OUI : le sous-traitant livre directement le client. La commande est réceptionnée sur l'entrepôt Sous-traitance avec un lot égal à la référence de la commande fournisseur.
+DiamantutilsSTBannerReception = Livraison directe client : réception sur l'entrepôt Sous-traitance, lot = %s
+DiamantutilsSTErrorDirectWarehouse = Commande %s en livraison directe client : la réception du produit %s doit se faire sur l'entrepôt Sous-traitance avec le lot %s.
+DiamantutilsSTErrorDirectBatch = Commande %s en livraison directe client : le produit %s doit être réceptionné avec le lot %s (lot saisi : « %s »).
+DiamantutilsSTErrorNotDirect = La commande fournisseur %s n'est pas en livraison directe client : le produit %s ne peut pas être réceptionné sur l'entrepôt Sous-traitance.
