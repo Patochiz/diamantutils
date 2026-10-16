@@ -20,8 +20,8 @@ class InterfaceDiamantutilstriggers extends DolibarrTriggers
 	 */
 	public function __construct($db)
 	{
-		$this->db = $db;
-		$this->name = preg_replace('/^Interface/i', '', get_class($this));
+		// Le constructeur parent initialise error et errors (déclarés sans valeur en v20)
+		parent::__construct($db);
 		$this->family = 'other';
 		$this->description = 'Triggers DiamantUtils : contrôles des commandes sous-traitées';
 		$this->version = '2.2';
@@ -74,7 +74,7 @@ class InterfaceDiamantutilstriggers extends DolibarrTriggers
 
 		if (!empty($errors)) {
 			dol_syslog(__METHOD__.' '.$action.' id='.$object->id.' : '.implode(' / ', $errors), LOG_WARNING);
-			$this->errors = array_merge($this->errors, $errors);
+			$this->errors = $errors;
 			$this->error = implode(' ', $errors);
 			return -1;
 		}
