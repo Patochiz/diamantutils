@@ -18,10 +18,10 @@ class modDiamantutils extends DolibarrModules
 		$this->family = 'custom';
 		$this->module_position = '90';
 		$this->name = preg_replace('/^mod/i', '', get_class($this));
-		$this->description = "Module interne Diamant Industrie : ordres de transformation de stock par lots (découpe, peinture, changement d'unité), dans le menu GPAO";
-		$this->descriptionlong = "Transformation de stock par lots : consommation de N lots et production de M lots (découpe de profilés, peinture, changement d'unité), avec saisie en pièces × longueur, contrôle d'équilibre, gestion des restes et des pertes, calcul du coût et traçabilité des mouvements de stock.";
+		$this->description = "Module interne Diamant Industrie : ordres de transformation de stock par lots (menu GPAO) et commandes sous-traitées livrées directement au client";
+		$this->descriptionlong = "Transformation de stock par lots : consommation de N lots et production de M lots (découpe de profilés, peinture, changement d'unité), avec saisie en pièces × longueur, contrôle d'équilibre, gestion des restes et des pertes, calcul du coût et traçabilité des mouvements de stock. Commandes sous-traitées : réception sur l'entrepôt Sous-traitance avec lot = ref de la commande fournisseur, BL client prélevé sur ce lot.";
 		$this->editor_name = 'Diamant Industrie';
-		$this->version = '2.1';
+		$this->version = '2.2';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'generic';
 
@@ -37,6 +37,15 @@ class modDiamantutils extends DolibarrModules
 				'chaine',
 				'Longueur %dmm',
 				'Format du nom de lot généré par une transformation (sprintf avec la longueur en mm)',
+				0,
+				'current',
+				0
+			),
+			1 => array(
+				'DIAMANTUTILS_SOUSTRAITANCE_ENABLED',
+				'chaine',
+				'0',
+				'Gestion des commandes sous-traitées (livraison directe client) : 1 = active',
 				0,
 				'current',
 				0
@@ -154,11 +163,25 @@ class modDiamantutils extends DolibarrModules
 			}
 		}
 
+		// Commandes sous-traitées : extrafield sur commande fournisseur et entrepôt Sous-traitance
+		dol_include_once('/diamantutils/lib/soustraitance.lib.php');
+		$error = '';
+		if (diamantutils_st_install_extrafield($this->db, $error) < 0) {
+			$this->error = $error;
+			return -1;
+		}
+		global $user;
+		if (diamantutils_st_install_warehouse($this->db, $user, $error) < 0) {
+			$this->error = $error;
+			return -1;
+		}
+
 		return $this->_init(array(), $options);
 	}
 
 	public function remove($options = '')
 	{
+		// L'extrafield diam_livraison_directe et l'entrepôt Sous-traitance portent des données : conservés
 		return $this->_remove(array(), $options);
 	}
 }

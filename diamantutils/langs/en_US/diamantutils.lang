@@ -117,3 +117,21 @@ DiamantutilsDateConsume = Consumption date
 DiamantutilsCannotConsumeStock = Cannot consume: at least one lot would go below zero (red line). Stock may have changed since validation.
 DiamantutilsConsumedProducts = Consumed product(s)
 DiamantutilsProducedProducts = Produced product(s)
+
+# Subcontracted orders (direct delivery to customer)
+DiamantutilsSoustraitance = Subcontracted orders (direct delivery to customer)
+DiamantutilsSoustraitanceEnabled = Enable subcontracted orders management
+DiamantutilsSoustraitanceEnabledDesc = When disabled, no check nor prefill is applied to receptions and shipments.
+DiamantutilsSoustraitanceWarehouse = Subcontracting warehouse
+DiamantutilsSoustraitanceWarehouseHelp = Transit warehouse for orders delivered directly by the subcontractor. Left empty on activation, warehouse SOUS-TRAITANCE is created or reused.
+DiamantutilsSoustraitanceWarehouseLabel = Subcontracting
+DiamantutilsSoustraitanceWarehouseDesc = Transit stock of orders delivered directly by the subcontractor — must be 0
+DiamantutilsSoustraitanceStatus = Installation status
+DiamantutilsSoustraitanceExtrafieldOk = Extra field %s exists on purchase orders
+DiamantutilsSoustraitanceExtrafieldMissing = Extra field %s missing: it will be created on save with the feature enabled
+DiamantutilsSoustraitanceWarehouseOk = Warehouse:
+DiamantutilsSoustraitanceWarehouseMissing = Subcontracting warehouse not set or not found
+DiamantutilsSoustraitanceActive = Feature active
+DiamantutilsSoustraitanceInactive = Feature inactive
+DiamantutilsLivraisonDirecte = Direct delivery to customer
+DiamantutilsLivraisonDirecteHelp = YES: the subcontractor delivers the customer directly. The order is received into the Subcontracting warehouse with a lot equal to the purchase order reference.

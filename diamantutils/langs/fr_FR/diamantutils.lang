@@ -117,3 +117,21 @@ DiamantutilsDateConsume = Date de consommation
 DiamantutilsCannotConsumeStock = Consommation impossible : au moins un lot passerait en stock négatif (ligne en rouge). Le stock a pu bouger depuis la validation.
 DiamantutilsConsumedProducts = Produit(s) consommé(s)
 DiamantutilsProducedProducts = Produit(s) produit(s)
+
+# Commandes sous-traitées (livraison directe client)
+DiamantutilsSoustraitance = Commandes sous-traitées (livraison directe client)
+DiamantutilsSoustraitanceEnabled = Activer la gestion des commandes sous-traitées
+DiamantutilsSoustraitanceEnabledDesc = Désactivée, aucun contrôle ni pré-remplissage n'est appliqué aux réceptions et expéditions.
+DiamantutilsSoustraitanceWarehouse = Entrepôt Sous-traitance
+DiamantutilsSoustraitanceWarehouseHelp = Entrepôt transitoire des commandes livrées directement par le sous-traitant. Laissé vide à l'activation, l'entrepôt SOUS-TRAITANCE est créé ou réutilisé.
+DiamantutilsSoustraitanceWarehouseLabel = Sous-traitance
+DiamantutilsSoustraitanceWarehouseDesc = Stock transitoire des commandes livrées directement par le sous-traitant — doit être à 0
+DiamantutilsSoustraitanceStatus = État de l'installation
+DiamantutilsSoustraitanceExtrafieldOk = Attribut supplémentaire %s présent sur les commandes fournisseur
+DiamantutilsSoustraitanceExtrafieldMissing = Attribut supplémentaire %s absent : il sera créé à l'enregistrement avec la fonctionnalité activée
+DiamantutilsSoustraitanceWarehouseOk = Entrepôt :
+DiamantutilsSoustraitanceWarehouseMissing = Entrepôt Sous-traitance non défini ou introuvable
+DiamantutilsSoustraitanceActive = Fonctionnalité active
+DiamantutilsSoustraitanceInactive = Fonctionnalité inactive
+DiamantutilsLivraisonDirecte = Livraison directe client
+DiamantutilsLivraisonDirecteHelp = OUI : le sous-traitant livre directement le client. La commande est réceptionnée sur l'entrepôt Sous-traitance avec un lot égal à la référence de la commande fournisseur.
