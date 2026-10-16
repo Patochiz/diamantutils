@@ -146,3 +146,25 @@ DiamantutilsSTForeignLot = Lot %s non lié à cette commande client
 DiamantutilsSTErrorShipNotLinked = La commande fournisseur %s n'est pas liée à cette commande client : liez-la depuis la commande fournisseur (onglet Objets liés) puis recommencez.
 DiamantutilsSTErrorShipBadLot = Expédition depuis l'entrepôt Sous-traitance : le lot « %s » du produit %s ne correspond à aucune commande fournisseur en livraison directe liée à la commande client %s. Lots attendus : %s.
 DiamantutilsSTErrorShipNoDirect = Expédition du produit %s depuis l'entrepôt Sous-traitance : aucune commande fournisseur en livraison directe n'est liée à la commande client %s.
+
+# Suivi des commandes sous-traitées
+DiamantutilsSTListTitle = Sous-traitance en cours
+DiamantutilsSTListDesc = Lots non nuls de l'entrepôt Sous-traitance. En régime normal, tous les lots sont à 0 : un lot affiché correspond à une commande fournisseur réceptionnée dont le BL client n'est pas encore validé.
+DiamantutilsSTListNbAnomalies = %s ligne(s) en anomalie
+DiamantutilsSTListSearch = Lot, produit, sous-traitant, commande client
+DiamantutilsSTListOnlyAnomalies = Anomalies seulement
+DiamantutilsSTListEmpty = Aucun lot en cours : l'entrepôt Sous-traitance est à 0.
+DiamantutilsSTColLot = Lot / commande fournisseur
+DiamantutilsSTColSupplier = Sous-traitant
+DiamantutilsSTColOrder = Commande client liée
+DiamantutilsSTColDraft = BL brouillon
+DiamantutilsSTColQty = Quantité restante
+DiamantutilsSTColDateReception = Date de réception
+DiamantutilsSTColAnomalies = Anomalies
+DiamantutilsSTNoDraft = À créer
+DiamantutilsSTAnoNegative = Quantité négative : lot du BL différent du lot de réception ?
+DiamantutilsSTAnoNoCF = Lot sans commande fournisseur correspondante
+DiamantutilsSTAnoNotDirect = Commande fournisseur non marquée « Livraison directe client »
+DiamantutilsSTAnoNoOrder = Commande fournisseur sans commande client liée
+DiamantutilsSTBoxLabel = Sous-traitance en cours
+DiamantutilsSTBoxNbLots = %s lot(s) en cours (%s ligne(s) produit)

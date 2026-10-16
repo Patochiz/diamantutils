@@ -33,6 +33,11 @@ class modDiamantutils extends DolibarrModules
 
 		$this->dirs = array();
 
+		// Widget d'accueil « Sous-traitance en cours »
+		$this->boxes = array(
+			0 => array('file' => 'box_diamantutils_soustraitance.php@diamantutils', 'note' => '', 'enabledbydefaulton' => 'Home'),
+		);
+
 		$this->const = array(
 			0 => array(
 				'DIAMANTUTILS_TRANSFO_LOT_FORMAT',
@@ -85,6 +90,13 @@ class modDiamantutils extends DolibarrModules
 		$this->rights[$r][4] = 'transformation';
 		$this->rights[$r][5] = 'cancel';
 		$r++;
+		$this->rights[$r][0] = $this->numero.'04';
+		$this->rights[$r][1] = 'Consulter les commandes sous-traitées en cours';
+		$this->rights[$r][2] = 'r';
+		$this->rights[$r][3] = 0;
+		$this->rights[$r][4] = 'soustraitance';
+		$this->rights[$r][5] = 'read';
+		$r++;
 
 		// Menus gauche dans le menu haut GPAO (eldy : mainmenu=mrp)
 		$this->menu = array();
@@ -129,6 +141,21 @@ class modDiamantutils extends DolibarrModules
 			'position' => 1000 + $r,
 			'enabled' => 'isModEnabled("diamantutils")',
 			'perms' => '$user->hasRight("diamantutils", "transformation", "read")',
+			'target' => '',
+			'user' => 2,
+		);
+		// Menu gauche Produits/Stocks (eldy : mainmenu=products, leftmenu=stock)
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=products,fk_leftmenu=stock',
+			'type' => 'left',
+			'titre' => 'DiamantutilsSTListTitle',
+			'mainmenu' => 'products',
+			'leftmenu' => 'diamantutils_st',
+			'url' => '/diamantutils/soustraitance_list.php?mainmenu=products&leftmenu=stock',
+			'langs' => 'diamantutils@diamantutils',
+			'position' => 1000 + $r,
+			'enabled' => 'isModEnabled("diamantutils") && getDolGlobalInt("DIAMANTUTILS_SOUSTRAITANCE_ENABLED")',
+			'perms' => '$user->hasRight("diamantutils", "soustraitance", "read")',
 			'target' => '',
 			'user' => 2,
 		);

@@ -146,3 +146,25 @@ DiamantutilsSTForeignLot = Lot %s not linked to this sales order
 DiamantutilsSTErrorShipNotLinked = Purchase order %s is not linked to this sales order: link it from the purchase order (Linked objects tab) then try again.
 DiamantutilsSTErrorShipBadLot = Shipment from the Subcontracting warehouse: lot "%s" of product %s does not match any direct-delivery purchase order linked to sales order %s. Expected lots: %s.
 DiamantutilsSTErrorShipNoDirect = Shipment of product %s from the Subcontracting warehouse: no direct-delivery purchase order is linked to sales order %s.
+
+# Subcontracted orders follow-up
+DiamantutilsSTListTitle = Subcontracting in progress
+DiamantutilsSTListDesc = Non-zero lots in the Subcontracting warehouse. Normally all lots are 0: a listed lot is a received purchase order whose customer delivery note is not validated yet.
+DiamantutilsSTListNbAnomalies = %s line(s) with anomalies
+DiamantutilsSTListSearch = Lot, product, subcontractor, sales order
+DiamantutilsSTListOnlyAnomalies = Anomalies only
+DiamantutilsSTListEmpty = No lot in progress: the Subcontracting warehouse is empty.
+DiamantutilsSTColLot = Lot / purchase order
+DiamantutilsSTColSupplier = Subcontractor
+DiamantutilsSTColOrder = Linked sales order
+DiamantutilsSTColDraft = Draft shipment
+DiamantutilsSTColQty = Remaining quantity
+DiamantutilsSTColDateReception = Reception date
+DiamantutilsSTColAnomalies = Anomalies
+DiamantutilsSTNoDraft = To create
+DiamantutilsSTAnoNegative = Negative quantity: shipment lot different from reception lot?
+DiamantutilsSTAnoNoCF = Lot without matching purchase order
+DiamantutilsSTAnoNotDirect = Purchase order not flagged "Direct delivery to customer"
+DiamantutilsSTAnoNoOrder = Purchase order without linked sales order
+DiamantutilsSTBoxLabel = Subcontracting in progress
+DiamantutilsSTBoxNbLots = %s lot(s) in progress (%s product line(s))

@@ -26,6 +26,8 @@ class DiamantutilsSoustraitance
 	/** @var DoliDB */
 	public $db;
 
+	public $error = '';
+
 	/** @var array Cache des commandes fournisseur lues */
 	private $cache_cf = array();
 
@@ -449,6 +451,163 @@ class DiamantutilsSoustraitance
 			}
 		}
 		return $errors;
+	}
+
+	/**
+	 * Lots non nuls de l'entrepôt Sous-traitance, avec CF, sous-traitant, commandes clients
+	 * liées, BL brouillons, date de réception et anomalies
+	 *
+	 * Anomalies (clés de traduction) : quantité négative, lot sans CF, CF à NON, CF sans
+	 * commande client liée.
+	 *
+	 * @return	array|int	Liste de lignes, <0 si erreur SQL
+	 */
+	public function getInProgressLots()
+	{
+		$sql = "SELECT pb.rowid as pbid, pb.batch, pb.qty, p.rowid as fk_product, p.ref as product_ref, p.label as product_label,";
+		$sql .= " cf.rowid as cf_id, cf.ref as cf_ref, cf.date_commande, s.rowid as socid, s.nom as soc_name";
+		$sql .= " FROM ".MAIN_DB_PREFIX."product_batch as pb";
+		$sql .= " INNER JOIN ".MAIN_DB_PREFIX."product_stock as ps ON ps.rowid = pb.fk_product_stock";
+		$sql .= " INNER JOIN ".MAIN_DB_PREFIX."product as p ON p.rowid = ps.fk_product";
+		$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."commande_fournisseur as cf ON cf.ref = pb.batch AND cf.entity IN (".getEntity('supplier_order').")";
+		$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."societe as s ON s.rowid = cf.fk_soc";
+		$sql .= " WHERE ps.fk_entrepot = ".((int) diamantutils_st_warehouse_id());
+		$sql .= " AND ABS(pb.qty) > 0.0001";
+		$sql .= " ORDER BY (cf.date_commande IS NULL), cf.date_commande, pb.batch, p.ref";
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->error = $this->db->lasterror();
+			return -1;
+		}
+		$rows = array();
+		while ($obj = $this->db->fetch_object($resql)) {
+			$rows[] = $obj;
+		}
+		$this->db->free($resql);
+
+		$res = array();
+		$orders_by_cf = array();
+		foreach ($rows as $obj) {
+			$qty = (float) price2num($obj->qty, 'MS');
+			$cf = ($obj->cf_id ? $this->getSupplierOrder($obj->cf_id) : null);
+			if ($cf && !isset($orders_by_cf[$cf['id']])) {
+				$orders_by_cf[$cf['id']] = $this->getLinkedCustomerOrders($cf['id']);
+			}
+			$orders = ($cf ? $orders_by_cf[$cf['id']] : array());
+
+			$anomalies = array();
+			if ($qty < 0) {
+				$anomalies[] = 'DiamantutilsSTAnoNegative';
+			}
+			if (!$cf) {
+				$anomalies[] = 'DiamantutilsSTAnoNoCF';
+			} else {
+				if (!$cf['direct']) {
+					$anomalies[] = 'DiamantutilsSTAnoNotDirect';
+				}
+				if (empty($orders)) {
+					$anomalies[] = 'DiamantutilsSTAnoNoOrder';
+				}
+			}
+
+			$res[] = array(
+				'batch' => (string) $obj->batch,
+				'qty' => $qty,
+				'fk_product' => (int) $obj->fk_product,
+				'product_ref' => (string) $obj->product_ref,
+				'product_label' => (string) $obj->product_label,
+				'cf' => $cf,
+				'date_commande' => $this->db->jdate($obj->date_commande),
+				'socid' => (int) $obj->socid,
+				'soc_name' => (string) $obj->soc_name,
+				'orders' => $orders,
+				'drafts' => $this->getDraftShipments($obj->batch, $obj->fk_product),
+				'date_reception' => ($cf ? $this->getLastReceptionDate($cf['id'], $obj->batch, $obj->fk_product) : null),
+				'anomalies' => $anomalies,
+			);
+		}
+		return $res;
+	}
+
+	/**
+	 * Commandes clients liées à une commande fournisseur (llx_element_element, dans les deux sens)
+	 *
+	 * @param	int		$fk_cf	Id commande fournisseur
+	 * @return	array			Liste de array('id', 'ref')
+	 */
+	public function getLinkedCustomerOrders($fk_cf)
+	{
+		$fk_cf = (int) $fk_cf;
+		$res = array();
+		$sql = "SELECT c.rowid, c.ref FROM ".MAIN_DB_PREFIX."commande as c";
+		$sql .= " WHERE c.rowid IN (";
+		$sql .= "SELECT fk_source FROM ".MAIN_DB_PREFIX."element_element WHERE sourcetype = 'commande' AND targettype = 'order_supplier' AND fk_target = ".$fk_cf;
+		$sql .= " UNION SELECT fk_target FROM ".MAIN_DB_PREFIX."element_element WHERE targettype = 'commande' AND sourcetype = 'order_supplier' AND fk_source = ".$fk_cf;
+		$sql .= ") ORDER BY c.ref";
+		$resql = $this->db->query($sql);
+		if ($resql) {
+			while ($obj = $this->db->fetch_object($resql)) {
+				$res[] = array('id' => (int) $obj->rowid, 'ref' => (string) $obj->ref);
+			}
+			$this->db->free($resql);
+		}
+		return $res;
+	}
+
+	/**
+	 * Expéditions brouillon qui prélèvent un lot d'un produit
+	 *
+	 * @param	string	$batch			Lot
+	 * @param	int		$fk_product		Id produit
+	 * @return	array					Liste de array('id', 'ref')
+	 */
+	public function getDraftShipments($batch, $fk_product)
+	{
+		$res = array();
+		$sql = "SELECT DISTINCT e.rowid, e.ref FROM ".MAIN_DB_PREFIX."expedition as e";
+		$sql .= " INNER JOIN ".MAIN_DB_PREFIX."expeditiondet as ed ON ed.fk_expedition = e.rowid";
+		$sql .= " INNER JOIN ".MAIN_DB_PREFIX."expeditiondet_batch as edb ON edb.fk_expeditiondet = ed.rowid";
+		$sql .= " INNER JOIN ".MAIN_DB_PREFIX."commandedet as cd ON cd.rowid = ed.fk_elementdet";
+		$sql .= " WHERE e.fk_statut = 0";
+		$sql .= " AND e.entity IN (".getEntity('expedition').")";
+		$sql .= " AND edb.batch = '".$this->db->escape($batch)."'";
+		$sql .= " AND cd.fk_product = ".((int) $fk_product);
+		$sql .= " ORDER BY e.rowid";
+		$resql = $this->db->query($sql);
+		if ($resql) {
+			while ($obj = $this->db->fetch_object($resql)) {
+				$res[] = array('id' => (int) $obj->rowid, 'ref' => (string) $obj->ref);
+			}
+			$this->db->free($resql);
+		}
+		return $res;
+	}
+
+	/**
+	 * Date de la dernière réception validée d'un lot d'une CF sur l'entrepôt Sous-traitance
+	 *
+	 * @param	int		$fk_cf			Id commande fournisseur
+	 * @param	string	$batch			Lot
+	 * @param	int		$fk_product		Id produit
+	 * @return	int|null				Timestamp
+	 */
+	public function getLastReceptionDate($fk_cf, $batch, $fk_product)
+	{
+		// Réception validée : date de validation ; ventilation directe : date de la ligne
+		$sql = "SELECT MAX(COALESCE(r.date_valid, rb.datec)) as datec FROM ".MAIN_DB_PREFIX."receptiondet_batch as rb";
+		$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."reception as r ON r.rowid = rb.fk_reception";
+		$sql .= " WHERE rb.fk_element = ".((int) $fk_cf);
+		$sql .= " AND rb.fk_product = ".((int) $fk_product);
+		$sql .= " AND rb.fk_entrepot = ".((int) diamantutils_st_warehouse_id());
+		$sql .= " AND rb.batch = '".$this->db->escape($batch)."'";
+		$sql .= " AND (rb.fk_reception IS NULL OR r.fk_statut > 0)";
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			return null;
+		}
+		$obj = $this->db->fetch_object($resql);
+		$this->db->free($resql);
+		return (($obj && $obj->datec) ? $this->db->jdate($obj->datec) : null);
 	}
 
 	/**
