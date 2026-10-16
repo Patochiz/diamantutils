@@ -13,6 +13,8 @@ if (!$res) {
 require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/product/class/html.formproduct.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/product.lib.php';
+require_once DOL_DOCUMENT_ROOT.'/product/stock/class/entrepot.class.php';
+dol_include_once('/diamantutils/lib/soustraitance.lib.php');
 
 if (!$user->admin) {
 	accessforbidden();
@@ -50,12 +52,37 @@ if ($action == 'update') {
 		}
 	}
 
+	// Commandes sous-traitées : activation et entrepôt
+	$st_enabled = GETPOSTINT('DIAMANTUTILS_SOUSTRAITANCE_ENABLED') ? 1 : 0;
+	$st_warehouse = GETPOSTINT('DIAMANTUTILS_SOUSTRAITANCE_WAREHOUSE_ID');
+	if ($st_warehouse > 0) {
+		if (dolibarr_set_const($db, 'DIAMANTUTILS_SOUSTRAITANCE_WAREHOUSE_ID', $st_warehouse, 'chaine', 0, '', $conf->entity) < 0) {
+			$error++;
+		}
+	}
+	if ($st_enabled) {
+		// Installation complétée si besoin (extrafield supprimé, entrepôt non défini)
+		$errmsg = '';
+		if (diamantutils_st_install_extrafield($db, $errmsg) < 0) {
+			setEventMessages($errmsg, null, 'errors');
+			$error++;
+		}
+		if (!($st_warehouse > 0) && diamantutils_st_install_warehouse($db, $user, $errmsg) < 0) {
+			setEventMessages($errmsg, null, 'errors');
+			$error++;
+		}
+	}
+	if (dolibarr_set_const($db, 'DIAMANTUTILS_SOUSTRAITANCE_ENABLED', $st_enabled, 'chaine', 0, '', $conf->entity) < 0) {
+		$error++;
+	}
+
 	if (!$error) {
 		setEventMessages($langs->trans('DiamantutilsConfigUpdated'), null);
 	}
 }
 
 $formproduct = new FormProduct($db);
+$form = new Form($db);
 
 llxHeader('', $langs->trans('DiamantutilsSetupTitle'));
 
@@ -83,6 +110,45 @@ print $langs->trans('DiamantutilsTransfoLotFormat').'<br>';
 print '<span class="opacitymedium">'.$langs->trans('DiamantutilsTransfoLotFormatDesc', '%d', 'Longueur %dmm').'</span>';
 print '</td><td>';
 print '<input type="text" class="flat minwidth200" name="DIAMANTUTILS_TRANSFO_LOT_FORMAT" value="'.dol_escape_htmltag(getDolGlobalString('DIAMANTUTILS_TRANSFO_LOT_FORMAT', 'Longueur %dmm')).'">';
+print '</td></tr>';
+
+// Commandes sous-traitées
+print '<tr class="liste_titre"><td colspan="2">'.$langs->trans('DiamantutilsSoustraitance').'</td></tr>';
+
+print '<tr class="oddeven"><td>';
+print $langs->trans('DiamantutilsSoustraitanceEnabled').'<br>';
+print '<span class="opacitymedium">'.$langs->trans('DiamantutilsSoustraitanceEnabledDesc').'</span>';
+print '</td><td>';
+print $form->selectyesno('DIAMANTUTILS_SOUSTRAITANCE_ENABLED', getDolGlobalInt('DIAMANTUTILS_SOUSTRAITANCE_ENABLED'), 1);
+print '</td></tr>';
+
+print '<tr class="oddeven"><td>';
+print $langs->trans('DiamantutilsSoustraitanceWarehouse').'<br>';
+print '<span class="opacitymedium">'.$langs->trans('DiamantutilsSoustraitanceWarehouseHelp').'</span>';
+print '</td><td>';
+print $formproduct->selectWarehouses(diamantutils_st_warehouse_id(), 'DIAMANTUTILS_SOUSTRAITANCE_WAREHOUSE_ID', 'warehouseopen', 1);
+print '</td></tr>';
+
+// État de l'installation
+print '<tr class="oddeven"><td>'.$langs->trans('DiamantutilsSoustraitanceStatus').'</td><td>';
+if (diamantutils_st_extrafield_exists($db)) {
+	print img_picto('', 'tick', 'class="pictofixedwidth"').$langs->trans('DiamantutilsSoustraitanceExtrafieldOk', DIAMANTUTILS_ST_EXTRAFIELD);
+} else {
+	print img_warning('', 'class="pictofixedwidth"').'<span class="warning">'.$langs->trans('DiamantutilsSoustraitanceExtrafieldMissing', DIAMANTUTILS_ST_EXTRAFIELD).'</span>';
+}
+print '<br>';
+$st_entrepot = new Entrepot($db);
+if (diamantutils_st_warehouse_id() > 0 && $st_entrepot->fetch(diamantutils_st_warehouse_id()) > 0) {
+	print img_picto('', 'tick', 'class="pictofixedwidth"').$langs->trans('DiamantutilsSoustraitanceWarehouseOk').' '.$st_entrepot->getNomUrl(1);
+} else {
+	print img_warning('', 'class="pictofixedwidth"').'<span class="warning">'.$langs->trans('DiamantutilsSoustraitanceWarehouseMissing').'</span>';
+}
+print '<br>';
+if (diamantutils_st_enabled()) {
+	print img_picto('', 'tick', 'class="pictofixedwidth"').$langs->trans('DiamantutilsSoustraitanceActive');
+} else {
+	print '<span class="opacitymedium">'.$langs->trans('DiamantutilsSoustraitanceInactive').'</span>';
+}
 print '</td></tr>';
 
 print '</table>';

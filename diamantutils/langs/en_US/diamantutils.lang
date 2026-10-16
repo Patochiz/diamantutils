@@ -117,3 +117,54 @@ DiamantutilsDateConsume = Consumption date
 DiamantutilsCannotConsumeStock = Cannot consume: at least one lot would go below zero (red line). Stock may have changed since validation.
 DiamantutilsConsumedProducts = Consumed product(s)
 DiamantutilsProducedProducts = Produced product(s)
+
+# Subcontracted orders (direct delivery to customer)
+DiamantutilsSoustraitance = Subcontracted orders (direct delivery to customer)
+DiamantutilsSoustraitanceEnabled = Enable subcontracted orders management
+DiamantutilsSoustraitanceEnabledDesc = When disabled, no check nor prefill is applied to receptions and shipments.
+DiamantutilsSoustraitanceWarehouse = Subcontracting warehouse
+DiamantutilsSoustraitanceWarehouseHelp = Transit warehouse for orders delivered directly by the subcontractor. Left empty on activation, warehouse SOUS-TRAITANCE is created or reused.
+DiamantutilsSoustraitanceWarehouseLabel = Subcontracting
+DiamantutilsSoustraitanceWarehouseDesc = Transit stock of orders delivered directly by the subcontractor — must be 0
+DiamantutilsSoustraitanceStatus = Installation status
+DiamantutilsSoustraitanceExtrafieldOk = Extra field %s exists on purchase orders
+DiamantutilsSoustraitanceExtrafieldMissing = Extra field %s missing: it will be created on save with the feature enabled
+DiamantutilsSoustraitanceWarehouseOk = Warehouse:
+DiamantutilsSoustraitanceWarehouseMissing = Subcontracting warehouse not set or not found
+DiamantutilsSoustraitanceActive = Feature active
+DiamantutilsSoustraitanceInactive = Feature inactive
+DiamantutilsLivraisonDirecte = Direct delivery to customer
+DiamantutilsLivraisonDirecteHelp = YES: the subcontractor delivers the customer directly. The order is received into the Subcontracting warehouse with a lot equal to the purchase order reference.
+DiamantutilsSTBannerReception = Direct delivery to customer: receive into the Subcontracting warehouse, lot = %s
+DiamantutilsSTErrorDirectWarehouse = Order %s is delivered directly to the customer: product %s must be received into the Subcontracting warehouse with lot %s.
+DiamantutilsSTErrorDirectBatch = Order %s is delivered directly to the customer: product %s must be received with lot %s (lot entered: "%s").
+DiamantutilsSTErrorNotDirect = Purchase order %s is not delivered directly to the customer: product %s cannot be received into the Subcontracting warehouse.
+DiamantutilsSTBannerShipment = Direct delivery to customer (linked purchase orders: %s): ship from the Subcontracting warehouse, lot = purchase order reference.
+DiamantutilsSTBannerShipmentStock = Available lots: %s.
+DiamantutilsSTBannerShipmentNoStock = No lot in stock in the Subcontracting warehouse: has the purchase order been received?
+DiamantutilsSTForeignLot = Lot %s not linked to this sales order
+DiamantutilsSTErrorShipNotLinked = Purchase order %s is not linked to this sales order: link it from the purchase order (Linked objects tab) then try again.
+DiamantutilsSTErrorShipBadLot = Shipment from the Subcontracting warehouse: lot "%s" of product %s does not match any direct-delivery purchase order linked to sales order %s. Expected lots: %s.
+DiamantutilsSTErrorShipNoDirect = Shipment of product %s from the Subcontracting warehouse: no direct-delivery purchase order is linked to sales order %s.
+
+# Subcontracted orders follow-up
+DiamantutilsSTListTitle = Subcontracting in progress
+DiamantutilsSTListDesc = Non-zero lots in the Subcontracting warehouse. Normally all lots are 0: a listed lot is a received purchase order whose customer delivery note is not validated yet.
+DiamantutilsSTListNbAnomalies = %s line(s) with anomalies
+DiamantutilsSTListSearch = Lot, product, subcontractor, sales order
+DiamantutilsSTListOnlyAnomalies = Anomalies only
+DiamantutilsSTListEmpty = No lot in progress: the Subcontracting warehouse is empty.
+DiamantutilsSTColLot = Lot / purchase order
+DiamantutilsSTColSupplier = Subcontractor
+DiamantutilsSTColOrder = Linked sales order
+DiamantutilsSTColDraft = Draft shipment
+DiamantutilsSTColQty = Remaining quantity
+DiamantutilsSTColDateReception = Reception date
+DiamantutilsSTColAnomalies = Anomalies
+DiamantutilsSTNoDraft = To create
+DiamantutilsSTAnoNegative = Negative quantity: shipment lot different from reception lot?
+DiamantutilsSTAnoNoCF = Lot without matching purchase order
+DiamantutilsSTAnoNotDirect = Purchase order not flagged "Direct delivery to customer"
+DiamantutilsSTAnoNoOrder = Purchase order without linked sales order
+DiamantutilsSTBoxLabel = Subcontracting in progress
+DiamantutilsSTBoxNbLots = %s lot(s) in progress (%s product line(s))

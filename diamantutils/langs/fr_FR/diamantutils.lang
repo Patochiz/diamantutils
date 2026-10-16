@@ -117,3 +117,54 @@ DiamantutilsDateConsume = Date de consommation
 DiamantutilsCannotConsumeStock = Consommation impossible : au moins un lot passerait en stock négatif (ligne en rouge). Le stock a pu bouger depuis la validation.
 DiamantutilsConsumedProducts = Produit(s) consommé(s)
 DiamantutilsProducedProducts = Produit(s) produit(s)
+
+# Commandes sous-traitées (livraison directe client)
+DiamantutilsSoustraitance = Commandes sous-traitées (livraison directe client)
+DiamantutilsSoustraitanceEnabled = Activer la gestion des commandes sous-traitées
+DiamantutilsSoustraitanceEnabledDesc = Désactivée, aucun contrôle ni pré-remplissage n'est appliqué aux réceptions et expéditions.
+DiamantutilsSoustraitanceWarehouse = Entrepôt Sous-traitance
+DiamantutilsSoustraitanceWarehouseHelp = Entrepôt transitoire des commandes livrées directement par le sous-traitant. Laissé vide à l'activation, l'entrepôt SOUS-TRAITANCE est créé ou réutilisé.
+DiamantutilsSoustraitanceWarehouseLabel = Sous-traitance
+DiamantutilsSoustraitanceWarehouseDesc = Stock transitoire des commandes livrées directement par le sous-traitant — doit être à 0
+DiamantutilsSoustraitanceStatus = État de l'installation
+DiamantutilsSoustraitanceExtrafieldOk = Attribut supplémentaire %s présent sur les commandes fournisseur
+DiamantutilsSoustraitanceExtrafieldMissing = Attribut supplémentaire %s absent : il sera créé à l'enregistrement avec la fonctionnalité activée
+DiamantutilsSoustraitanceWarehouseOk = Entrepôt :
+DiamantutilsSoustraitanceWarehouseMissing = Entrepôt Sous-traitance non défini ou introuvable
+DiamantutilsSoustraitanceActive = Fonctionnalité active
+DiamantutilsSoustraitanceInactive = Fonctionnalité inactive
+DiamantutilsLivraisonDirecte = Livraison directe client
+DiamantutilsLivraisonDirecteHelp = OUI : le sous-traitant livre directement le client. La commande est réceptionnée sur l'entrepôt Sous-traitance avec un lot égal à la référence de la commande fournisseur.
+DiamantutilsSTBannerReception = Livraison directe client : réception sur l'entrepôt Sous-traitance, lot = %s
+DiamantutilsSTErrorDirectWarehouse = Commande %s en livraison directe client : la réception du produit %s doit se faire sur l'entrepôt Sous-traitance avec le lot %s.
+DiamantutilsSTErrorDirectBatch = Commande %s en livraison directe client : le produit %s doit être réceptionné avec le lot %s (lot saisi : « %s »).
+DiamantutilsSTErrorNotDirect = La commande fournisseur %s n'est pas en livraison directe client : le produit %s ne peut pas être réceptionné sur l'entrepôt Sous-traitance.
+DiamantutilsSTBannerShipment = Livraison directe client (commandes fournisseur liées : %s) : expédier depuis l'entrepôt Sous-traitance, lot = ref de la commande fournisseur.
+DiamantutilsSTBannerShipmentStock = Lots disponibles : %s.
+DiamantutilsSTBannerShipmentNoStock = Aucun lot en stock dans l'entrepôt Sous-traitance : la commande fournisseur a-t-elle été réceptionnée ?
+DiamantutilsSTForeignLot = Lot %s non lié à cette commande client
+DiamantutilsSTErrorShipNotLinked = La commande fournisseur %s n'est pas liée à cette commande client : liez-la depuis la commande fournisseur (onglet Objets liés) puis recommencez.
+DiamantutilsSTErrorShipBadLot = Expédition depuis l'entrepôt Sous-traitance : le lot « %s » du produit %s ne correspond à aucune commande fournisseur en livraison directe liée à la commande client %s. Lots attendus : %s.
+DiamantutilsSTErrorShipNoDirect = Expédition du produit %s depuis l'entrepôt Sous-traitance : aucune commande fournisseur en livraison directe n'est liée à la commande client %s.
+
+# Suivi des commandes sous-traitées
+DiamantutilsSTListTitle = Sous-traitance en cours
+DiamantutilsSTListDesc = Lots non nuls de l'entrepôt Sous-traitance. En régime normal, tous les lots sont à 0 : un lot affiché correspond à une commande fournisseur réceptionnée dont le BL client n'est pas encore validé.
+DiamantutilsSTListNbAnomalies = %s ligne(s) en anomalie
+DiamantutilsSTListSearch = Lot, produit, sous-traitant, commande client
+DiamantutilsSTListOnlyAnomalies = Anomalies seulement
+DiamantutilsSTListEmpty = Aucun lot en cours : l'entrepôt Sous-traitance est à 0.
+DiamantutilsSTColLot = Lot / commande fournisseur
+DiamantutilsSTColSupplier = Sous-traitant
+DiamantutilsSTColOrder = Commande client liée
+DiamantutilsSTColDraft = BL brouillon
+DiamantutilsSTColQty = Quantité restante
+DiamantutilsSTColDateReception = Date de réception
+DiamantutilsSTColAnomalies = Anomalies
+DiamantutilsSTNoDraft = À créer
+DiamantutilsSTAnoNegative = Quantité négative : lot du BL différent du lot de réception ?
+DiamantutilsSTAnoNoCF = Lot sans commande fournisseur correspondante
+DiamantutilsSTAnoNotDirect = Commande fournisseur non marquée « Livraison directe client »
+DiamantutilsSTAnoNoOrder = Commande fournisseur sans commande client liée
+DiamantutilsSTBoxLabel = Sous-traitance en cours
+DiamantutilsSTBoxNbLots = %s lot(s) en cours (%s ligne(s) produit)
