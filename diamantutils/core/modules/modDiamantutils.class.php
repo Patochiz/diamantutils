@@ -18,10 +18,10 @@ class modDiamantutils extends DolibarrModules
 		$this->family = 'custom';
 		$this->module_position = '90';
 		$this->name = preg_replace('/^mod/i', '', get_class($this));
-		$this->description = "Module interne Diamant Industrie : ordres de transformation de stock par lots (menu GPAO) commandes sous-traitées livrées directement au client et listes personnalisées SQL (menu Outils)";
-		$this->descriptionlong = "Transformation de stock par lots : consommation de N lots et production de M lots (découpe de profilés, peinture, changement d'unité), avec saisie en pièces × longueur, contrôle d'équilibre, gestion des restes et des pertes, calcul du coût et traçabilité des mouvements de stock. Commandes sous-traitées : réception sur l'entrepôt Sous-traitance avec lot = ref de la commande fournisseur, BL client prélevé sur ce lot. Listes personnalisées : requêtes SQL en lecture seule enregistrées par un administrateur, consultables avec recherche, tri, pagination et export CSV.";
+		$this->description = "Module interne Diamant Industrie : ordres de transformation de stock par lots (menu GPAO), commandes sous-traitées livrées directement au client, listes personnalisées SQL (menu Outils) et description pour devis sur la fiche produit";
+		$this->descriptionlong = "Transformation de stock par lots : consommation de N lots et production de M lots (découpe de profilés, peinture, changement d'unité), avec saisie en pièces × longueur, contrôle d'équilibre, gestion des restes et des pertes, calcul du coût et traçabilité des mouvements de stock. Commandes sous-traitées : réception sur l'entrepôt Sous-traitance avec lot = ref de la commande fournisseur, BL client prélevé sur ce lot. Listes personnalisées : requêtes SQL en lecture seule enregistrées par un administrateur, consultables avec recherche, tri, pagination et export CSV. Description pour devis : texte saisi sur la fiche produit, repris sur les lignes de propositions commerciales à la place de la description standard.";
 		$this->editor_name = 'Diamant Industrie';
-		$this->version = '2.4';
+		$this->version = '2.5';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'generic';
 
@@ -80,6 +80,24 @@ class modDiamantutils extends DolibarrModules
 				'chaine',
 				'50000',
 				'Listes personnalisées : nombre maximum de lignes d\'un export CSV',
+				0,
+				'current',
+				0
+			),
+			5 => array(
+				'DIAMANTUTILS_DESC_PROPAL',
+				'chaine',
+				'0',
+				'Description pour devis reprise sur les lignes de propositions commerciales : 1 = active',
+				0,
+				'current',
+				0
+			),
+			6 => array(
+				'DIAMANTUTILS_DESC_PROPAL_MODE',
+				'chaine',
+				'REPLACE',
+				'Description pour devis : REPLACE = remplace la description de la ligne, PREPEND = placée avant',
 				0,
 				'current',
 				0
@@ -276,12 +294,20 @@ class modDiamantutils extends DolibarrModules
 			return -1;
 		}
 
+		// Description pour devis : extrafield produit desc_propal
+		dol_include_once('/diamantutils/lib/descpropal.lib.php');
+		if (diamantutils_descpropal_install_extrafield($this->db, $error) < 0) {
+			$this->error = $error;
+			return -1;
+		}
+
 		return $this->_init(array(), $options);
 	}
 
 	public function remove($options = '')
 	{
-		// L'extrafield diam_livraison_directe et l'entrepôt Sous-traitance portent des données : conservés
+		// Les extrafields diam_livraison_directe et desc_propal et l'entrepôt Sous-traitance
+		// portent des données : conservés
 		return $this->_remove(array(), $options);
 	}
 }
