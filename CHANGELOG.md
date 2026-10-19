@@ -1,5 +1,28 @@
 # Changelog — DiamantUtils
 
+## 2.4 — Configuration par onglets
+
+- Page de configuration du module : un onglet par fonctionnalité (Ordres de transformation, Sous-traitance, Listes personnalisées), avec pastille d'état dans le titre de l'onglet.
+- Chaque onglet a une option d'activation et ses réglages propres ; chaque onglet n'enregistre que ses réglages.
+- Nouvelles constantes `DIAMANTUTILS_TRANSFO_ENABLED` et `DIAMANTUTILS_CUSTOMLIST_ENABLED` (actives par défaut, y compris sur une installation existante). Désactivée, une fonctionnalité masque ses menus et refuse ses pages ; les données sont conservées.
+- Listes personnalisées : plafond de l'export CSV réglable (`DIAMANTUTILS_CUSTOMLIST_EXPORT_MAX`, défaut 50 000).
+- Mise à jour : désactiver puis réactiver le module (conditions d'affichage des menus).
+
+## 2.3.1 — Listes personnalisées : variables `{{entity}}` / `{{prefix}}`
+
+- Les requêtes acceptent `{{entity}}` et `{{prefix}}` (casse et espaces libres) en plus de `__ENTITY__` / `__PREFIX__`. Auparavant `{{entity}}` était envoyé tel quel à MySQL (erreur de syntaxe).
+- Une variable `{{…}}` inconnue est refusée avec un message listant les variables disponibles.
+
+## 2.3 — Listes personnalisées (menu Outils)
+
+- Nouvelle entrée **Outils → Listes personnalisées** : listes générées par des requêtes SQL enregistrées.
+- Table `llx_diamantutils_customlist` (libellé, description, requête, position, active).
+- Gestion (création, modification, suppression avec confirmation, test de la requête sur 10 lignes) réservée aux administrateurs ayant le droit *Gérer les listes personnalisées*.
+- Consultation avec le droit *Consulter les listes personnalisées* : recherche globale, tri par colonne, pagination, export CSV (`;`, BOM UTF-8, décimales à la virgule, 50 000 lignes maximum).
+- Sécurité : une seule requête `SELECT`/`WITH`, mots-clés d'écriture et fonctions dangereuses refusés, exécution dans une transaction en lecture seule annulée ensuite.
+- Variables `__PREFIX__` (préfixe des tables) et `__ENTITY__` (entité courante).
+- Mise à jour : désactiver puis réactiver le module.
+
 ## 2.2 — Commandes sous-traitées (livraison directe client)
 
 Fonctionnalité activable dans la configuration du module (`DIAMANTUTILS_SOUSTRAITANCE_ENABLED`, désactivée par défaut). Désactivée, aucun hook ni trigger n'agit.

@@ -445,3 +445,54 @@ function diamantutils_transfo_prepare_head($object)
 
 	return $head;
 }
+
+/**
+ * Fonctionnalité « Ordres de transformation » active ?
+ * Constante absente (installation antérieure à la v2.4) = active, comme avant.
+ *
+ * @return	bool
+ */
+function diamantutils_transfo_enabled()
+{
+	return isModEnabled('diamantutils') && !empty(getDolGlobalString('DIAMANTUTILS_TRANSFO_ENABLED', '1'));
+}
+
+/**
+ * Fonctionnalité « Listes personnalisées » active ?
+ * Constante absente (installation antérieure à la v2.4) = active, comme avant.
+ *
+ * @return	bool
+ */
+function diamantutils_customlist_enabled()
+{
+	return isModEnabled('diamantutils') && !empty(getDolGlobalString('DIAMANTUTILS_CUSTOMLIST_ENABLED', '1'));
+}
+
+/**
+ * Onglets de la page de configuration : un onglet par fonctionnalité
+ *
+ * @return	array	Onglets
+ */
+function diamantutils_admin_prepare_head()
+{
+	global $langs;
+
+	$url = dol_buildpath('/diamantutils/admin/setup.php', 1);
+	$tabs = array(
+		'transfo' => array('DiamantutilsTransformations', diamantutils_transfo_enabled()),
+		'soustraitance' => array('DiamantutilsSTTabTitle', getDolGlobalInt('DIAMANTUTILS_SOUSTRAITANCE_ENABLED') > 0),
+		'customlist' => array('DiamantutilsCustomLists', diamantutils_customlist_enabled()),
+	);
+
+	$h = 0;
+	$head = array();
+	foreach ($tabs as $key => $tab) {
+		$head[$h][0] = $url.'?tab='.$key;
+		// Pastille : fonctionnalité active ou non, visible sans ouvrir l'onglet
+		$head[$h][1] = $langs->trans($tab[0]).' '.($tab[1] ? img_picto($langs->trans('Enabled'), 'switch_on', 'class="small"') : img_picto($langs->trans('Disabled'), 'switch_off', 'class="small opacitymedium"'));
+		$head[$h][2] = $key;
+		$h++;
+	}
+
+	return $head;
+}

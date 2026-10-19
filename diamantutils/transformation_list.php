@@ -29,6 +29,9 @@ $langs->loadLangs(array('products', 'stocks', 'orders', 'productbatch', 'diamant
 if (!isModEnabled('diamantutils') || !$user->hasRight('diamantutils', 'transformation', 'read')) {
 	accessforbidden();
 }
+if (!diamantutils_transfo_enabled()) {
+	accessforbidden($langs->trans('DiamantutilsFeatureDisabled'));
+}
 
 $action = GETPOST('action', 'aZ09');
 

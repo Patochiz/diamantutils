@@ -36,6 +36,9 @@ $fk_product_default = GETPOSTINT('fk_product');
 if (!isModEnabled('diamantutils')) {
 	accessforbidden();
 }
+if (!diamantutils_transfo_enabled()) {
+	accessforbidden($langs->trans('DiamantutilsFeatureDisabled'));
+}
 $permread = $user->hasRight('diamantutils', 'transformation', 'read');
 $permwrite = $user->hasRight('diamantutils', 'transformation', 'write');
 $permcancel = $user->hasRight('diamantutils', 'transformation', 'cancel');
