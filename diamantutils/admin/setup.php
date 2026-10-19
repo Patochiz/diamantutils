@@ -18,6 +18,7 @@ require_once DOL_DOCUMENT_ROOT.'/product/stock/class/entrepot.class.php';
 dol_include_once('/diamantutils/lib/diamantutils.lib.php');
 dol_include_once('/diamantutils/lib/soustraitance.lib.php');
 dol_include_once('/diamantutils/class/customlist.class.php');
+dol_include_once('/diamantutils/lib/descpropal.lib.php');
 
 if (!$user->admin) {
 	accessforbidden();
@@ -27,7 +28,7 @@ $langs->loadLangs(array("admin", "stocks", "diamantutils@diamantutils"));
 
 $action = GETPOST('action', 'aZ09');
 $tab = GETPOST('tab', 'aZ09');
-if (!in_array($tab, array('transfo', 'soustraitance', 'customlist'))) {
+if (!in_array($tab, array('transfo', 'soustraitance', 'customlist', 'descpropal'))) {
 	$tab = 'transfo';
 }
 
@@ -104,6 +105,25 @@ if ($action == 'update') {
 			$exportmax = DiamantutilsCustomList::EXPORT_MAX_ROWS;
 		}
 		if (dolibarr_set_const($db, 'DIAMANTUTILS_CUSTOMLIST_EXPORT_MAX', $exportmax, 'chaine', 0, '', $conf->entity) < 0) {
+			$error++;
+		}
+	}
+
+	if ($tab == 'descpropal') {
+		$enabled = GETPOSTINT('DIAMANTUTILS_DESC_PROPAL') ? 1 : 0;
+		if ($enabled) {
+			// Installation complétée si besoin (extrafield supprimé à la main)
+			$errmsg = '';
+			if (diamantutils_descpropal_install_extrafield($db, $errmsg) < 0) {
+				setEventMessages($errmsg, null, 'errors');
+				$error++;
+			}
+		}
+		if (dolibarr_set_const($db, 'DIAMANTUTILS_DESC_PROPAL', $enabled, 'chaine', 0, '', $conf->entity) < 0) {
+			$error++;
+		}
+		$mode = (GETPOST('DIAMANTUTILS_DESC_PROPAL_MODE', 'aZ09') == 'PREPEND' ? 'PREPEND' : 'REPLACE');
+		if (dolibarr_set_const($db, 'DIAMANTUTILS_DESC_PROPAL_MODE', $mode, 'chaine', 0, '', $conf->entity) < 0) {
 			$error++;
 		}
 	}
@@ -233,6 +253,30 @@ if ($tab == 'customlist') {
 		'',
 		$langs->trans('DiamantutilsCLCount', $nb, $nbactive).' &nbsp; <a href="'.dol_buildpath('/diamantutils/customlist_index.php', 1).'">'.img_picto('', 'list', 'class="pictofixedwidth"').$langs->trans('DiamantutilsCLManage').'</a>'
 	);
+}
+
+if ($tab == 'descpropal') {
+	diamantutils_setup_row(
+		$langs->trans('DiamantutilsFeatureEnabled'),
+		$langs->trans('DiamantutilsDescPropalEnabledDesc'),
+		$form->selectyesno('DIAMANTUTILS_DESC_PROPAL', getDolGlobalInt('DIAMANTUTILS_DESC_PROPAL'), 1)
+	);
+	diamantutils_setup_row(
+		$langs->trans('DiamantutilsDescPropalMode'),
+		$langs->trans('DiamantutilsDescPropalModeDesc'),
+		$form->selectarray('DIAMANTUTILS_DESC_PROPAL_MODE', array(
+			'REPLACE' => $langs->trans('DiamantutilsDescPropalModeREPLACE'),
+			'PREPEND' => $langs->trans('DiamantutilsDescPropalModePREPEND'),
+		), diamantutils_descpropal_mode())
+	);
+
+	// État de l'installation
+	if (diamantutils_descpropal_extrafield_exists($db)) {
+		$status = img_picto('', 'tick', 'class="pictofixedwidth"').$langs->trans('DiamantutilsDescPropalExtrafieldOk', DIAMANTUTILS_DESCPROPAL_EXTRAFIELD);
+	} else {
+		$status = img_warning('', 'class="pictofixedwidth"').'<span class="warning">'.$langs->trans('DiamantutilsDescPropalExtrafieldMissing', DIAMANTUTILS_DESCPROPAL_EXTRAFIELD).'</span>';
+	}
+	diamantutils_setup_row($langs->trans('DiamantutilsDescPropalStatus'), '', $status);
 }
 
 print '</table>';

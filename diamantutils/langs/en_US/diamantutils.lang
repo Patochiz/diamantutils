@@ -1,5 +1,5 @@
 Module510125Name = DiamantUtils
-Module510125Desc = Batch-based stock transformation orders, subcontracted orders and custom SQL lists
+Module510125Desc = Batch-based stock transformation orders, subcontracted orders, custom SQL lists and quotation description
 
 # Setup page
 DiamantutilsSetupTitle = DiamantUtils - Configuration
@@ -201,3 +201,21 @@ DiamantutilsCLExportMax = Maximum rows of a CSV export
 DiamantutilsCLExportMaxDesc = Beyond this, the export is truncated. Default: 50000.
 DiamantutilsCLCount = %s list(s), %s enabled
 DiamantutilsCLManage = Manage lists
+
+# Quotation description (commercial proposals)
+DiamantutilsDescPropal = Quotation description
+DiamantutilsDescPropalHelp = Used on commercial proposal lines instead of the standard description (when the feature is enabled in the DiamantUtils module setup). On a variant parent product, accepts placeholders such as {COLOR}. Leave empty to keep the standard description (or the parent product one for a variant).
+DiamantutilsDescPropalTabTitle = Quotation description
+DiamantutilsDescPropalEnabledDesc = When a product is added to a commercial proposal, the line uses its "Quotation description" if filled in. A description edited by hand, a cloned line or a line copied from another object is kept.
+DiamantutilsDescPropalMode = Mode
+DiamantutilsDescPropalModeDesc = Replace: the line description becomes the quotation description. Prepend: the quotation description is placed before the standard description.
+DiamantutilsDescPropalModeREPLACE = Replace the description
+DiamantutilsDescPropalModePREPEND = Place before the description
+DiamantutilsDescPropalStatus = Installation status
+DiamantutilsDescPropalExtrafieldOk = Product attribute %s present
+DiamantutilsDescPropalExtrafieldMissing = Product attribute %s missing: it will be created on save with the feature enabled, or by disabling then re-enabling the module.
+DiamantutilsDescPropalPlaceholders = Quotation placeholders
+DiamantutilsDescPropalPlaceholdersDesc = Usable in the quotation description: replaced by the values of the variant added to the quotation. A variant without its own quotation description uses this product's one.
+DiamantutilsDescPropalHelpProduct = ref and label of the variant
+DiamantutilsDescPropalCheckWarning = Quotation description: %s. The product is saved; the template is copied as is on quotations until fixed.
+DiamantutilsDescPropalConditions = Conditions: {IF WIDTH=200}…{ELSEIF WIDTH IN 300,400}…{ELSE}…{ENDIF}, operators = != > >= < <=, IN, AND, OR, attribute alone (present); suffix :ref to compare the value reference.

@@ -1,5 +1,18 @@
 # Changelog — DiamantUtils
 
+## 2.5 — Description pour devis (propositions commerciales)
+
+- Nouvel attribut produit `desc_propal` « Description pour devis » (texte HTML), sur la fiche produit et service, hors listes. Créé à l'activation du module (idempotent), conservé à la désactivation.
+- Fonction activable dans un nouvel onglet **Description devis** de la configuration (`DIAMANTUTILS_DESC_PROPAL`, désactivée par défaut), avec deux modes (`DIAMANTUTILS_DESC_PROPAL_MODE`) : `REPLACE` (défaut) remplace la description de la ligne, `PREPEND` place la description pour devis avant.
+- Trigger `LINEPROPAL_INSERT` : à l'ajout d'un produit à une proposition commerciale, la ligne reprend `desc_propal` si elle est renseignée et si la description de la ligne est vide ou identique à la description standard du produit (traductions et mention code douane / pays d'origine comprises).
+- Lignes conservées telles quelles : description modifiée à la main, clonage de propale, création depuis un autre objet, import de lignes d'un objet lié, lignes libres.
+- Variantes : une variante sans `desc_propal` propre prend celle de son produit parent. Placeholders remplacés par les valeurs de la variante : `{REF_ATTRIBUT}` (valeur), `{REF_ATTRIBUT:ref}` (réf. de la valeur), `{REF_ATTRIBUT:label}` (libellé de l'attribut), `{PRODUCT_REF}`, `{PRODUCT_LABEL}`. Insensibles à la casse ; valeurs échappées dans un modèle HTML ; placeholder inconnu laissé tel quel avec un avertissement dans le log.
+- Fiche d'un produit parent : liste des placeholders disponibles sous l'attribut (hook `productcard`).
+- Blocs conditionnels `{IF …}{ELSEIF …}{ELSE}{ENDIF}` (imbrication autorisée) évalués sur les attributs de la variante : `= != > >= < <=`, `IN`, présence, `AND` / `OR` (`AND` prioritaire), suffixe `:ref`, comparaison numérique avec virgule décimale. Parseur dédié, sans `eval()`. Attribut inconnu : condition fausse ; syntaxe invalide : modèle laissé brut ; avertissement dans le log dans les deux cas.
+- Enregistrement d'un produit (`PRODUCT_CREATE`, `PRODUCT_MODIFY`) : syntaxe et attributs de `desc_propal` vérifiés, avertissement non bloquant.
+- Tests du rendu : `test/descpropal_render_test.php`, à ouvrir dans le navigateur en administrateur.
+- Mise à jour : déposer les fichiers, puis désactiver et réactiver le module.
+
 ## 2.4 — Configuration par onglets
 
 - Page de configuration du module : un onglet par fonctionnalité (Ordres de transformation, Sous-traitance, Listes personnalisées), avec pastille d'état dans le titre de l'onglet.
