@@ -13,6 +13,8 @@
  *    mouvement de stock) : toutes les lignes ;
  *  - LINESHIPPING_MODIFY : ligne modifiée dans le brouillon. L'ajout d'une ligne de lot par
  *    create_line_batch() n'a pas de trigger après l'insertion du lot : contrôlé à la validation.
+ * Description pour devis (lib/descpropal.lib.php) :
+ *  - LINEPROPAL_INSERT : la ligne d'un produit reprend son extrafield desc_propal.
  * Tous ces triggers sont appelés dans la transaction : un retour < 0 annule l'opération.
  */
 
@@ -28,8 +30,8 @@ class InterfaceDiamantutilstriggers extends DolibarrTriggers
 		// Le constructeur parent initialise error et errors (déclarés sans valeur en v20)
 		parent::__construct($db);
 		$this->family = 'other';
-		$this->description = 'Triggers DiamantUtils : contrôles des commandes sous-traitées';
-		$this->version = '2.2';
+		$this->description = 'Triggers DiamantUtils : contrôles des commandes sous-traitées, description pour devis';
+		$this->version = '2.5';
 		$this->picto = 'generic';
 	}
 
@@ -43,6 +45,10 @@ class InterfaceDiamantutilstriggers extends DolibarrTriggers
 	 */
 	public function runTrigger($action, $object, User $user, Translate $langs, Conf $conf)
 	{
+		if ($action == 'LINEPROPAL_INSERT') {
+			return $this->descPropal($object);
+		}
+
 		if (!in_array($action, array('RECEPTION_CREATE', 'RECEPTION_VALIDATE', 'LINERECEPTION_CREATE', 'LINERECEPTION_MODIFY', 'LINEORDER_SUPPLIER_DISPATCH', 'SHIPPING_CREATE', 'SHIPPING_VALIDATE', 'LINESHIPPING_MODIFY'))) {
 			return 0;
 		}
@@ -93,5 +99,25 @@ class InterfaceDiamantutilstriggers extends DolibarrTriggers
 			return -1;
 		}
 		return 1;
+	}
+
+	/**
+	 * LINEPROPAL_INSERT : description pour devis du produit reprise sur la ligne
+	 *
+	 * @param	PropaleLigne	$line	Ligne insérée
+	 * @return	int						1 = ligne modifiée, 0 = rien fait, -1 = erreur
+	 */
+	private function descPropal($line)
+	{
+		dol_include_once('/diamantutils/lib/descpropal.lib.php');
+		$error = '';
+		$result = diamantutils_descpropal_apply($this->db, $line, $error);
+		if ($result < 0) {
+			dol_syslog(__METHOD__.' line id='.((int) $line->id).' : '.$error, LOG_ERR);
+			$this->error = $error;
+			$this->errors = array($error);
+			return -1;
+		}
+		return $result;
 	}
 }
