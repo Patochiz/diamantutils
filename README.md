@@ -4,6 +4,7 @@ Module Dolibarr interne de Diamant Industrie (Dolibarr 20, PHP 8.2, déploiement
 
 - **Ordres de transformation** de stock par lots (menu GPAO) : voir `GUIDE_TRANSFORMATION_V2.md`.
 - **Commandes sous-traitées** (livraison directe client) : section ci-dessous.
+- **Listes personnalisées** (menu Outils) : listes générées par des requêtes SQL, section ci-dessous.
 
 Historique des versions : `CHANGELOG.md`.
 
@@ -58,3 +59,41 @@ Les contrôles tournent dans la transaction Dolibarr : un refus annule l'opérat
 | `class/actions_diamantutils.class.php`, `js/soustraitance.js` | pré-remplissage et bandeaux |
 | `soustraitance_list.php`, `core/boxes/box_diamantutils_soustraitance.php` | suivi |
 | `admin/setup.php` | configuration |
+
+---
+
+## Listes personnalisées (menu Outils)
+
+### Principe
+Un administrateur enregistre des requêtes SQL `SELECT` ; chaque requête devient une liste consultable depuis **Outils → Listes personnalisées**, avec recherche globale, tri par colonne, pagination et export CSV (séparateur `;`, compatible Excel, 50 000 lignes maximum).
+
+### Mise en service
+1. Désactiver puis réactiver le module (création de la table `llx_diamantutils_customlist`, des droits et des menus).
+2. Donner les droits dans la fiche utilisateur ou groupe :
+   - *Consulter les listes personnalisées* : voir et exporter les listes actives ;
+   - *Gérer les listes personnalisées* : créer, modifier, supprimer. Réservé en plus aux **administrateurs** (le SQL donne accès en lecture à toute la base).
+
+### Écrire une requête
+- Une seule requête `SELECT` ou `WITH`. Mots-clés d'écriture (`INSERT`, `UPDATE`, `DELETE`, `DROP`, `SET`…) et fonctions dangereuses (`SLEEP`, `LOAD_FILE`, `INTO OUTFILE`…) refusés, y compris dans un nom de colonne non entre guillemets.
+- La requête s'exécute dans une transaction **en lecture seule**, annulée ensuite.
+- `__PREFIX__` est remplacé par le préfixe des tables (`llx_`) et `__ENTITY__` par l'entité courante.
+- Donner un alias à chaque colonne : il sert d'en-tête. Deux colonnes de même nom empêchent le tri.
+- Le bouton **Tester la requête** affiche les 10 premières lignes avant enregistrement.
+
+Exemple :
+```sql
+SELECT p.ref AS "Référence", p.label AS "Libellé", p.stock AS "Stock"
+FROM __PREFIX__product AS p
+WHERE p.entity = __ENTITY__ AND p.tosell = 1
+ORDER BY p.ref
+```
+
+### Fichiers
+
+| Fichier | Rôle |
+|---|---|
+| `sql/llx_diamantutils_customlist*.sql` | table des listes |
+| `class/customlist.class.php` | enregistrement, contrôle et exécution en lecture seule |
+| `customlist_index.php` | sommaire et gestion (menu Outils) |
+| `customlist_card.php` | création, modification, test de la requête |
+| `customlist_view.php` | affichage, recherche, tri, pagination, export CSV |

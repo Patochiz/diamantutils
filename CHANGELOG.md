@@ -1,5 +1,15 @@
 # Changelog — DiamantUtils
 
+## 2.3 — Listes personnalisées (menu Outils)
+
+- Nouvelle entrée **Outils → Listes personnalisées** : listes générées par des requêtes SQL enregistrées.
+- Table `llx_diamantutils_customlist` (libellé, description, requête, position, active).
+- Gestion (création, modification, suppression avec confirmation, test de la requête sur 10 lignes) réservée aux administrateurs ayant le droit *Gérer les listes personnalisées*.
+- Consultation avec le droit *Consulter les listes personnalisées* : recherche globale, tri par colonne, pagination, export CSV (`;`, BOM UTF-8, décimales à la virgule, 50 000 lignes maximum).
+- Sécurité : une seule requête `SELECT`/`WITH`, mots-clés d'écriture et fonctions dangereuses refusés, exécution dans une transaction en lecture seule annulée ensuite.
+- Variables `__PREFIX__` (préfixe des tables) et `__ENTITY__` (entité courante).
+- Mise à jour : désactiver puis réactiver le module.
+
 ## 2.2 — Commandes sous-traitées (livraison directe client)
 
 Fonctionnalité activable dans la configuration du module (`DIAMANTUTILS_SOUSTRAITANCE_ENABLED`, désactivée par défaut). Désactivée, aucun hook ni trigger n'agit.

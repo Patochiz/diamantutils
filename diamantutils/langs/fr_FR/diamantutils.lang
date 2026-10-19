@@ -1,5 +1,5 @@
 Module510125Name = DiamantUtils
-Module510125Desc = Ordres de transformation de stock par lots (découpe, peinture, changement d'unité)
+Module510125Desc = Ordres de transformation de stock par lots, commandes sous-traitées et listes personnalisées SQL
 
 # Page de configuration
 DiamantutilsSetupTitle = DiamantUtils - Configuration
@@ -168,3 +168,24 @@ DiamantutilsSTAnoNotDirect = Commande fournisseur non marquée « Livraison dire
 DiamantutilsSTAnoNoOrder = Commande fournisseur sans commande client liée
 DiamantutilsSTBoxLabel = Sous-traitance en cours
 DiamantutilsSTBoxNbLots = %s lot(s) en cours (%s ligne(s) produit)
+
+# Listes personnalisées (menu Outils)
+DiamantutilsCustomLists = Listes personnalisées
+DiamantutilsNewCustomList = Nouvelle liste
+DiamantutilsCLEdit = Modifier la liste
+DiamantutilsCLDelete = Supprimer la liste
+DiamantutilsCLConfirmDelete = Supprimer définitivement la liste « %s » ?
+DiamantutilsCLDeleted = Liste « %s » supprimée
+DiamantutilsCLIndexDesc = Listes générées par des requêtes SQL en lecture seule. Cliquez sur une liste pour l'afficher.
+DiamantutilsCLNone = Aucune liste personnalisée.
+DiamantutilsCLSql = Requête SQL
+DiamantutilsCLSqlHelp = Une seule requête SELECT (ou WITH), exécutée en lecture seule. __PREFIX__ est remplacé par le préfixe des tables (%s) et __ENTITY__ par l'entité courante. Donnez un alias à chaque colonne (AS « Nom affiché ») : il sert d'en-tête et deux colonnes ne doivent pas porter le même nom.
+DiamantutilsCLSqlOnlySelect = La requête doit être une lecture : elle doit commencer par SELECT ou WITH.
+DiamantutilsCLSqlOneStatement = Une seule requête est autorisée (pas de « ; » au milieu).
+DiamantutilsCLSqlForbidden = Mot-clé interdit dans une liste personnalisée : %s
+DiamantutilsCLReadOnlyFailed = Impossible d'ouvrir une transaction en lecture seule : requête non exécutée.
+DiamantutilsCLTest = Tester la requête
+DiamantutilsCLTestError = Erreur de la requête
+DiamantutilsCLPreview = Aperçu (10 premières lignes sur %s)
+DiamantutilsCLExportCsv = Export CSV
+DiamantutilsCLSortFailed = Tri impossible sur cette colonne (deux colonnes ont-elles le même nom ?) : ordre de la requête conservé.
