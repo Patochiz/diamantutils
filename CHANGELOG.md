@@ -8,6 +8,9 @@
 - Lignes conservées telles quelles : description modifiée à la main, clonage de propale, création depuis un autre objet, import de lignes d'un objet lié, lignes libres.
 - Variantes : une variante sans `desc_propal` propre prend celle de son produit parent. Placeholders remplacés par les valeurs de la variante : `{REF_ATTRIBUT}` (valeur), `{REF_ATTRIBUT:ref}` (réf. de la valeur), `{REF_ATTRIBUT:label}` (libellé de l'attribut), `{PRODUCT_REF}`, `{PRODUCT_LABEL}`. Insensibles à la casse ; valeurs échappées dans un modèle HTML ; placeholder inconnu laissé tel quel avec un avertissement dans le log.
 - Fiche d'un produit parent : liste des placeholders disponibles sous l'attribut (hook `productcard`).
+- Blocs conditionnels `{IF …}{ELSEIF …}{ELSE}{ENDIF}` (imbrication autorisée) évalués sur les attributs de la variante : `= != > >= < <=`, `IN`, présence, `AND` / `OR` (`AND` prioritaire), suffixe `:ref`, comparaison numérique avec virgule décimale. Parseur dédié, sans `eval()`. Attribut inconnu : condition fausse ; syntaxe invalide : modèle laissé brut ; avertissement dans le log dans les deux cas.
+- Enregistrement d'un produit (`PRODUCT_CREATE`, `PRODUCT_MODIFY`) : syntaxe et attributs de `desc_propal` vérifiés, avertissement non bloquant.
+- Tests du rendu : `test/descpropal_render_test.php`, à ouvrir dans le navigateur en administrateur.
 - Mise à jour : déposer les fichiers, puis désactiver et réactiver le module.
 
 ## 2.4 — Configuration par onglets

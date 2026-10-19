@@ -14,7 +14,8 @@
  *  - LINESHIPPING_MODIFY : ligne modifiée dans le brouillon. L'ajout d'une ligne de lot par
  *    create_line_batch() n'a pas de trigger après l'insertion du lot : contrôlé à la validation.
  * Description pour devis (lib/descpropal.lib.php) :
- *  - LINEPROPAL_INSERT : la ligne d'un produit reprend son extrafield desc_propal.
+ *  - LINEPROPAL_INSERT : la ligne d'un produit reprend son extrafield desc_propal ;
+ *  - PRODUCT_CREATE, PRODUCT_MODIFY : syntaxe de desc_propal vérifiée, avertissement non bloquant.
  * Tous ces triggers sont appelés dans la transaction : un retour < 0 annule l'opération.
  */
 
@@ -47,6 +48,9 @@ class InterfaceDiamantutilstriggers extends DolibarrTriggers
 	{
 		if ($action == 'LINEPROPAL_INSERT') {
 			return $this->descPropal($object);
+		}
+		if ($action == 'PRODUCT_CREATE' || $action == 'PRODUCT_MODIFY') {
+			return $this->checkDescPropal($object, $langs);
 		}
 
 		if (!in_array($action, array('RECEPTION_CREATE', 'RECEPTION_VALIDATE', 'LINERECEPTION_CREATE', 'LINERECEPTION_MODIFY', 'LINEORDER_SUPPLIER_DISPATCH', 'SHIPPING_CREATE', 'SHIPPING_VALIDATE', 'LINESHIPPING_MODIFY'))) {
@@ -119,5 +123,42 @@ class InterfaceDiamantutilstriggers extends DolibarrTriggers
 			return -1;
 		}
 		return $result;
+	}
+
+	/**
+	 * PRODUCT_CREATE / PRODUCT_MODIFY : vérifie le modèle desc_propal (syntaxe, attributs connus)
+	 * et affiche un avertissement. Jamais bloquant : le produit est enregistré dans tous les cas.
+	 *
+	 * @param	Product		$product	Produit enregistré
+	 * @param	Translate	$langs		Langues
+	 * @return	int						0
+	 */
+	private function checkDescPropal($product, $langs)
+	{
+		$template = (string) ($product->array_options['options_desc_propal'] ?? '');
+		if (strpos($template, '{') === false) {
+			return 0;
+		}
+
+		dol_include_once('/diamantutils/lib/diamantutils_descpropal.lib.php');
+		// Attributs connus : ceux des variantes (produit parent) ou de la variante elle-même
+		$known = null;
+		if (isModEnabled('variants') && !empty($product->id)) {
+			$known = diamantutils_descpropal_parent_attributes($this->db, $product->id);
+			if (empty($known)) {
+				$known = diamantutils_descpropal_variant_attributes($this->db, $product->id);
+			}
+			if (!is_array($known) || empty($known)) {
+				$known = null;	// produit simple : syntaxe seulement
+			}
+		}
+
+		$errors = diamantutils_descpropal_check($template, $known);
+		if (count($errors)) {
+			$langs->load('diamantutils@diamantutils');
+			setEventMessages($langs->trans('DiamantutilsDescPropalCheckWarning', implode(' ; ', $errors)), null, 'warnings');
+			dol_syslog(__METHOD__.' produit '.$product->ref.' : '.implode(' ; ', $errors), LOG_WARNING);
+		}
+		return 0;
 	}
 }

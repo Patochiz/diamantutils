@@ -217,3 +217,5 @@ DiamantutilsDescPropalExtrafieldMissing = Product attribute %s missing: it will 
 DiamantutilsDescPropalPlaceholders = Quotation placeholders
 DiamantutilsDescPropalPlaceholdersDesc = Usable in the quotation description: replaced by the values of the variant added to the quotation. A variant without its own quotation description uses this product's one.
 DiamantutilsDescPropalHelpProduct = ref and label of the variant
+DiamantutilsDescPropalCheckWarning = Quotation description: %s. The product is saved; the template is copied as is on quotations until fixed.
+DiamantutilsDescPropalConditions = Conditions: {IF WIDTH=200}…{ELSEIF WIDTH IN 300,400}…{ELSE}…{ENDIF}, operators = != > >= < <=, IN, AND, OR, attribute alone (present); suffix :ref to compare the value reference.

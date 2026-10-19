@@ -228,6 +228,7 @@ class ActionsDiamantutils
 				.' &nbsp; <code>{'.$code.':label}</code>';
 		}
 		$lines[] = '<code>{PRODUCT_REF}</code> <code>{PRODUCT_LABEL}</code> <span class="opacitymedium">'.$langs->trans('DiamantutilsDescPropalHelpProduct').'</span>';
+		$lines[] = '<span class="opacitymedium">'.$langs->trans('DiamantutilsDescPropalConditions').'</span>';
 
 		$colspan = (!empty($parameters['colspan']) ? $parameters['colspan'] : '');
 		$out = '<tr id="diamantutils-descpropal-help"><td class="titlefield">'.$langs->trans('DiamantutilsDescPropalPlaceholders').'</td>';

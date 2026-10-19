@@ -126,6 +126,30 @@ Saisir la description pour devis sur le **produit parent** seulement : une varia
 
 `REF_ATTRIBUT` est la référence de l'attribut (Produits → Attributs de variantes), sans distinction de casse. Exemple : `Profilé {FINITION}, coloris {COULEUR}` donne `Profilé Laqué, coloris RAL 9010`. Un placeholder inconnu reste visible tel quel dans le devis (avertissement dans le log Dolibarr). La fiche du produit parent liste les placeholders disponibles sous l'attribut.
 
+### Conditions
+Des blocs conditionnels choisissent le texte selon la variante (mots-clés sans distinction de casse, `ELSEIF` et `ELSE` facultatifs, blocs imbriqués autorisés) :
+
+```
+{IF LARGEUR=200}Largeur 200 avec portée 2,13 m
+{ELSEIF LARGEUR=300}Largeur 300 avec portée 2,50 m
+{ELSE}Largeur {LARGEUR}
+{ENDIF}
+```
+
+| Condition | Exemple |
+|---|---|
+| Comparaison | `LARGEUR=200`, `LARGEUR!=200`, `LARGEUR>=300`, `LARGEUR<600` |
+| Liste | `LARGEUR IN 200,300,400` |
+| Présence | `COULEUR` : attribut présent et non vide |
+| Combinaison | `LARGEUR=200 AND FINITION=Laqué`, `A=1 OR B=2` (`AND` prioritaire, pas de parenthèses) |
+
+- `COULEUR:ref=9010` compare la référence de la valeur au lieu de son libellé.
+- Deux nombres sont comparés numériquement (`200` = `200,0`) ; sinon comparaison de textes sans casse ni espaces autour. Guillemets facultatifs : `FINITION="Laqué brillant"`.
+- Les conditions sont évaluées d'abord, puis les placeholders du texte retenu.
+- Attribut inconnu dans une condition : condition fausse. Syntaxe invalide (`ENDIF` manquant, `ELSE` orphelin…) : le modèle est repris **brut** sur le devis, pour que l'erreur se voie à la relecture. Dans les deux cas, avertissement dans le log Dolibarr.
+- À l'enregistrement du produit, une erreur de syntaxe ou un attribut inconnu des variantes est signalé par un avertissement (le produit est enregistré quand même).
+- Tests : ouvrir `custom/diamantutils/test/descpropal_render_test.php` en administrateur (aucune écriture en base).
+
 ### Règles
 - La ligne n'est modifiée que si sa description est vide ou identique à la description standard du produit (ou à l'une de ses traductions). La mention « (Code douane … / Pays d'origine …) » ajoutée par Dolibarr est conservée.
 - Ne sont jamais modifiées : une description changée à la main dans le formulaire, les lignes d'une propale clonée, créée depuis un autre objet ou importée d'un objet lié, les lignes libres.
@@ -137,8 +161,9 @@ Saisir la description pour devis sur le **produit parent** seulement : une varia
 | Fichier | Rôle |
 |---|---|
 | `lib/descpropal.lib.php` | installation de l'attribut, choix parent / variante, règles de remplacement |
-| `lib/diamantutils_descpropal.lib.php` | rendu du modèle (`diamantutils_render_desc()`), attributs de variante |
+| `lib/diamantutils_descpropal.lib.php` | rendu du modèle (`diamantutils_render_desc()` : conditions puis placeholders), vérification, attributs de variante |
 | `class/actions_diamantutils.class.php` | aide à la saisie sur la fiche produit parent |
-| `core/triggers/interface_99_modDiamantutils_Diamantutilstriggers.class.php` | trigger `LINEPROPAL_INSERT` |
+| `test/descpropal_render_test.php`, `test/descpropal_render_cases.php` | tests du rendu (navigateur, administrateur) |
+| `core/triggers/interface_99_modDiamantutils_Diamantutilstriggers.class.php` | triggers `LINEPROPAL_INSERT`, `PRODUCT_CREATE` / `PRODUCT_MODIFY` (vérification) |
 | `admin/setup.php`, `lib/diamantutils.lib.php` | onglet de configuration |
 | `core/modules/modDiamantutils.class.php` | constantes, création de l'attribut à l'activation |
