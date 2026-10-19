@@ -1,5 +1,5 @@
 Module510125Name = DiamantUtils
-Module510125Desc = Batch-based stock transformation orders, subcontracted orders and custom SQL lists
+Module510125Desc = Batch-based stock transformation orders, subcontracted orders, custom SQL lists and quotation description
 
 # Setup page
 DiamantutilsSetupTitle = DiamantUtils - Configuration
@@ -201,3 +201,16 @@ DiamantutilsCLExportMax = Maximum rows of a CSV export
 DiamantutilsCLExportMaxDesc = Beyond this, the export is truncated. Default: 50000.
 DiamantutilsCLCount = %s list(s), %s enabled
 DiamantutilsCLManage = Manage lists
+
+# Quotation description (commercial proposals)
+DiamantutilsDescPropal = Quotation description
+DiamantutilsDescPropalHelp = Used on commercial proposal lines instead of the standard description (when the feature is enabled in the DiamantUtils module setup). Leave empty to keep the standard description.
+DiamantutilsDescPropalTabTitle = Quotation description
+DiamantutilsDescPropalEnabledDesc = When a product is added to a commercial proposal, the line uses its "Quotation description" if filled in. A description edited by hand, a cloned line or a line copied from another object is kept.
+DiamantutilsDescPropalMode = Mode
+DiamantutilsDescPropalModeDesc = Replace: the line description becomes the quotation description. Prepend: the quotation description is placed before the standard description.
+DiamantutilsDescPropalModeREPLACE = Replace the description
+DiamantutilsDescPropalModePREPEND = Place before the description
+DiamantutilsDescPropalStatus = Installation status
+DiamantutilsDescPropalExtrafieldOk = Product attribute %s present
+DiamantutilsDescPropalExtrafieldMissing = Product attribute %s missing: it will be created on save with the feature enabled, or by disabling then re-enabling the module.

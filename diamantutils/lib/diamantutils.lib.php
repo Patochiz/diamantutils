@@ -482,6 +482,7 @@ function diamantutils_admin_prepare_head()
 		'transfo' => array('DiamantutilsTransformations', diamantutils_transfo_enabled()),
 		'soustraitance' => array('DiamantutilsSTTabTitle', getDolGlobalInt('DIAMANTUTILS_SOUSTRAITANCE_ENABLED') > 0),
 		'customlist' => array('DiamantutilsCustomLists', diamantutils_customlist_enabled()),
+		'descpropal' => array('DiamantutilsDescPropalTabTitle', isModEnabled('diamantutils') && getDolGlobalInt('DIAMANTUTILS_DESC_PROPAL') > 0),
 	);
 
 	$h = 0;

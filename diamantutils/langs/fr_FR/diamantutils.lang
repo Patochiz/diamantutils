@@ -1,5 +1,5 @@
 Module510125Name = DiamantUtils
-Module510125Desc = Ordres de transformation de stock par lots, commandes sous-traitées et listes personnalisées SQL
+Module510125Desc = Ordres de transformation de stock par lots, commandes sous-traitées, listes personnalisées SQL et description pour devis
 
 # Page de configuration
 DiamantutilsSetupTitle = DiamantUtils - Configuration
@@ -201,3 +201,16 @@ DiamantutilsCLExportMax = Lignes maximum d'un export CSV
 DiamantutilsCLExportMaxDesc = Au-delà, l'export est tronqué. Défaut : 50000.
 DiamantutilsCLCount = %s liste(s) dont %s active(s)
 DiamantutilsCLManage = Gérer les listes
+
+# Description pour devis (propositions commerciales)
+DiamantutilsDescPropal = Description pour devis
+DiamantutilsDescPropalHelp = Reprise sur les lignes de propositions commerciales à la place de la description standard (si la fonction est activée dans la configuration du module DiamantUtils). Laisser vide pour garder la description standard.
+DiamantutilsDescPropalTabTitle = Description devis
+DiamantutilsDescPropalEnabledDesc = Quand un produit est ajouté à une proposition commerciale, la ligne reprend sa « Description pour devis » si elle est renseignée. Une description modifiée à la main, une ligne clonée ou reprise d'un autre objet est conservée.
+DiamantutilsDescPropalMode = Mode
+DiamantutilsDescPropalModeDesc = Remplacer : la description de la ligne devient la description pour devis. Placer avant : la description pour devis précède la description standard.
+DiamantutilsDescPropalModeREPLACE = Remplacer la description
+DiamantutilsDescPropalModePREPEND = Placer avant la description
+DiamantutilsDescPropalStatus = État de l'installation
+DiamantutilsDescPropalExtrafieldOk = Attribut produit %s présent
+DiamantutilsDescPropalExtrafieldMissing = Attribut produit %s absent : il sera créé à l'enregistrement avec la fonction activée, ou en désactivant puis réactivant le module.
