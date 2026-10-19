@@ -6,6 +6,8 @@ Module Dolibarr interne de Diamant Industrie (Dolibarr 20, PHP 8.2, déploiement
 - **Commandes sous-traitées** (livraison directe client) : section ci-dessous.
 - **Listes personnalisées** (menu Outils) : listes générées par des requêtes SQL, section ci-dessous.
 
+Chaque fonctionnalité a son onglet dans **Configuration → Modules → DiamantUtils**, avec une option pour l'activer ou la désactiver et ses réglages propres. Une fonctionnalité désactivée masque ses menus et pages ; ses données sont conservées.
+
 Historique des versions : `CHANGELOG.md`.
 
 ---
@@ -65,7 +67,7 @@ Les contrôles tournent dans la transaction Dolibarr : un refus annule l'opérat
 ## Listes personnalisées (menu Outils)
 
 ### Principe
-Un administrateur enregistre des requêtes SQL `SELECT` ; chaque requête devient une liste consultable depuis **Outils → Listes personnalisées**, avec recherche globale, tri par colonne, pagination et export CSV (séparateur `;`, compatible Excel, 50 000 lignes maximum).
+Un administrateur enregistre des requêtes SQL `SELECT` ; chaque requête devient une liste consultable depuis **Outils → Listes personnalisées**, avec recherche globale, tri par colonne, pagination et export CSV (séparateur `;`, compatible Excel, 50 000 lignes maximum par défaut, réglable).
 
 ### Mise en service
 1. Désactiver puis réactiver le module (création de la table `llx_diamantutils_customlist`, des droits et des menus).

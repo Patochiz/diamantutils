@@ -190,3 +190,14 @@ DiamantutilsCLPreview = Preview (first 10 rows out of %s)
 DiamantutilsCLExportCsv = CSV export
 DiamantutilsCLSortFailed = Cannot sort on this column (do two columns share the same name?): query order kept.
 DiamantutilsCLUnknownVar = Unknown variable: {{%s}}. Available variables: {{entity}}, {{prefix}}.
+
+# Setup: one tab per feature
+DiamantutilsFeatureEnabled = Enable this feature
+DiamantutilsFeatureDisabled = This feature is disabled in the DiamantUtils module setup.
+DiamantutilsTransfoEnabledDesc = MRP menu "Transformation orders" and related pages. When disabled, existing orders are kept but not accessible.
+DiamantutilsSTTabTitle = Subcontracting
+DiamantutilsCLEnabledDesc = Tools menu "Custom lists". When disabled, saved lists are kept but not accessible.
+DiamantutilsCLExportMax = Maximum rows of a CSV export
+DiamantutilsCLExportMaxDesc = Beyond this, the export is truncated. Default: 50000.
+DiamantutilsCLCount = %s list(s), %s enabled
+DiamantutilsCLManage = Manage lists

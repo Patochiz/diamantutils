@@ -21,7 +21,7 @@ class modDiamantutils extends DolibarrModules
 		$this->description = "Module interne Diamant Industrie : ordres de transformation de stock par lots (menu GPAO) commandes sous-traitées livrées directement au client et listes personnalisées SQL (menu Outils)";
 		$this->descriptionlong = "Transformation de stock par lots : consommation de N lots et production de M lots (découpe de profilés, peinture, changement d'unité), avec saisie en pièces × longueur, contrôle d'équilibre, gestion des restes et des pertes, calcul du coût et traçabilité des mouvements de stock. Commandes sous-traitées : réception sur l'entrepôt Sous-traitance avec lot = ref de la commande fournisseur, BL client prélevé sur ce lot. Listes personnalisées : requêtes SQL en lecture seule enregistrées par un administrateur, consultables avec recherche, tri, pagination et export CSV.";
 		$this->editor_name = 'Diamant Industrie';
-		$this->version = '2.3.1';
+		$this->version = '2.4';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'generic';
 
@@ -53,6 +53,33 @@ class modDiamantutils extends DolibarrModules
 				'chaine',
 				'0',
 				'Gestion des commandes sous-traitées (livraison directe client) : 1 = active',
+				0,
+				'current',
+				0
+			),
+			2 => array(
+				'DIAMANTUTILS_TRANSFO_ENABLED',
+				'chaine',
+				'1',
+				'Ordres de transformation de stock : 1 = active',
+				0,
+				'current',
+				0
+			),
+			3 => array(
+				'DIAMANTUTILS_CUSTOMLIST_ENABLED',
+				'chaine',
+				'1',
+				'Listes personnalisées (menu Outils) : 1 = active',
+				0,
+				'current',
+				0
+			),
+			4 => array(
+				'DIAMANTUTILS_CUSTOMLIST_EXPORT_MAX',
+				'chaine',
+				'50000',
+				'Listes personnalisées : nombre maximum de lignes d\'un export CSV',
 				0,
 				'current',
 				0
@@ -125,7 +152,7 @@ class modDiamantutils extends DolibarrModules
 			'url' => '/diamantutils/transformation_list.php?mainmenu=mrp&leftmenu=diamantutils_ot',
 			'langs' => 'diamantutils@diamantutils',
 			'position' => 1000 + $r,
-			'enabled' => 'isModEnabled("diamantutils")',
+			'enabled' => 'isModEnabled("diamantutils") && getDolGlobalString("DIAMANTUTILS_TRANSFO_ENABLED", "1")',
 			'perms' => '$user->hasRight("diamantutils", "transformation", "read")',
 			'target' => '',
 			'user' => 2,
@@ -139,7 +166,7 @@ class modDiamantutils extends DolibarrModules
 			'url' => '/diamantutils/transformation_card.php?action=create&mainmenu=mrp&leftmenu=diamantutils_ot',
 			'langs' => 'diamantutils@diamantutils',
 			'position' => 1000 + $r,
-			'enabled' => 'isModEnabled("diamantutils")',
+			'enabled' => 'isModEnabled("diamantutils") && getDolGlobalString("DIAMANTUTILS_TRANSFO_ENABLED", "1")',
 			'perms' => '$user->hasRight("diamantutils", "transformation", "write")',
 			'target' => '',
 			'user' => 2,
@@ -153,7 +180,7 @@ class modDiamantutils extends DolibarrModules
 			'url' => '/diamantutils/transformation_list.php?mainmenu=mrp&leftmenu=diamantutils_ot',
 			'langs' => 'diamantutils@diamantutils',
 			'position' => 1000 + $r,
-			'enabled' => 'isModEnabled("diamantutils")',
+			'enabled' => 'isModEnabled("diamantutils") && getDolGlobalString("DIAMANTUTILS_TRANSFO_ENABLED", "1")',
 			'perms' => '$user->hasRight("diamantutils", "transformation", "read")',
 			'target' => '',
 			'user' => 2,
@@ -184,7 +211,7 @@ class modDiamantutils extends DolibarrModules
 			'url' => '/diamantutils/customlist_index.php?mainmenu=tools&leftmenu=diamantutils_cl',
 			'langs' => 'diamantutils@diamantutils',
 			'position' => 1000 + $r,
-			'enabled' => 'isModEnabled("diamantutils")',
+			'enabled' => 'isModEnabled("diamantutils") && getDolGlobalString("DIAMANTUTILS_CUSTOMLIST_ENABLED", "1")',
 			'perms' => '$user->hasRight("diamantutils", "customlist", "read")',
 			'target' => '',
 			'user' => 2,
@@ -198,7 +225,7 @@ class modDiamantutils extends DolibarrModules
 			'url' => '/diamantutils/customlist_card.php?action=create&mainmenu=tools&leftmenu=diamantutils_cl',
 			'langs' => 'diamantutils@diamantutils',
 			'position' => 1000 + $r,
-			'enabled' => 'isModEnabled("diamantutils")',
+			'enabled' => 'isModEnabled("diamantutils") && getDolGlobalString("DIAMANTUTILS_CUSTOMLIST_ENABLED", "1")',
 			'perms' => '$user->admin && $user->hasRight("diamantutils", "customlist", "write")',
 			'target' => '',
 			'user' => 2,

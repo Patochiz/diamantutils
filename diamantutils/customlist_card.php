@@ -21,6 +21,7 @@ if (!$res) {
 	die("Include of main fails");
 }
 
+dol_include_once('/diamantutils/lib/diamantutils.lib.php');
 dol_include_once('/diamantutils/class/customlist.class.php');
 
 $langs->loadLangs(array('admin', 'diamantutils@diamantutils'));
@@ -28,6 +29,9 @@ $langs->loadLangs(array('admin', 'diamantutils@diamantutils'));
 // Écrire du SQL donne accès en lecture à toute la base : réservé aux administrateurs autorisés
 if (!isModEnabled('diamantutils') || !$user->admin || !$user->hasRight('diamantutils', 'customlist', 'write')) {
 	accessforbidden();
+}
+if (!diamantutils_customlist_enabled()) {
+	accessforbidden($langs->trans('DiamantutilsFeatureDisabled'));
 }
 
 $action = GETPOST('action', 'aZ09');

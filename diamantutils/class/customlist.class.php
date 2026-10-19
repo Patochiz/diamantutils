@@ -11,7 +11,7 @@
 
 class DiamantutilsCustomList
 {
-	/** Lignes maximum d'un export CSV */
+	/** Lignes maximum d'un export CSV (défaut, réglable : DIAMANTUTILS_CUSTOMLIST_EXPORT_MAX) */
 	const EXPORT_MAX_ROWS = 50000;
 
 	/** @var DoliDB */
@@ -392,6 +392,10 @@ class DiamantutilsCustomList
 		}
 
 		$columns = self::fieldNames($resql);
+		$exportmax = getDolGlobalInt('DIAMANTUTILS_CUSTOMLIST_EXPORT_MAX', self::EXPORT_MAX_ROWS);
+		if ($exportmax < 1) {
+			$exportmax = self::EXPORT_MAX_ROWS;
+		}
 		$needle = ($search !== '' ? dol_strtolower($search) : '');
 		$rows = array();
 		$total = 0;
@@ -405,7 +409,7 @@ class DiamantutilsCustomList
 				continue;
 			}
 			$rows[] = $row;
-			if ($limit <= 0 && count($rows) >= self::EXPORT_MAX_ROWS) {
+			if ($limit <= 0 && count($rows) >= $exportmax) {
 				$truncated = true;
 				break;
 			}

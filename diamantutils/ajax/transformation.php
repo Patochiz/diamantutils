@@ -38,7 +38,7 @@ dol_include_once('/diamantutils/lib/diamantutils.lib.php');
 
 top_httphead('application/json');
 
-if (!isModEnabled('diamantutils') || !$user->hasRight('diamantutils', 'transformation', 'read')) {
+if (!diamantutils_transfo_enabled() || !$user->hasRight('diamantutils', 'transformation', 'read')) {
 	http_response_code(403);
 	print json_encode(array('error' => 'Forbidden'));
 	exit;
