@@ -9,6 +9,10 @@
  *  - receptioncard (reception/card.php, action=create) : pré-remplissage entrepôt / lot + bandeau ;
  *  - ordershipmentcard (expedition/shipment.php) : entrepôt Sous-traitance présélectionné + bandeau ;
  *  - expeditioncard (expedition/card.php, action=create) : bandeau + lots non liés signalés.
+ *
+ * Description pour devis :
+ *  - productcard (product/card.php) formObjectOptions : sur un produit parent de variantes,
+ *    liste des placeholders disponibles, affichée sous l'attribut desc_propal.
  */
 
 class ActionsDiamantutils
@@ -185,6 +189,53 @@ class ActionsDiamantutils
 		print '<script>var diamantutilsST = '.json_encode($config, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT).';</script>'."\n";
 		print '<script src="'.dol_buildpath('/diamantutils/js/soustraitance.js', 1).'?v=2.2b"></script>'."\n";
 
+		return 0;
+	}
+
+	/**
+	 * Attributs complémentaires : aide à la saisie de desc_propal sur un produit parent de variantes
+	 *
+	 * @param	array		$parameters		Paramètres du hook
+	 * @param	Object		$object			Produit
+	 * @param	string		$action			Action
+	 * @param	HookManager	$hookmanager	Gestionnaire de hooks
+	 * @return	int							0 = attributs standard affichés
+	 */
+	public function formObjectOptions($parameters, &$object, &$action, $hookmanager)
+	{
+		$contexts = explode(':', (string) $parameters['context']);
+		if (!in_array('productcard', $contexts) || !isModEnabled('variants') || !is_object($object) || $object->element != 'product' || empty($object->id)) {
+			return 0;
+		}
+
+		dol_include_once('/diamantutils/lib/diamantutils_descpropal.lib.php');
+		$attributes = diamantutils_descpropal_parent_attributes($this->db, $object->id);
+		if (empty($attributes)) {
+			return 0;	// pas un produit parent
+		}
+
+		global $langs;
+		$langs->load('diamantutils@diamantutils');
+
+		$lines = array();
+		foreach ($attributes as $attribute) {
+			$code = dol_escape_htmltag($attribute['ref']);
+			$values = array_slice($attribute['values'], 0, 6, true);
+			$more = (count($attribute['values']) > 6 ? ', …' : '');
+			$lines[] = '<code>{'.$code.'}</code> '.dol_escape_htmltag($attribute['label'])
+				.' <span class="opacitymedium">('.dol_escape_htmltag(implode(', ', $values)).$more.')</span>'
+				.' &nbsp; <code>{'.$code.':ref}</code> <span class="opacitymedium">('.dol_escape_htmltag(implode(', ', array_keys($values))).$more.')</span>'
+				.' &nbsp; <code>{'.$code.':label}</code>';
+		}
+		$lines[] = '<code>{PRODUCT_REF}</code> <code>{PRODUCT_LABEL}</code> <span class="opacitymedium">'.$langs->trans('DiamantutilsDescPropalHelpProduct').'</span>';
+
+		$colspan = (!empty($parameters['colspan']) ? $parameters['colspan'] : '');
+		$out = '<tr id="diamantutils-descpropal-help"><td class="titlefield">'.$langs->trans('DiamantutilsDescPropalPlaceholders').'</td>';
+		$out .= '<td'.$colspan.'><span class="opacitymedium">'.$langs->trans('DiamantutilsDescPropalPlaceholdersDesc').'</span><br>'.implode('<br>', $lines).'</td></tr>'."\n";
+		// Ligne déplacée sous l'attribut desc_propal (fiche et formulaire de modification)
+		$out .= '<script>jQuery(function () { var row = jQuery(".product_extras_desc_propal").first().closest("tr"); if (row.length) { row.after(jQuery("#diamantutils-descpropal-help")); } });</script>'."\n";
+
+		$this->resprints = $out;
 		return 0;
 	}
 }

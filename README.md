@@ -114,6 +114,18 @@ La fiche produit (et service) porte un attribut **« Description pour devis »**
    - **Remplacer** (`REPLACE`, défaut) : la description de la ligne devient la description pour devis ;
    - **Placer avant** (`PREPEND`) : la description pour devis précède la description standard.
 
+### Variantes et placeholders
+Saisir la description pour devis sur le **produit parent** seulement : une variante sans description pour devis propre prend celle de son parent. Une variante qui a la sienne l'utilise (exception ponctuelle).
+
+| Placeholder | Remplacé par |
+|---|---|
+| `{REF_ATTRIBUT}` | valeur de l'attribut sur la variante (ex. `Laqué`) |
+| `{REF_ATTRIBUT:ref}` | référence de la valeur (ex. `LAQ`) |
+| `{REF_ATTRIBUT:label}` | libellé de l'attribut (ex. `Finition`) |
+| `{PRODUCT_REF}`, `{PRODUCT_LABEL}` | réf. et libellé de la variante |
+
+`REF_ATTRIBUT` est la référence de l'attribut (Produits → Attributs de variantes), sans distinction de casse. Exemple : `Profilé {FINITION}, coloris {COULEUR}` donne `Profilé Laqué, coloris RAL 9010`. Un placeholder inconnu reste visible tel quel dans le devis (avertissement dans le log Dolibarr). La fiche du produit parent liste les placeholders disponibles sous l'attribut.
+
 ### Règles
 - La ligne n'est modifiée que si sa description est vide ou identique à la description standard du produit (ou à l'une de ses traductions). La mention « (Code douane … / Pays d'origine …) » ajoutée par Dolibarr est conservée.
 - Ne sont jamais modifiées : une description changée à la main dans le formulaire, les lignes d'une propale clonée, créée depuis un autre objet ou importée d'un objet lié, les lignes libres.
@@ -124,7 +136,9 @@ La fiche produit (et service) porte un attribut **« Description pour devis »**
 
 | Fichier | Rôle |
 |---|---|
-| `lib/descpropal.lib.php` | installation de l'attribut, règles de remplacement |
+| `lib/descpropal.lib.php` | installation de l'attribut, choix parent / variante, règles de remplacement |
+| `lib/diamantutils_descpropal.lib.php` | rendu du modèle (`diamantutils_render_desc()`), attributs de variante |
+| `class/actions_diamantutils.class.php` | aide à la saisie sur la fiche produit parent |
 | `core/triggers/interface_99_modDiamantutils_Diamantutilstriggers.class.php` | trigger `LINEPROPAL_INSERT` |
 | `admin/setup.php`, `lib/diamantutils.lib.php` | onglet de configuration |
 | `core/modules/modDiamantutils.class.php` | constantes, création de l'attribut à l'activation |

@@ -8,9 +8,12 @@
  *  - REPLACE : la description de la ligne est remplacée ;
  *  - PREPEND : desc_propal est placée avant la description de la ligne.
  *
+ * Variantes : sans desc_propal propre, une variante prend celle de son produit parent. Le
+ * modèle est rendu avec les attributs de la variante (lib/diamantutils_descpropal.lib.php).
+ *
  * La ligne n'est modifiée que si sa description est vide ou identique à la description
- * standard du produit : une saisie à la main, une ligne clonée ou reprise d'un autre objet
- * est conservée.
+ * standard du produit (la variante) : une saisie à la main, une ligne clonée ou reprise
+ * d'un autre objet est conservée.
  */
 
 require_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
@@ -146,6 +149,59 @@ function diamantutils_descpropal_is_copy($line)
 }
 
 /**
+ * Description pour devis d'un produit, rendue (placeholders de variante substitués)
+ *
+ * 1. desc_propal du produit lui-même si elle est renseignée (exception ponctuelle sur une variante) ;
+ * 2. sinon, pour une variante, desc_propal du produit parent ;
+ * 3. puis rendu du modèle avec les attributs de la variante (sans effet sans placeholder).
+ *
+ * @param	DoliDB		$db			Base de données
+ * @param	Product		$product	Produit de la ligne, extrafields chargés
+ * @param	string		$error		Message d'erreur (sortie)
+ * @return	string|null				Description rendue ('' si aucune), null si erreur
+ */
+function diamantutils_descpropal_resolve($db, $product, &$error)
+{
+	$template = (string) ($product->array_options['options_'.DIAMANTUTILS_DESCPROPAL_EXTRAFIELD] ?? '');
+
+	if (diamantutils_descpropal_normalize($template) === '' && isModEnabled('variants')) {
+		require_once DOL_DOCUMENT_ROOT.'/variants/class/ProductCombination.class.php';
+		$combination = new ProductCombination($db);
+		$fk_parent = $combination->fetchByFkProductChild($product->id, 1);
+		if ($fk_parent < 0) {
+			$error = 'DiamantUtils desc_propal : lecture de la variante '.$product->ref.' impossible ('.$db->lasterror().')';
+			return null;
+		}
+		if ($fk_parent > 0) {
+			$parent = new Product($db);
+			if ($parent->fetch($fk_parent, '', '', '', 0, 1, 1) <= 0 || $parent->fetch_optionals() < 0) {
+				$error = 'DiamantUtils desc_propal : produit parent '.((int) $fk_parent).' de '.$product->ref.' illisible ('.$parent->error.')';
+				return null;
+			}
+			$template = (string) ($parent->array_options['options_'.DIAMANTUTILS_DESCPROPAL_EXTRAFIELD] ?? '');
+		}
+	}
+
+	if (diamantutils_descpropal_normalize($template) === '') {
+		return '';
+	}
+	if (strpos($template, '{') === false) {
+		return $template;
+	}
+
+	dol_include_once('/diamantutils/lib/diamantutils_descpropal.lib.php');
+	$attributes = array();
+	if (isModEnabled('variants')) {
+		$attributes = diamantutils_descpropal_variant_attributes($db, $product->id);
+		if (!is_array($attributes)) {
+			$error = 'DiamantUtils desc_propal : lecture des attributs de '.$product->ref.' impossible ('.$db->lasterror().')';
+			return null;
+		}
+	}
+	return diamantutils_render_desc($template, $attributes, $product);
+}
+
+/**
  * Applique la description pour devis à une ligne de proposition commerciale venant d'être insérée
  *
  * @param	DoliDB			$db		Base de données
@@ -184,7 +240,10 @@ function diamantutils_descpropal_apply($db, $line, &$error)
 		return -1;
 	}
 
-	$descpropal = (string) ($product->array_options['options_'.DIAMANTUTILS_DESCPROPAL_EXTRAFIELD] ?? '');
+	$descpropal = diamantutils_descpropal_resolve($db, $product, $error);
+	if ($descpropal === null) {
+		return -1;
+	}
 	if (diamantutils_descpropal_normalize($descpropal) === '') {
 		return 0;
 	}

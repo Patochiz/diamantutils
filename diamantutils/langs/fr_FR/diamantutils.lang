@@ -204,7 +204,7 @@ DiamantutilsCLManage = Gérer les listes
 
 # Description pour devis (propositions commerciales)
 DiamantutilsDescPropal = Description pour devis
-DiamantutilsDescPropalHelp = Reprise sur les lignes de propositions commerciales à la place de la description standard (si la fonction est activée dans la configuration du module DiamantUtils). Laisser vide pour garder la description standard.
+DiamantutilsDescPropalHelp = Reprise sur les lignes de propositions commerciales à la place de la description standard (si la fonction est activée dans la configuration du module DiamantUtils). Sur un produit parent de variantes, accepte des placeholders comme {COULEUR}. Laisser vide pour garder la description standard (ou celle du produit parent pour une variante).
 DiamantutilsDescPropalTabTitle = Description devis
 DiamantutilsDescPropalEnabledDesc = Quand un produit est ajouté à une proposition commerciale, la ligne reprend sa « Description pour devis » si elle est renseignée. Une description modifiée à la main, une ligne clonée ou reprise d'un autre objet est conservée.
 DiamantutilsDescPropalMode = Mode
@@ -214,3 +214,6 @@ DiamantutilsDescPropalModePREPEND = Placer avant la description
 DiamantutilsDescPropalStatus = État de l'installation
 DiamantutilsDescPropalExtrafieldOk = Attribut produit %s présent
 DiamantutilsDescPropalExtrafieldMissing = Attribut produit %s absent : il sera créé à l'enregistrement avec la fonction activée, ou en désactivant puis réactivant le module.
+DiamantutilsDescPropalPlaceholders = Placeholders pour devis
+DiamantutilsDescPropalPlaceholdersDesc = Utilisables dans la description pour devis : remplacés par les valeurs de la variante ajoutée au devis. Une variante sans description pour devis prend celle de ce produit.
+DiamantutilsDescPropalHelpProduct = réf. et libellé de la variante
