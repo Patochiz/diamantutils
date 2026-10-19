@@ -1,5 +1,10 @@
 # Changelog — DiamantUtils
 
+## 2.3.1 — Listes personnalisées : variables `{{entity}}` / `{{prefix}}`
+
+- Les requêtes acceptent `{{entity}}` et `{{prefix}}` (casse et espaces libres) en plus de `__ENTITY__` / `__PREFIX__`. Auparavant `{{entity}}` était envoyé tel quel à MySQL (erreur de syntaxe).
+- Une variable `{{…}}` inconnue est refusée avec un message listant les variables disponibles.
+
 ## 2.3 — Listes personnalisées (menu Outils)
 
 - Nouvelle entrée **Outils → Listes personnalisées** : listes générées par des requêtes SQL enregistrées.

@@ -281,6 +281,11 @@ class DiamantutilsCustomList
 			$error = $langs->trans('DiamantutilsCLSqlOnlySelect');
 			return false;
 		}
+		// Variable {{…}} non reconnue : message clair plutôt qu'une erreur de syntaxe MySQL
+		if (preg_match('/\{\{\s*([^}]*?)\s*\}\}/', $code, $reg) && !preg_match('/^(entity|prefix)$/i', $reg[1])) {
+			$error = $langs->trans('DiamantutilsCLUnknownVar', $reg[1]);
+			return false;
+		}
 		if (strpos($code, ';') !== false) {
 			$error = $langs->trans('DiamantutilsCLSqlOneStatement');
 			return false;
@@ -314,7 +319,8 @@ class DiamantutilsCustomList
 	}
 
 	/**
-	 * Requête prête à exécuter : __PREFIX__ et __ENTITY__ remplacés
+	 * Requête prête à exécuter : variables remplacées.
+	 * Deux syntaxes : __PREFIX__ / __ENTITY__ et {{prefix}} / {{entity}} (casse et espaces libres).
 	 *
 	 * @param	string	$sql	Requête saisie
 	 * @return	string
@@ -322,10 +328,17 @@ class DiamantutilsCustomList
 	public static function prepareSql($sql)
 	{
 		global $conf;
-		return strtr(self::cleanSql($sql), array(
-			'__PREFIX__' => MAIN_DB_PREFIX,
-			'__ENTITY__' => (string) ((int) $conf->entity),
+		$values = array(
+			'prefix' => MAIN_DB_PREFIX,
+			'entity' => (string) ((int) $conf->entity),
+		);
+		$sql = strtr(self::cleanSql($sql), array(
+			'__PREFIX__' => $values['prefix'],
+			'__ENTITY__' => $values['entity'],
 		));
+		return preg_replace_callback('/\{\{\s*(entity|prefix)\s*\}\}/i', function ($m) use ($values) {
+			return $values[strtolower($m[1])];
+		}, $sql);
 	}
 
 	/**

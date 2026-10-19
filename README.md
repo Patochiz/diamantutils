@@ -76,7 +76,7 @@ Un administrateur enregistre des requêtes SQL `SELECT` ; chaque requête devien
 ### Écrire une requête
 - Une seule requête `SELECT` ou `WITH`. Mots-clés d'écriture (`INSERT`, `UPDATE`, `DELETE`, `DROP`, `SET`…) et fonctions dangereuses (`SLEEP`, `LOAD_FILE`, `INTO OUTFILE`…) refusés, y compris dans un nom de colonne non entre guillemets.
 - La requête s'exécute dans une transaction **en lecture seule**, annulée ensuite.
-- `__PREFIX__` est remplacé par le préfixe des tables (`llx_`) et `__ENTITY__` par l'entité courante.
+- `{{prefix}}` (ou `__PREFIX__`) est remplacé par le préfixe des tables (`llx_`) et `{{entity}}` (ou `__ENTITY__`) par l'entité courante. Une variable inconnue est signalée avant exécution.
 - Donner un alias à chaque colonne : il sert d'en-tête. Deux colonnes de même nom empêchent le tri.
 - Le bouton **Tester la requête** affiche les 10 premières lignes avant enregistrement.
 
