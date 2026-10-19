@@ -5,6 +5,7 @@ Module Dolibarr interne de Diamant Industrie (Dolibarr 20, PHP 8.2, déploiement
 - **Ordres de transformation** de stock par lots (menu GPAO) : voir `GUIDE_TRANSFORMATION_V2.md`.
 - **Commandes sous-traitées** (livraison directe client) : section ci-dessous.
 - **Listes personnalisées** (menu Outils) : listes générées par des requêtes SQL, section ci-dessous.
+- **Description pour devis** : description produit propre aux propositions commerciales, section ci-dessous.
 
 Chaque fonctionnalité a son onglet dans **Configuration → Modules → DiamantUtils**, avec une option pour l'activer ou la désactiver et ses réglages propres. Une fonctionnalité désactivée masque ses menus et pages ; ses données sont conservées.
 
@@ -99,3 +100,31 @@ ORDER BY p.ref
 | `customlist_index.php` | sommaire et gestion (menu Outils) |
 | `customlist_card.php` | création, modification, test de la requête |
 | `customlist_view.php` | affichage, recherche, tri, pagination, export CSV |
+
+---
+
+## Description pour devis (propositions commerciales)
+
+### Principe
+La fiche produit (et service) porte un attribut **« Description pour devis »** (`desc_propal`, texte HTML), distinct de la description standard, comme la description fournisseur l'est pour les commandes fournisseur. Quand un produit est ajouté à une proposition commerciale, la ligne reprend cette description si elle est renseignée.
+
+### Mise en service
+1. Désactiver puis réactiver le module : l'attribut produit est créé (sans doublon s'il existe déjà).
+2. Configuration du module → onglet **Description devis** : activer et choisir le mode :
+   - **Remplacer** (`REPLACE`, défaut) : la description de la ligne devient la description pour devis ;
+   - **Placer avant** (`PREPEND`) : la description pour devis précède la description standard.
+
+### Règles
+- La ligne n'est modifiée que si sa description est vide ou identique à la description standard du produit (ou à l'une de ses traductions). La mention « (Code douane … / Pays d'origine …) » ajoutée par Dolibarr est conservée.
+- Ne sont jamais modifiées : une description changée à la main dans le formulaire, les lignes d'une propale clonée, créée depuis un autre objet ou importée d'un objet lié, les lignes libres.
+- Produit sans description pour devis : description standard conservée.
+- La désactivation du module conserve l'attribut et ses données.
+
+### Fichiers
+
+| Fichier | Rôle |
+|---|---|
+| `lib/descpropal.lib.php` | installation de l'attribut, règles de remplacement |
+| `core/triggers/interface_99_modDiamantutils_Diamantutilstriggers.class.php` | trigger `LINEPROPAL_INSERT` |
+| `admin/setup.php`, `lib/diamantutils.lib.php` | onglet de configuration |
+| `core/modules/modDiamantutils.class.php` | constantes, création de l'attribut à l'activation |

@@ -1,5 +1,13 @@
 # Changelog — DiamantUtils
 
+## 2.5 — Description pour devis (propositions commerciales)
+
+- Nouvel attribut produit `desc_propal` « Description pour devis » (texte HTML), sur la fiche produit et service, hors listes. Créé à l'activation du module (idempotent), conservé à la désactivation.
+- Fonction activable dans un nouvel onglet **Description devis** de la configuration (`DIAMANTUTILS_DESC_PROPAL`, désactivée par défaut), avec deux modes (`DIAMANTUTILS_DESC_PROPAL_MODE`) : `REPLACE` (défaut) remplace la description de la ligne, `PREPEND` place la description pour devis avant.
+- Trigger `LINEPROPAL_INSERT` : à l'ajout d'un produit à une proposition commerciale, la ligne reprend `desc_propal` si elle est renseignée et si la description de la ligne est vide ou identique à la description standard du produit (traductions et mention code douane / pays d'origine comprises).
+- Lignes conservées telles quelles : description modifiée à la main, clonage de propale, création depuis un autre objet, import de lignes d'un objet lié, lignes libres.
+- Mise à jour : déposer les fichiers, puis désactiver et réactiver le module.
+
 ## 2.4 — Configuration par onglets
 
 - Page de configuration du module : un onglet par fonctionnalité (Ordres de transformation, Sous-traitance, Listes personnalisées), avec pastille d'état dans le titre de l'onglet.
