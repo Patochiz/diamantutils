@@ -6,6 +6,7 @@ Module Dolibarr interne de Diamant Industrie (Dolibarr 20, PHP 8.2, déploiement
 - **Commandes sous-traitées** (livraison directe client) : section ci-dessous.
 - **Listes personnalisées** (menu Outils) : listes générées par des requêtes SQL, section ci-dessous.
 - **Description pour devis** : description produit propre aux propositions commerciales, section ci-dessous.
+- **Lots de produits** (menu Commerce) : ensembles de produits ajoutés en une fois sur un devis ou une commande client, section ci-dessous.
 
 Chaque fonctionnalité a son onglet dans **Configuration → Modules → DiamantUtils**, avec une option pour l'activer ou la désactiver et ses réglages propres. Une fonctionnalité désactivée masque ses menus et pages ; ses données sont conservées.
 
@@ -167,3 +168,54 @@ Des blocs conditionnels choisissent le texte selon la variante (mots-clés sans 
 | `core/triggers/interface_99_modDiamantutils_Diamantutilstriggers.class.php` | triggers `LINEPROPAL_INSERT`, `PRODUCT_CREATE` / `PRODUCT_MODIFY` (vérification) |
 | `admin/setup.php`, `lib/diamantutils.lib.php` | onglet de configuration |
 | `core/modules/modDiamantutils.class.php` | constantes, création de l'attribut à l'activation |
+
+---
+
+## Lots de produits (devis et commandes client)
+
+### Principe
+Un lot est une liste prédéfinie de produits avec leur quantité (ex. « Plafond 10 m² » : profilés, suspentes, dalles). Sur un devis ou une commande client **en brouillon**, une ligne **Ajouter un lot de produits** au-dessus du formulaire d'ajout standard permet d'insérer tout le lot en une fois, avec un **multiplicateur** des quantités (défaut 1).
+
+### Mise en service
+1. Envoyer les fichiers par FTP dans `custom/diamantutils/`.
+2. Désactiver puis réactiver le module : cela crée les tables `llx_diamantutils_lot` et `llx_diamantutils_lot_det`, et enregistre les droits, le menu et les hooks `propalcard` / `ordercard`.
+3. Accorder les droits (Utilisateurs → Permissions → DiamantUtils). Aucun accès à la configuration du module n'est nécessaire :
+   - **Voir les lots et les ajouter sur les devis et commandes** (`lot` / `read`) ;
+   - **Créer et modifier les lots** (`lot` / `write`) ;
+   - **Supprimer les lots** (`lot` / `delete`).
+4. Option : la fonction peut être désactivée dans l'onglet **Lots de produits** de la configuration (`DIAMANTUTILS_LOT_ENABLED`, active par défaut).
+
+### Utilisation
+- **Commerce → Lots de produits** : liste (recherche sur le libellé, filtre actif / inactif), **Nouveau lot**. Fiche du lot : libellé, actif, lignes produit + quantité, modification de la quantité, ordre (monter / descendre), suppression, ajout en bas du tableau. Les lots sont partagés par tous les utilisateurs de l'entité ; seuls les lots actifs et non vides sont proposés sur les pièces.
+- **Sur un devis ou une commande en brouillon** (droit `lot` / `read` + droit de créer/modifier la pièce) : choisir le lot, le multiplicateur, puis **Ajouter le lot**. Message « N ligne(s) ajoutée(s) ».
+- **Enregistrer comme lot** (droit `lot` / `write`, tout statut de pièce) : bouton de la fiche devis / commande. Demande un libellé (réf. de la pièce par défaut) et crée un lot avec les lignes produit de la pièce (produit + quantité) ; lignes libres, titres et sous-totaux ignorés.
+
+### Règles d'insertion
+Chaque ligne passe par `addline()` de la pièce, **triggers actifs**, comme une saisie manuelle d'un produit :
+- **prix et TVA** : `Product::getSellPrice($mysoc, $tiers)` (prix unique, niveau de prix du client, prix client) ; pas de prix → 0 ;
+- **remise** : remise par défaut du tiers (la valeur pré-remplie du formulaire standard) ;
+- **description** : description standard du produit ; dans la langue du tiers si `MAIN_MULTILANGS` **et** « textes des produits dans la langue du tiers » (`PRODUIT_TEXTS_IN_THIRDPARTY_LANGUAGE`) sont actifs, comme la saisie native ; mention code douane / pays d'origine ajoutée comme en natif ;
+- **quantité** = quantité du lot × multiplicateur ; unité et type du produit ; prix d'achat calculé par Dolibarr selon la configuration des marges ;
+- ordre des lignes du lot conservé, lignes ajoutées en fin de pièce ;
+- **tout ou rien** : si une ligne échoue (produit supprimé ou plus en vente, stock insuffisant si l'option devis l'exige, refus d'un trigger), aucune ligne n'est ajoutée et le message d'erreur est affiché ;
+- le PDF de la pièce est régénéré comme après un ajout manuel (sauf `MAIN_DISABLE_PDF_AUTOUPDATE`).
+
+**Description pour devis** : les lignes d'un lot ajoutées sur un devis reçoivent la description pour devis du produit (trigger `LINEPROPAL_INSERT`), exactement comme un ajout manuel.
+
+**Cohabitation** : le hook `formAddObjectLine` affiche la ligne par `print` et retourne 0 : le formulaire standard et les ajouts d'autres modules (ex. productselector) restent affichés. Le bouton d'ajout envoie son propre formulaire (le tableau des lignes est déjà dans le formulaire `addproduct` de la fiche).
+
+### Test
+Ouvrir `custom/diamantutils/test/lot_insert_test.php` en administrateur, choisir un produit ayant une description pour devis et un client, lancer : ajout sur un devis puis une commande brouillon, contrôles des quantités, du prix, de la description pour devis et du « tout ou rien ». Tout est annulé à la fin (transaction annulée, devis de contrôle supprimé).
+
+### Fichiers
+
+| Fichier | Rôle |
+|---|---|
+| `sql/llx_diamantutils_lot*.sql` | tables des lots et de leurs lignes (clé étrangère, suppression en cascade) |
+| `class/diamantlot.class.php` | classe `DiamantLot` (CommonObject) et `DiamantLotLine` |
+| `lib/lot.lib.php` | insertion d'un lot sur une pièce (`diamantutils_lot_insert()`), lignes d'une pièce pour « Enregistrer comme lot » |
+| `lot_list.php`, `lot_card.php` | liste et fiche des lots |
+| `class/actions_diamantutils.class.php` | hooks `formAddObjectLine`, `doActions` (`addlot`, `confirm_diamantutils_savelot`), `addMoreActionsButtons`, `formConfirm` |
+| `test/lot_insert_test.php` | test d'intégration (navigateur, administrateur) |
+| `admin/setup.php`, `lib/diamantutils.lib.php` | onglet de configuration |
+| `core/modules/modDiamantutils.class.php` | droits, menu Commerce, hooks, constante |

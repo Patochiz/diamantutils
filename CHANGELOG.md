@@ -1,5 +1,18 @@
 # Changelog — DiamantUtils
 
+## 2.6 — Lots de produits (devis et commandes client)
+
+- Nouvelles tables `llx_diamantutils_lot` (libellé, actif) et `llx_diamantutils_lot_det` (rang, produit, quantité ; clé étrangère avec suppression en cascade). Classe `DiamantLot` (CommonObject) et ses lignes.
+- Nouveaux droits `lot` : *read* (voir et utiliser), *write* (créer / modifier), *delete* (supprimer). Lots partagés par l'entité, gérés sans accès à la configuration du module.
+- Menu **Commerce → Lots de produits** (Nouveau lot, Liste) : liste paginée avec recherche sur le libellé ; fiche avec lignes produit / quantité, modification de la quantité, ordre, suppression, ajout en bas du tableau.
+- Devis et commandes client en brouillon (hooks `propalcard`, `ordercard`) : ligne **Ajouter un lot** au-dessus du formulaire standard (lot actif + multiplicateur). Insertion par `addline()` triggers actifs, prix et TVA par `getSellPrice()` (multiprix, prix client ; 0 sans prix), remise par défaut du tiers, description standard (langue du tiers comme en natif), dans une transaction : tout ou rien. Jeton CSRF vérifié. PDF régénéré comme après un ajout manuel.
+- Compatible avec la description pour devis : les lignes d'un lot reçoivent `desc_propal` via `LINEPROPAL_INSERT`.
+- Bouton **Enregistrer comme lot** sur devis et commandes (tout statut, droit *write*) : lot créé avec les lignes produit de la pièce, lignes libres ignorées.
+- Coexistence avec productselector : `formAddObjectLine` affiche par `print` et retourne 0. Les méthodes du hook vident `resprints` en entrée (instance partagée par tous les hooks de la page).
+- Onglet de configuration **Lots de produits** (`DIAMANTUTILS_LOT_ENABLED`, active par défaut).
+- Test d'intégration `test/lot_insert_test.php` (navigateur, administrateur, aucune donnée conservée).
+- Mise à jour : déposer les fichiers, puis désactiver et réactiver le module (tables, droits, menu, hooks), et accorder les nouveaux droits.
+
 ## 2.5 — Description pour devis (propositions commerciales)
 
 - Nouvel attribut produit `desc_propal` « Description pour devis » (texte HTML), sur la fiche produit et service, hors listes. Créé à l'activation du module (idempotent), conservé à la désactivation.

@@ -18,16 +18,16 @@ class modDiamantutils extends DolibarrModules
 		$this->family = 'custom';
 		$this->module_position = '90';
 		$this->name = preg_replace('/^mod/i', '', get_class($this));
-		$this->description = "Module interne Diamant Industrie : ordres de transformation de stock par lots (menu GPAO), commandes sous-traitées livrées directement au client, listes personnalisées SQL (menu Outils) et description pour devis sur la fiche produit";
-		$this->descriptionlong = "Transformation de stock par lots : consommation de N lots et production de M lots (découpe de profilés, peinture, changement d'unité), avec saisie en pièces × longueur, contrôle d'équilibre, gestion des restes et des pertes, calcul du coût et traçabilité des mouvements de stock. Commandes sous-traitées : réception sur l'entrepôt Sous-traitance avec lot = ref de la commande fournisseur, BL client prélevé sur ce lot. Listes personnalisées : requêtes SQL en lecture seule enregistrées par un administrateur, consultables avec recherche, tri, pagination et export CSV. Description pour devis : texte saisi sur la fiche produit, repris sur les lignes de propositions commerciales à la place de la description standard.";
+		$this->description = "Module interne Diamant Industrie : ordres de transformation de stock par lots (menu GPAO), commandes sous-traitées livrées directement au client, listes personnalisées SQL (menu Outils) description pour devis sur la fiche produit et lots de produits ajoutés en une fois sur les devis et commandes (menu Commerce)";
+		$this->descriptionlong = "Transformation de stock par lots : consommation de N lots et production de M lots (découpe de profilés, peinture, changement d'unité), avec saisie en pièces × longueur, contrôle d'équilibre, gestion des restes et des pertes, calcul du coût et traçabilité des mouvements de stock. Commandes sous-traitées : réception sur l'entrepôt Sous-traitance avec lot = ref de la commande fournisseur, BL client prélevé sur ce lot. Listes personnalisées : requêtes SQL en lecture seule enregistrées par un administrateur, consultables avec recherche, tri, pagination et export CSV. Description pour devis : texte saisi sur la fiche produit, repris sur les lignes de propositions commerciales à la place de la description standard. Lots de produits : ensembles prédéfinis de produits et quantités, ajoutés en une fois (avec multiplicateur) sur un devis ou une commande client en brouillon, aux prix et descriptions de la saisie standard.";
 		$this->editor_name = 'Diamant Industrie';
-		$this->version = '2.5';
+		$this->version = '2.6';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'generic';
 
 		// Format plat (le format imbriqué data/entity casse l'enregistrement en v20)
 		$this->module_parts = array(
-			'hooks' => array('ordersupplierdispatch', 'receptioncard', 'ordershipmentcard', 'expeditioncard', 'productcard'),
+			'hooks' => array('ordersupplierdispatch', 'receptioncard', 'ordershipmentcard', 'expeditioncard', 'productcard', 'propalcard', 'ordercard'),
 			'triggers' => 1,
 		);
 
@@ -102,6 +102,15 @@ class modDiamantutils extends DolibarrModules
 				'current',
 				0
 			),
+			7 => array(
+				'DIAMANTUTILS_LOT_ENABLED',
+				'chaine',
+				'1',
+				'Lots de produits (menu Commerce, ajout sur devis et commandes) : 1 = active',
+				0,
+				'current',
+				0
+			),
 		);
 
 		// Le menu GPAO n'est affiché que si le module MRP (ou BOM) est actif
@@ -155,6 +164,27 @@ class modDiamantutils extends DolibarrModules
 		$this->rights[$r][3] = 0;
 		$this->rights[$r][4] = 'customlist';
 		$this->rights[$r][5] = 'write';
+		$r++;
+		$this->rights[$r][0] = $this->numero.'07';
+		$this->rights[$r][1] = 'Voir les lots de produits et les ajouter sur les devis et commandes';
+		$this->rights[$r][2] = 'r';
+		$this->rights[$r][3] = 0;
+		$this->rights[$r][4] = 'lot';
+		$this->rights[$r][5] = 'read';
+		$r++;
+		$this->rights[$r][0] = $this->numero.'08';
+		$this->rights[$r][1] = 'Créer et modifier les lots de produits';
+		$this->rights[$r][2] = 'w';
+		$this->rights[$r][3] = 0;
+		$this->rights[$r][4] = 'lot';
+		$this->rights[$r][5] = 'write';
+		$r++;
+		$this->rights[$r][0] = $this->numero.'09';
+		$this->rights[$r][1] = 'Supprimer les lots de produits';
+		$this->rights[$r][2] = 'd';
+		$this->rights[$r][3] = 0;
+		$this->rights[$r][4] = 'lot';
+		$this->rights[$r][5] = 'delete';
 		$r++;
 
 		// Menus gauche dans le menu haut GPAO (eldy : mainmenu=mrp)
@@ -248,6 +278,51 @@ class modDiamantutils extends DolibarrModules
 			'target' => '',
 			'user' => 2,
 		);
+		// Menu gauche Commerce (eldy : mainmenu=commercial) : lots de produits
+		$lotenabled = 'isModEnabled("diamantutils") && getDolGlobalString("DIAMANTUTILS_LOT_ENABLED", "1") && (isModEnabled("propal") || isModEnabled("order"))';
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=commercial',
+			'type' => 'left',
+			'titre' => 'DiamantutilsLots',
+			'prefix' => img_picto('', 'list', 'class="paddingright pictofixedwidth"'),
+			'mainmenu' => 'commercial',
+			'leftmenu' => 'diamantutils_lot',
+			'url' => '/diamantutils/lot_list.php?mainmenu=commercial&leftmenu=diamantutils_lot',
+			'langs' => 'diamantutils@diamantutils',
+			'position' => 1000 + $r,
+			'enabled' => $lotenabled,
+			'perms' => '$user->hasRight("diamantutils", "lot", "read")',
+			'target' => '',
+			'user' => 2,
+		);
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=commercial,fk_leftmenu=diamantutils_lot',
+			'type' => 'left',
+			'titre' => 'DiamantutilsNewLot',
+			'mainmenu' => 'commercial',
+			'leftmenu' => 'diamantutils_lot_new',
+			'url' => '/diamantutils/lot_card.php?action=create&mainmenu=commercial&leftmenu=diamantutils_lot',
+			'langs' => 'diamantutils@diamantutils',
+			'position' => 1000 + $r,
+			'enabled' => $lotenabled,
+			'perms' => '$user->hasRight("diamantutils", "lot", "write")',
+			'target' => '',
+			'user' => 2,
+		);
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=commercial,fk_leftmenu=diamantutils_lot',
+			'type' => 'left',
+			'titre' => 'List',
+			'mainmenu' => 'commercial',
+			'leftmenu' => 'diamantutils_lot_list',
+			'url' => '/diamantutils/lot_list.php?mainmenu=commercial&leftmenu=diamantutils_lot',
+			'langs' => 'diamantutils@diamantutils',
+			'position' => 1000 + $r,
+			'enabled' => $lotenabled,
+			'perms' => '$user->hasRight("diamantutils", "lot", "read")',
+			'target' => '',
+			'user' => 2,
+		);
 	}
 
 	public function init($options = '')
@@ -258,7 +333,7 @@ class modDiamantutils extends DolibarrModules
 		$sql = "DELETE FROM ".MAIN_DB_PREFIX."const WHERE name = '".$this->db->escape('DIAMANTUTILS_INVOICE_CHECK_MODE')."'";
 		$this->db->query($sql);
 
-		// Création des tables de transformation (fichiers sql/ du module)
+		// Création des tables (fichiers sql/ du module : transformations, listes, lots de produits)
 		$result = $this->_load_tables('/diamantutils/sql/');
 		if ($result < 0) {
 			return -1;
