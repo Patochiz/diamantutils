@@ -19,6 +19,8 @@ dol_include_once('/diamantutils/lib/diamantutils.lib.php');
 dol_include_once('/diamantutils/lib/soustraitance.lib.php');
 dol_include_once('/diamantutils/class/customlist.class.php');
 dol_include_once('/diamantutils/lib/descpropal.lib.php');
+dol_include_once('/diamantutils/lib/lot.lib.php');
+dol_include_once('/diamantutils/class/diamantlot.class.php');
 
 if (!$user->admin) {
 	accessforbidden();
@@ -28,7 +30,7 @@ $langs->loadLangs(array("admin", "stocks", "diamantutils@diamantutils"));
 
 $action = GETPOST('action', 'aZ09');
 $tab = GETPOST('tab', 'aZ09');
-if (!in_array($tab, array('transfo', 'soustraitance', 'customlist', 'descpropal'))) {
+if (!in_array($tab, array('transfo', 'soustraitance', 'customlist', 'descpropal', 'lot'))) {
 	$tab = 'transfo';
 }
 
@@ -124,6 +126,13 @@ if ($action == 'update') {
 		}
 		$mode = (GETPOST('DIAMANTUTILS_DESC_PROPAL_MODE', 'aZ09') == 'PREPEND' ? 'PREPEND' : 'REPLACE');
 		if (dolibarr_set_const($db, 'DIAMANTUTILS_DESC_PROPAL_MODE', $mode, 'chaine', 0, '', $conf->entity) < 0) {
+			$error++;
+		}
+	}
+
+	if ($tab == 'lot') {
+		$enabled = GETPOSTINT('DIAMANTUTILS_LOT_ENABLED') ? 1 : 0;
+		if (dolibarr_set_const($db, 'DIAMANTUTILS_LOT_ENABLED', $enabled, 'chaine', 0, '', $conf->entity) < 0) {
 			$error++;
 		}
 	}
@@ -277,6 +286,28 @@ if ($tab == 'descpropal') {
 		$status = img_warning('', 'class="pictofixedwidth"').'<span class="warning">'.$langs->trans('DiamantutilsDescPropalExtrafieldMissing', DIAMANTUTILS_DESCPROPAL_EXTRAFIELD).'</span>';
 	}
 	diamantutils_setup_row($langs->trans('DiamantutilsDescPropalStatus'), '', $status);
+}
+
+if ($tab == 'lot') {
+	diamantutils_setup_row(
+		$langs->trans('DiamantutilsFeatureEnabled'),
+		$langs->trans('DiamantutilsLotEnabledDesc'),
+		$form->selectyesno('DIAMANTUTILS_LOT_ENABLED', diamantutils_lot_enabled() ? 1 : 0, 1)
+	);
+	$static = new DiamantLot($db);
+	$lots = $static->fetchAll(0);
+	$nb = (is_array($lots) ? count($lots) : 0);
+	$nbactive = 0;
+	if (is_array($lots)) {
+		foreach ($lots as $lot) {
+			$nbactive += ($lot->active ? 1 : 0);
+		}
+	}
+	diamantutils_setup_row(
+		$langs->trans('DiamantutilsLots'),
+		$langs->trans('DiamantutilsLotSetupRights'),
+		$langs->trans('DiamantutilsLotCount', $nb, $nbactive).' &nbsp; <a href="'.dol_buildpath('/diamantutils/lot_list.php', 1).'">'.img_picto('', 'list', 'class="pictofixedwidth"').$langs->trans('DiamantutilsLotManage').'</a>'
+	);
 }
 
 print '</table>';
