@@ -1,5 +1,13 @@
 # Changelog — DiamantUtils
 
+## 2.7 — Description pour devis : calculs
+
+- Balises de calcul `{=EXPRESSION}` et `{=EXPRESSION ;N}` dans la description pour devis : `+ - * /`, parenthèses, moins unaire, nombres à virgule ou point, attributs de variante (valeur ou `:ref`) numériques. Exemple : `{=MODULE:ref-5}` donne `595` pour un module de réf. 600.
+- Résultat : au plus 2 décimales sans zéros inutiles, ou exactement N décimales arrondies avec `;N` (`{=MODULE:ref/2 ;2}` donne `300,00`). Virgule décimale.
+- Parseur dédié, sans `eval()`. Calcul impossible (valeur non numérique, attribut absent, division par zéro, syntaxe) : balise laissée telle quelle, avertissement dans le log.
+- Vérification à l'enregistrement du produit : syntaxe des calculs et attributs utilisés.
+- Nouveaux cas dans `test/descpropal_render_cases.php`.
+
 ## 2.6 — Lots de produits (devis et commandes client)
 
 - Nouvelles tables `llx_diamantutils_lot` (libellé, actif) et `llx_diamantutils_lot_det` (rang, produit, quantité ; clé étrangère avec suppression en cascade). Classe `DiamantLot` (CommonObject) et ses lignes.

@@ -151,6 +151,25 @@ Des blocs conditionnels choisissent le texte selon la variante (mots-clés sans 
 - À l'enregistrement du produit, une erreur de syntaxe ou un attribut inconnu des variantes est signalé par un avertissement (le produit est enregistré quand même).
 - Tests : ouvrir `custom/diamantutils/test/descpropal_render_test.php` en administrateur (aucune écriture en base).
 
+### Calculs
+Une balise qui commence par `=` calcule un nombre à partir des attributs de la variante :
+
+| Modèle | Variante | Résultat |
+|---|---|---|
+| `{=MODULE:ref-5}` | réf. de MODULE = 600 | `595` |
+| `{=(LARGEUR-5)*2}` | LARGEUR = 600 | `1190` |
+| `{=LARGEUR*LONGUEUR/1000}` | 600 et 1200 | `720` |
+| `{=LARGEUR/4}` | LARGEUR = 595 | `148,75` |
+| `{=MODULE:ref/2 ;2}` | réf. de MODULE = 600 | `300,00` |
+| `{=LARGEUR/3 ;0}` | LARGEUR = 1000 | `333` |
+
+- Opérateurs `+ - * /` et parenthèses, avec les priorités habituelles (`*` et `/` avant `+` et `-`). Nombres à virgule ou à point (`0,5`, `0.5`).
+- `ATTRIBUT` prend la valeur, `ATTRIBUT:ref` la référence de la valeur ; elle doit être un nombre (virgule décimale acceptée). Les noms d'attributs peuvent contenir `%`, `_`, `Ø`…, mais pas `+ - * / ( ) : ;`.
+- Résultat : sans `;N`, au plus 2 décimales sans zéros inutiles ; avec `;N`, arrondi à exactement N décimales. Virgule décimale, pas de séparateur de milliers.
+- Le texte hors des accolades n'est pas calculé : `{MODULE:ref}-5` donne `600-5`.
+- Calcul impossible (valeur non numérique, attribut absent, division par zéro, syntaxe) : la balise reste visible telle quelle sur le devis, avec un avertissement dans le log. À l'enregistrement du produit, une erreur de syntaxe ou un attribut inconnu est signalé.
+- Les calculs s'utilisent dans le texte, y compris dans une branche `{IF}`, mais pas encore dans les conditions.
+
 ### Règles
 - La ligne n'est modifiée que si sa description est vide ou identique à la description standard du produit (ou à l'une de ses traductions). La mention « (Code douane … / Pays d'origine …) » ajoutée par Dolibarr est conservée.
 - Ne sont jamais modifiées : une description changée à la main dans le formulaire, les lignes d'une propale clonée, créée depuis un autre objet ou importée d'un objet lié, les lignes libres.
@@ -162,7 +181,7 @@ Des blocs conditionnels choisissent le texte selon la variante (mots-clés sans 
 | Fichier | Rôle |
 |---|---|
 | `lib/descpropal.lib.php` | installation de l'attribut, choix parent / variante, règles de remplacement |
-| `lib/diamantutils_descpropal.lib.php` | rendu du modèle (`diamantutils_render_desc()` : conditions puis placeholders), vérification, attributs de variante |
+| `lib/diamantutils_descpropal.lib.php` | rendu du modèle (`diamantutils_render_desc()` : conditions puis placeholders et calculs), vérification, attributs de variante |
 | `class/actions_diamantutils.class.php` | aide à la saisie sur la fiche produit parent |
 | `test/descpropal_render_test.php`, `test/descpropal_render_cases.php` | tests du rendu (navigateur, administrateur) |
 | `core/triggers/interface_99_modDiamantutils_Diamantutilstriggers.class.php` | triggers `LINEPROPAL_INSERT`, `PRODUCT_CREATE` / `PRODUCT_MODIFY` (vérification) |
