@@ -12,6 +12,16 @@
  *  - {PRODUCT_REF}, {PRODUCT_LABEL}  réf. et libellé du produit (la variante).
  * Placeholder inconnu ou attribut absent : laissé tel quel, avertissement dans le log.
  *
+ * Calculs : {=EXPRESSION} ou {=EXPRESSION ;N}
+ *   ex. {=MODULE:ref-5}, {=(LARGEUR-5)*2}, {=MODULE:ref/2 ;2}
+ * Opérateurs + - * / et parenthèses (priorités usuelles, moins unaire), nombres à virgule ou
+ * point décimal, attributs REF_ATTRIBUT (valeur) ou REF_ATTRIBUT:ref (référence de la valeur),
+ * qui doivent contenir un nombre. Les noms d'attributs peuvent contenir % _ Ø… mais pas d'opérateur.
+ * Résultat : avec ;N, arrondi à exactement N décimales (300,00) ; sans, au plus 2 décimales sans
+ * zéros inutiles (595, 297,5). Virgule décimale, pas de séparateur de milliers.
+ * Erreur (valeur non numérique, attribut absent, division par zéro, syntaxe) : balise laissée
+ * telle quelle, avertissement dans le log.
+ *
  * Blocs conditionnels (mots-clés insensibles à la casse, imbrication autorisée) :
  *   {IF LARGEUR=200}…{ELSEIF LARGEUR IN 300,400}…{ELSE}…{ENDIF}
  * Conditions : ATTR=v, ATTR!=v, ATTR>=v, ATTR<=v, ATTR>v, ATTR<v, ATTR IN v1,v2, ATTR seul
@@ -146,6 +156,14 @@ function diamantutils_descpropal_substitute($text, $attributes, $product, $html,
 {
 	return preg_replace_callback('/\{([^{}]*)\}/u', function ($m) use ($attributes, $product, $html, &$warnings) {
 		$tag = diamantutils_descpropal_tag_text($m[1], $html);
+		if (substr($tag, 0, 1) === '=') {
+			$value = diamantutils_descpropal_calc_render(substr($tag, 1), $attributes, $error);
+			if ($value === null) {
+				$warnings[] = 'Calcul impossible ('.$error.') : '.$m[0];
+				return $m[0];
+			}
+			return $value;
+		}
 		if (!preg_match('/^([^\s:]+)\s*(?::\s*(ref|label))?$/iu', $tag, $reg)) {
 			$warnings[] = 'Placeholder non reconnu : '.$m[0];
 			return $m[0];
@@ -168,6 +186,230 @@ function diamantutils_descpropal_substitute($text, $attributes, $product, $html,
 		// Seuls & < > " sont échappés (accents et retours ligne de la valeur conservés)
 		return ($html ? dol_escape_htmltag($value, 1, 1, '', 1) : $value);
 	}, (string) $text);
+}
+
+/**
+ * Analyse un calcul {=…} : expression et nombre de décimales
+ *
+ * Grammaire : expr = terme (('+'|'-') terme)* ; terme = facteur (('*'|'/') facteur)* ;
+ * facteur = ('+'|'-') facteur | '(' expr ')' | nombre | ATTRIBUT[:ref]
+ *
+ * @param	string		$text		Texte de la balise sans le « = »
+ * @param	string		$error		Message d'erreur (sortie)
+ * @return	array|null				array('ast' => arbre, 'decimals' => int|null), null si syntaxe invalide
+ */
+function diamantutils_descpropal_calc_parse($text, &$error)
+{
+	$error = '';
+	$decimals = null;
+	$text = (string) $text;
+	if (preg_match('/^(.*);\s*(\d+)\s*$/su', $text, $reg)) {
+		$text = $reg[1];
+		$decimals = min((int) $reg[2], 10);
+	}
+	if (strpos($text, ';') !== false) {
+		$error = 'nombre de décimales invalide après « ; »';
+		return null;
+	}
+
+	// Jetons : opérateurs, parenthèses, opérandes (nombre ou attribut, suffixe :ref facultatif)
+	$tokens = array();
+	$pos = 0;
+	$len = strlen($text);
+	while ($pos < $len) {
+		if (!preg_match('/\G\s*(?:([-+*\/()])|([^\s\-+*\/():;]+)(?:\s*:\s*(ref)(?![^\s\-+*\/()]))?|(\S))\s*/iu', $text, $reg, 0, $pos) || $reg[0] === '') {
+			break;
+		}
+		$pos += strlen($reg[0]);
+		if (($reg[1] ?? '') !== '') {
+			$tokens[] = array('op', $reg[1]);
+		} elseif (($reg[2] ?? '') !== '') {
+			$number = diamantutils_descpropal_number($reg[2]);
+			if ($number !== null && ($reg[3] ?? '') === '' && preg_match('/^\d+(?:[.,]\d+)?$/', $reg[2])) {
+				$tokens[] = array('num', $number);
+			} else {
+				$tokens[] = array('attr', $reg[2], (($reg[3] ?? '') !== ''));
+			}
+		} else {
+			$error = 'caractère inattendu « '.($reg[4] ?? '').' »';
+			return null;
+		}
+	}
+	if (!count($tokens)) {
+		$error = 'expression vide';
+		return null;
+	}
+
+	$i = 0;
+	$parse_expr = null;
+	$parse_factor = null;
+	// Fermetures récursives (référencées par elles-mêmes)
+	$parse_factor = function () use (&$tokens, &$i, &$parse_expr, &$parse_factor, &$error) {
+		$token = $tokens[$i] ?? null;
+		if ($token === null) {
+			$error = 'expression incomplète';
+			return null;
+		}
+		if ($token[0] == 'op' && ($token[1] == '-' || $token[1] == '+')) {
+			$i++;
+			$operand = $parse_factor();
+			if ($operand === null) {
+				return null;
+			}
+			return ($token[1] == '-' ? array('neg', $operand) : $operand);
+		}
+		if ($token[0] == 'op' && $token[1] == '(') {
+			$i++;
+			$node = $parse_expr();
+			if ($node === null) {
+				return null;
+			}
+			if (($tokens[$i][0] ?? '') != 'op' || $tokens[$i][1] != ')') {
+				$error = 'parenthèse non fermée';
+				return null;
+			}
+			$i++;
+			return $node;
+		}
+		if ($token[0] == 'num' || $token[0] == 'attr') {
+			$i++;
+			return $token;
+		}
+		$error = 'opérateur « '.$token[1].' » inattendu';
+		return null;
+	};
+	$parse_term = function () use (&$tokens, &$i, &$parse_factor) {
+		$left = $parse_factor();
+		while ($left !== null && ($tokens[$i][0] ?? '') == 'op' && in_array($tokens[$i][1], array('*', '/'))) {
+			$op = $tokens[$i][1];
+			$i++;
+			$right = $parse_factor();
+			$left = ($right === null ? null : array($op, $left, $right));
+		}
+		return $left;
+	};
+	$parse_expr = function () use (&$tokens, &$i, &$parse_term) {
+		$left = $parse_term();
+		while ($left !== null && ($tokens[$i][0] ?? '') == 'op' && in_array($tokens[$i][1], array('+', '-'))) {
+			$op = $tokens[$i][1];
+			$i++;
+			$right = $parse_term();
+			$left = ($right === null ? null : array($op, $left, $right));
+		}
+		return $left;
+	};
+
+	$ast = $parse_expr();
+	if ($ast === null) {
+		return null;
+	}
+	if ($i < count($tokens)) {
+		$error = ($tokens[$i][1] == ')' ? 'parenthèse fermante en trop' : 'élément inattendu « '.$tokens[$i][1].' »');
+		return null;
+	}
+	return array('ast' => $ast, 'decimals' => $decimals);
+}
+
+/**
+ * Évalue l'arbre d'un calcul
+ *
+ * @param	array		$node			Nœud (diamantutils_descpropal_calc_parse())
+ * @param	array		$attributes		Attributs de la variante
+ * @param	string		$error			Message d'erreur (sortie)
+ * @return	float|null					Résultat, null si erreur
+ */
+function diamantutils_descpropal_calc_eval($node, $attributes, &$error)
+{
+	switch ($node[0]) {
+		case 'num':
+			return $node[1];
+		case 'attr':
+			$key = diamantutils_descpropal_key($node[1]);
+			if (!isset($attributes[$key])) {
+				$error = 'attribut '.$node[1].' absent de la variante';
+				return null;
+			}
+			$value = ($node[2] ? $attributes[$key]['value_ref'] : $attributes[$key]['value']);
+			$number = diamantutils_descpropal_number($value);
+			if ($number === null) {
+				$error = 'valeur non numérique « '.$value.' » pour '.$node[1].($node[2] ? ':ref' : '');
+				return null;
+			}
+			return $number;
+		case 'neg':
+			$value = diamantutils_descpropal_calc_eval($node[1], $attributes, $error);
+			return ($value === null ? null : -$value);
+	}
+	$left = diamantutils_descpropal_calc_eval($node[1], $attributes, $error);
+	if ($left === null) {
+		return null;
+	}
+	$right = diamantutils_descpropal_calc_eval($node[2], $attributes, $error);
+	if ($right === null) {
+		return null;
+	}
+	switch ($node[0]) {
+		case '+':
+			return $left + $right;
+		case '-':
+			return $left - $right;
+		case '*':
+			return $left * $right;
+	}
+	if (abs($right) < 1e-12) {
+		$error = 'division par zéro';
+		return null;
+	}
+	return $left / $right;
+}
+
+/**
+ * Attributs utilisés par l'arbre d'un calcul
+ *
+ * @param	array		$node	Nœud
+ * @param	string[]	$refs	Références trouvées (sortie, clés en majuscules)
+ * @return	void
+ */
+function diamantutils_descpropal_calc_refs($node, &$refs)
+{
+	if ($node[0] == 'attr') {
+		$refs[diamantutils_descpropal_key($node[1])] = $node[1];
+	} elseif ($node[0] == 'neg') {
+		diamantutils_descpropal_calc_refs($node[1], $refs);
+	} elseif ($node[0] != 'num') {
+		diamantutils_descpropal_calc_refs($node[1], $refs);
+		diamantutils_descpropal_calc_refs($node[2], $refs);
+	}
+}
+
+/**
+ * Calcul {=…} : texte du résultat (virgule décimale)
+ *
+ * @param	string		$text			Texte de la balise sans le « = »
+ * @param	array		$attributes		Attributs de la variante
+ * @param	string		$error			Message d'erreur (sortie)
+ * @return	string|null					Résultat formaté, null si erreur
+ */
+function diamantutils_descpropal_calc_render($text, $attributes, &$error)
+{
+	$calc = diamantutils_descpropal_calc_parse($text, $error);
+	if ($calc === null) {
+		return null;
+	}
+	$value = diamantutils_descpropal_calc_eval($calc['ast'], $attributes, $error);
+	if ($value === null) {
+		return null;
+	}
+	$decimals = ($calc['decimals'] === null ? 2 : $calc['decimals']);
+	$value = round($value, $decimals);
+	if ($value == 0) {
+		$value = 0.0;	// pas de « -0 »
+	}
+	$out = number_format($value, $decimals, ',', '');
+	if ($calc['decimals'] === null && strpos($out, ',') !== false) {
+		$out = rtrim(rtrim($out, '0'), ',');
+	}
+	return $out;
 }
 
 /**
@@ -492,14 +734,25 @@ function diamantutils_descpropal_eval_nodes($nodes, $attributes, &$warnings)
  * @param	array		$nodes	Nœuds
  * @param	string[]	$refs	Références trouvées (sortie, clés en majuscules)
  * @param	bool		$html	Modèle HTML
+ * @param	string[]	$errors	Erreurs de syntaxe des calculs {=…} (sortie, ajoutées)
  * @return	void
  */
-function diamantutils_descpropal_collect_refs($nodes, &$refs, $html = true)
+function diamantutils_descpropal_collect_refs($nodes, &$refs, $html = true, &$errors = null)
 {
 	foreach ($nodes as $node) {
 		if ($node['type'] == 'text') {
 			if (preg_match_all('/\{([^{}]*)\}/u', $node['text'], $matches)) {
 				foreach ($matches[1] as $content) {
+					$tag = diamantutils_descpropal_tag_text($content, $html);
+					if (substr($tag, 0, 1) === '=') {
+						$calc = diamantutils_descpropal_calc_parse(substr($tag, 1), $error);
+						if ($calc === null) {
+							$errors[] = 'calcul {'.$tag.'} : '.$error;
+						} else {
+							diamantutils_descpropal_calc_refs($calc['ast'], $refs);
+						}
+						continue;
+					}
 					if (preg_match('/^([^\s:]+)\s*(?::\s*(?:ref|label))?$/iu', diamantutils_descpropal_tag_text($content, $html), $reg)) {
 						$key = diamantutils_descpropal_key($reg[1]);
 						if (!in_array($key, array('PRODUCT_REF', 'PRODUCT_LABEL'))) {
@@ -516,10 +769,10 @@ function diamantutils_descpropal_collect_refs($nodes, &$refs, $html = true)
 					$refs[diamantutils_descpropal_key($atom['attr'])] = $atom['attr'];
 				}
 			}
-			diamantutils_descpropal_collect_refs($branch['children'], $refs, $html);
+			diamantutils_descpropal_collect_refs($branch['children'], $refs, $html, $errors);
 		}
 		if ($node['else'] !== null) {
-			diamantutils_descpropal_collect_refs($node['else'], $refs, $html);
+			diamantutils_descpropal_collect_refs($node['else'], $refs, $html, $errors);
 		}
 	}
 }
@@ -542,9 +795,9 @@ function diamantutils_descpropal_check($template, $knownattributes = null)
 		$errors[] = $error;
 		return $errors;
 	}
+	$refs = array();
+	diamantutils_descpropal_collect_refs($tree, $refs, dol_textishtml((string) $template), $errors);
 	if (is_array($knownattributes)) {
-		$refs = array();
-		diamantutils_descpropal_collect_refs($tree, $refs, dol_textishtml((string) $template));
 		$unknown = array_diff_key($refs, $knownattributes);
 		if (count($unknown)) {
 			$errors[] = 'attribut(s) inconnu(s) : '.implode(', ', $unknown);

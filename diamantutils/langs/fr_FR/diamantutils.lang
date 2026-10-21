@@ -218,7 +218,7 @@ DiamantutilsDescPropalPlaceholders = Placeholders pour devis
 DiamantutilsDescPropalPlaceholdersDesc = Utilisables dans la description pour devis : remplacés par les valeurs de la variante ajoutée au devis. Une variante sans description pour devis prend celle de ce produit.
 DiamantutilsDescPropalHelpProduct = réf. et libellé de la variante
 DiamantutilsDescPropalCheckWarning = Description pour devis : %s. Le produit est enregistré ; le modèle est repris tel quel sur les devis tant qu'il n'est pas corrigé.
-DiamantutilsDescPropalConditions = Conditions : {IF LARGEUR=200}…{ELSEIF LARGEUR IN 300,400}…{ELSE}…{ENDIF}, opérateurs = != > >= < <=, IN, AND, OR, attribut seul (présent) ; suffixe :ref pour comparer la référence de la valeur.
+DiamantutilsDescPropalConditions = Conditions : {IF LARGEUR=200}…{ELSEIF LARGEUR IN 300,400}…{ELSE}…{ENDIF}, opérateurs = != > >= < <=, IN, AND, OR, attribut seul (présent) ; suffixe :ref pour comparer la référence de la valeur. Calculs : {=MODULE:ref-5}, {=(LARGEUR-5)*2}, {=LARGEUR/3 ;2} (+ - * / et parenthèses ; ;N = nombre de décimales).
 
 # Lots de produits (menu Commerce, devis et commandes client)
 DiamantutilsLots = Lots de produits

@@ -218,7 +218,7 @@ DiamantutilsDescPropalPlaceholders = Quotation placeholders
 DiamantutilsDescPropalPlaceholdersDesc = Usable in the quotation description: replaced by the values of the variant added to the quotation. A variant without its own quotation description uses this product's one.
 DiamantutilsDescPropalHelpProduct = ref and label of the variant
 DiamantutilsDescPropalCheckWarning = Quotation description: %s. The product is saved; the template is copied as is on quotations until fixed.
-DiamantutilsDescPropalConditions = Conditions: {IF WIDTH=200}…{ELSEIF WIDTH IN 300,400}…{ELSE}…{ENDIF}, operators = != > >= < <=, IN, AND, OR, attribute alone (present); suffix :ref to compare the value reference.
+DiamantutilsDescPropalConditions = Conditions: {IF WIDTH=200}…{ELSEIF WIDTH IN 300,400}…{ELSE}…{ENDIF}, operators = != > >= < <=, IN, AND, OR, attribute alone (present); suffix :ref to compare the value reference. Calculations: {=MODULE:ref-5}, {=(WIDTH-5)*2}, {=WIDTH/3 ;2} (+ - * / and parentheses; ;N = number of decimals).
 
 # Product kits (Commercial menu, proposals and sales orders)
 DiamantutilsLots = Product kits
