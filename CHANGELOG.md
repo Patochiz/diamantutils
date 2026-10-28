@@ -1,5 +1,13 @@
 # Changelog — DiamantUtils
 
+## 2.8 — Prix de revient à la réception fournisseur
+
+- Nouvelle option `DIAMANTUTILS_COSTPRICE_FROM_RECEIPT` (désactivée par défaut), onglet **Prix de revient** de la configuration : « Mettre à jour le prix de revient avec le prix de réception fournisseur ».
+- Trigger `STOCK_MOVEMENT` : à chaque entrée en stock issue d'une réception fournisseur (type 3, quantité > 0, origine `reception` ou `order_supplier`, prix > 0), `llx_product.cost_price` prend le prix unitaire du mouvement, c'est-à-dire le prix rendu saisi à la réception. Ancien et nouveau prix tracés dans le log (`LOG_DEBUG`).
+- Inchangés : prix fournisseurs, lignes de commande et de facture fournisseur, PMP (déjà calculé par Dolibarr avec ce prix).
+- Prérequis Dolibarr : `SUPPLIER_ORDER_EDIT_BUYINGPRICE_DURING_RECEIPT = 1` (contrôlé dans l'onglet), case « mettre à jour le prix fournisseur » décochée à la réception.
+- Mise à jour : déposer les fichiers ; la constante vaut 0 tant qu'elle n'est pas activée dans l'onglet (désactiver / réactiver le module n'est pas nécessaire).
+
 ## 2.7 — Description pour devis : calculs
 
 - Balises de calcul `{=EXPRESSION}` et `{=EXPRESSION ;N}` dans la description pour devis : `+ - * /`, parenthèses, moins unaire, nombres à virgule ou point, attributs de variante (valeur ou `:ref`) numériques. Exemple : `{=MODULE:ref-5}` donne `595` pour un module de réf. 600.

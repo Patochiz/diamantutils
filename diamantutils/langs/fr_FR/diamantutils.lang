@@ -258,3 +258,12 @@ DiamantutilsLotEnabledDesc = Menu Commerce « Lots de produits » et ajout d'un 
 DiamantutilsLotSetupRights = Droits utilisateur (DiamantUtils) : voir et utiliser, créer / modifier, supprimer. La gestion des lots ne demande pas l'accès à cette configuration.
 DiamantutilsLotCount = %s lot(s) dont %s actif(s)
 DiamantutilsLotManage = Gérer les lots
+
+# Prix de revient à la réception fournisseur (v2.8)
+DiamantutilsCostPriceTabTitle = Prix de revient
+DiamantutilsCostPriceEnabled = Mettre à jour le prix de revient avec le prix de réception fournisseur
+DiamantutilsCostPriceEnabledDesc = À chaque entrée en stock issue d'une réception de commande fournisseur, le prix de revient du produit prend le prix unitaire saisi à la réception (prix rendu, frais d'approche inclus). Les prix fournisseurs, les lignes de commande et de facture fournisseur et le PMP ne sont pas modifiés. Prix nul : rien n'est fait.
+DiamantutilsCostPricePrereq = Prix modifiable à la réception
+DiamantutilsCostPricePrereqDesc = Constante Dolibarr SUPPLIER_ORDER_EDIT_BUYINGPRICE_DURING_RECEIPT = 1. Laisser décochée la case « mettre à jour le prix fournisseur » de l'écran de réception.
+DiamantutilsCostPricePrereqOk = SUPPLIER_ORDER_EDIT_BUYINGPRICE_DURING_RECEIPT = 1
+DiamantutilsCostPricePrereqMissing = SUPPLIER_ORDER_EDIT_BUYINGPRICE_DURING_RECEIPT n'est pas à 1 : le prix de réception reprend celui de la commande (Configuration → Divers).

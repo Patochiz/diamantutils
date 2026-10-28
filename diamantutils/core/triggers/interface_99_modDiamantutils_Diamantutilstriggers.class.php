@@ -16,6 +16,8 @@
  * Description pour devis (lib/descpropal.lib.php) :
  *  - LINEPROPAL_INSERT : la ligne d'un produit reprend son extrafield desc_propal ;
  *  - PRODUCT_CREATE, PRODUCT_MODIFY : syntaxe de desc_propal vérifiée, avertissement non bloquant.
+ * Prix de revient (DIAMANTUTILS_COSTPRICE_FROM_RECEIPT) :
+ *  - STOCK_MOVEMENT : entrée issue d'une réception fournisseur, cost_price = prix du mouvement.
  * Tous ces triggers sont appelés dans la transaction : un retour < 0 annule l'opération.
  */
 
@@ -32,7 +34,7 @@ class InterfaceDiamantutilstriggers extends DolibarrTriggers
 		parent::__construct($db);
 		$this->family = 'other';
 		$this->description = 'Triggers DiamantUtils : contrôles des commandes sous-traitées, description pour devis';
-		$this->version = '2.5';
+		$this->version = '2.8';
 		$this->picto = 'generic';
 	}
 
@@ -51,6 +53,9 @@ class InterfaceDiamantutilstriggers extends DolibarrTriggers
 		}
 		if ($action == 'PRODUCT_CREATE' || $action == 'PRODUCT_MODIFY') {
 			return $this->checkDescPropal($object, $langs);
+		}
+		if ($action == 'STOCK_MOVEMENT') {
+			return $this->costPriceFromReceipt($object);
 		}
 
 		if (!in_array($action, array('RECEPTION_CREATE', 'RECEPTION_VALIDATE', 'LINERECEPTION_CREATE', 'LINERECEPTION_MODIFY', 'LINEORDER_SUPPLIER_DISPATCH', 'SHIPPING_CREATE', 'SHIPPING_VALIDATE', 'LINESHIPPING_MODIFY'))) {
@@ -160,5 +165,56 @@ class InterfaceDiamantutilstriggers extends DolibarrTriggers
 			dol_syslog(__METHOD__.' produit '.$product->ref.' : '.implode(' ; ', $errors), LOG_WARNING);
 		}
 		return 0;
+	}
+
+	/**
+	 * STOCK_MOVEMENT : prix de revient du produit = prix unitaire de la réception fournisseur.
+	 * Seul llx_product.cost_price est modifié : le PMP est déjà calculé par MouvementStock::_create()
+	 * avec ce même prix, prix fournisseurs et lignes de commande / facture restent inchangés.
+	 *
+	 * Mouvements retenus : MouvementStock::reception() (type 3), quantité > 0, origine
+	 * 'reception' (module Réceptions) ou 'order_supplier' (ventilation sans module Réceptions), prix > 0.
+	 *
+	 * @param	MouvementStock	$mvt	Mouvement de stock créé
+	 * @return	int						1 = prix mis à jour, 0 = rien fait, -1 = erreur SQL
+	 */
+	private function costPriceFromReceipt($mvt)
+	{
+		if (!isModEnabled('diamantutils') || !getDolGlobalInt('DIAMANTUTILS_COSTPRICE_FROM_RECEIPT')) {
+			return 0;
+		}
+
+		$origin = (string) (!empty($mvt->origin_type) ? $mvt->origin_type : ($mvt->origintype ?? ''));
+		$productId = (int) (!empty($mvt->product_id) ? $mvt->product_id : ($mvt->fk_product ?? 0));
+		$qty = (float) ($mvt->qty ?? 0);
+		$price = (float) price2num($mvt->price ?? 0, 'MU');
+
+		if ((int) $mvt->type !== 3 || $qty <= 0 || !in_array($origin, array('order_supplier', 'reception'), true)
+			|| $price <= 0 || $productId <= 0) {
+			return 0;
+		}
+
+		// Ancien prix de revient, pour le log
+		$oldprice = '';
+		$resql = $this->db->query("SELECT cost_price FROM ".MAIN_DB_PREFIX."product WHERE rowid = ".$productId);
+		if ($resql) {
+			$obj = $this->db->fetch_object($resql);
+			$oldprice = ($obj ? (string) $obj->cost_price : '');
+			$this->db->free($resql);
+		}
+
+		$sql = "UPDATE ".MAIN_DB_PREFIX."product";
+		$sql .= " SET cost_price = ".((float) $price);
+		$sql .= " WHERE rowid = ".((int) $productId);
+
+		dol_syslog(__METHOD__.' STOCK_MOVEMENT cost_price product='.$productId.' old='.$oldprice.' new='.$price.' origin='.$origin.' origin_id='.((int) ($mvt->origin_id ?? 0)).' mvt='.((int) $mvt->id), LOG_DEBUG);
+
+		if (!$this->db->query($sql)) {
+			$this->error = $this->db->lasterror();
+			$this->errors = array($this->error);
+			dol_syslog(__METHOD__.' '.$this->error, LOG_ERR);
+			return -1;
+		}
+		return 1;
 	}
 }

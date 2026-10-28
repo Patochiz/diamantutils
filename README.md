@@ -7,6 +7,7 @@ Module Dolibarr interne de Diamant Industrie (Dolibarr 20, PHP 8.2, déploiement
 - **Listes personnalisées** (menu Outils) : listes générées par des requêtes SQL, section ci-dessous.
 - **Description pour devis** : description produit propre aux propositions commerciales, section ci-dessous.
 - **Lots de produits** (menu Commerce) : ensembles de produits ajoutés en une fois sur un devis ou une commande client, section ci-dessous.
+- **Prix de revient à la réception** : le prix de revient du produit prend le prix rendu saisi à chaque réception fournisseur, section ci-dessous.
 
 Chaque fonctionnalité a son onglet dans **Configuration → Modules → DiamantUtils**, avec une option pour l'activer ou la désactiver et ses réglages propres. Une fonctionnalité désactivée masque ses menus et pages ; ses données sont conservées.
 
@@ -238,3 +239,42 @@ Ouvrir `custom/diamantutils/test/lot_insert_test.php` en administrateur, choisir
 | `test/lot_insert_test.php` | test d'intégration (navigateur, administrateur) |
 | `admin/setup.php`, `lib/diamantutils.lib.php` | onglet de configuration |
 | `core/modules/modDiamantutils.class.php` | droits, menu Commerce, hooks, constante |
+
+---
+
+## Prix de revient à la réception fournisseur
+
+### Principe
+À chaque réception de commande fournisseur, le prix unitaire saisi à l'écran de réception (prix « rendu Brest », frais d'approche inclus) est recopié dans le **prix de revient** du produit (`llx_product.cost_price`).
+
+Restent inchangés :
+- les prix fournisseurs (`llx_product_fournisseur_price`), qui servent aux futures commandes ;
+- les lignes de commande et de facture fournisseur ;
+- le PMP, déjà calculé par Dolibarr avec le prix du mouvement.
+
+Exemple : produit commandé à 9,40 €/m², réceptionné à 12,23 €/m² → prix de revient 12,23, prix fournisseur toujours 9,40.
+
+### Mise en service
+1. Dolibarr : **Configuration → Divers**, constante `SUPPLIER_ORDER_EDIT_BUYINGPRICE_DURING_RECEIPT = 1` (prix modifiable à la réception). L'onglet du module indique si elle est en place.
+2. Configuration du module → onglet **Prix de revient** : activer `DIAMANTUTILS_COSTPRICE_FROM_RECEIPT`.
+3. À la réception : saisir le prix rendu, laisser **décochée** la case « mettre à jour le prix fournisseur ».
+
+### Règles
+Trigger `STOCK_MOVEMENT`, le prix de revient est mis à jour si toutes les conditions sont remplies :
+- option active ;
+- mouvement d'entrée de réception (type 3) avec une quantité positive ;
+- origine `reception` (module Réceptions) ou `order_supplier` (ventilation sans module Réceptions) ;
+- prix > 0.
+
+Corrections et transferts de stock, expéditions, annulations de réception et réceptions à prix nul ne changent rien. Réception en plusieurs fois : le dernier prix reçu l'emporte. Le trigger s'exécute dans la transaction du mouvement : une erreur SQL annule la réception.
+
+Cas particulier : avec l'option Dolibarr d'entrée en stock à l'approbation de la commande fournisseur, le mouvement porte l'origine `order_supplier` et le prix de la commande ; le prix de revient prend alors ce prix.
+
+### Fichiers
+
+| Fichier | Rôle |
+|---|---|
+| `core/triggers/interface_99_modDiamantutils_Diamantutilstriggers.class.php` | `STOCK_MOVEMENT` → `costPriceFromReceipt()` |
+| `admin/setup.php`, `lib/diamantutils.lib.php` | onglet de configuration |
+| `core/modules/modDiamantutils.class.php` | constante, version |
+| `langs/fr_FR/diamantutils.lang`, `langs/en_US/diamantutils.lang` | libellés |
