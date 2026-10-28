@@ -258,3 +258,12 @@ DiamantutilsLotEnabledDesc = Commercial menu "Product kits" and adding a kit to 
 DiamantutilsLotSetupRights = User permissions (DiamantUtils): view and use, create / modify, delete. Managing kits does not require access to this setup.
 DiamantutilsLotCount = %s kit(s), %s active
 DiamantutilsLotManage = Manage kits
+
+# Cost price from supplier receipt (v2.8)
+DiamantutilsCostPriceTabTitle = Cost price
+DiamantutilsCostPriceEnabled = Update the cost price with the supplier receipt price
+DiamantutilsCostPriceEnabledDesc = On each stock entry from a supplier order receipt, the product cost price takes the unit price entered at receipt (landed price, incidental costs included). Supplier prices, supplier order and invoice lines and the WAP are not changed. Zero price: nothing is done.
+DiamantutilsCostPricePrereq = Price editable at receipt
+DiamantutilsCostPricePrereqDesc = Dolibarr constant SUPPLIER_ORDER_EDIT_BUYINGPRICE_DURING_RECEIPT = 1. Leave the "update supplier price" box of the receipt screen unchecked.
+DiamantutilsCostPricePrereqOk = SUPPLIER_ORDER_EDIT_BUYINGPRICE_DURING_RECEIPT = 1
+DiamantutilsCostPricePrereqMissing = SUPPLIER_ORDER_EDIT_BUYINGPRICE_DURING_RECEIPT is not 1: the receipt price is the order price (Setup → Other setup).

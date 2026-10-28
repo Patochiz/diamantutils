@@ -30,7 +30,7 @@ $langs->loadLangs(array("admin", "stocks", "diamantutils@diamantutils"));
 
 $action = GETPOST('action', 'aZ09');
 $tab = GETPOST('tab', 'aZ09');
-if (!in_array($tab, array('transfo', 'soustraitance', 'customlist', 'descpropal', 'lot'))) {
+if (!in_array($tab, array('transfo', 'soustraitance', 'customlist', 'descpropal', 'lot', 'costprice'))) {
 	$tab = 'transfo';
 }
 
@@ -133,6 +133,13 @@ if ($action == 'update') {
 	if ($tab == 'lot') {
 		$enabled = GETPOSTINT('DIAMANTUTILS_LOT_ENABLED') ? 1 : 0;
 		if (dolibarr_set_const($db, 'DIAMANTUTILS_LOT_ENABLED', $enabled, 'chaine', 0, '', $conf->entity) < 0) {
+			$error++;
+		}
+	}
+
+	if ($tab == 'costprice') {
+		$enabled = GETPOSTINT('DIAMANTUTILS_COSTPRICE_FROM_RECEIPT') ? 1 : 0;
+		if (dolibarr_set_const($db, 'DIAMANTUTILS_COSTPRICE_FROM_RECEIPT', $enabled, 'chaine', 0, '', $conf->entity) < 0) {
 			$error++;
 		}
 	}
@@ -308,6 +315,22 @@ if ($tab == 'lot') {
 		$langs->trans('DiamantutilsLotSetupRights'),
 		$langs->trans('DiamantutilsLotCount', $nb, $nbactive).' &nbsp; <a href="'.dol_buildpath('/diamantutils/lot_list.php', 1).'">'.img_picto('', 'list', 'class="pictofixedwidth"').$langs->trans('DiamantutilsLotManage').'</a>'
 	);
+}
+
+if ($tab == 'costprice') {
+	diamantutils_setup_row(
+		$langs->trans('DiamantutilsCostPriceEnabled'),
+		$langs->trans('DiamantutilsCostPriceEnabledDesc'),
+		$form->selectyesno('DIAMANTUTILS_COSTPRICE_FROM_RECEIPT', getDolGlobalInt('DIAMANTUTILS_COSTPRICE_FROM_RECEIPT'), 1)
+	);
+
+	// Prérequis Dolibarr : prix modifiable à la réception
+	if (getDolGlobalInt('SUPPLIER_ORDER_EDIT_BUYINGPRICE_DURING_RECEIPT')) {
+		$status = img_picto('', 'tick', 'class="pictofixedwidth"').$langs->trans('DiamantutilsCostPricePrereqOk');
+	} else {
+		$status = img_warning('', 'class="pictofixedwidth"').'<span class="warning">'.$langs->trans('DiamantutilsCostPricePrereqMissing').'</span>';
+	}
+	diamantutils_setup_row($langs->trans('DiamantutilsCostPricePrereq'), $langs->trans('DiamantutilsCostPricePrereqDesc'), $status);
 }
 
 print '</table>';
