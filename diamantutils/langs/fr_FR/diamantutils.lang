@@ -267,3 +267,18 @@ DiamantutilsCostPricePrereq = Prix modifiable à la réception
 DiamantutilsCostPricePrereqDesc = Constante Dolibarr SUPPLIER_ORDER_EDIT_BUYINGPRICE_DURING_RECEIPT = 1. Laisser décochée la case « mettre à jour le prix fournisseur » de l'écran de réception.
 DiamantutilsCostPricePrereqOk = SUPPLIER_ORDER_EDIT_BUYINGPRICE_DURING_RECEIPT = 1
 DiamantutilsCostPricePrereqMissing = SUPPLIER_ORDER_EDIT_BUYINGPRICE_DURING_RECEIPT n'est pas à 1 : le prix de réception reprend celui de la commande (Configuration → Divers).
+
+# Liaison des commandes fournisseurs (v2.9)
+DiamantutilsLinkSOTabTitle = Liaison commandes fournisseurs
+DiamantutilsLinkSOEnabled = Permettre de lier une commande fournisseur à une autre commande fournisseur (tous fournisseurs)
+DiamantutilsLinkSOEnabledDesc = Ajoute « Lier à une commande fournisseur » au menu « Lier à… » du bloc Objets liés de la commande fournisseur, sans filtre sur le fournisseur (ex. commande de transport liée aux commandes qu'elle enlève). Sont exclues de la liste : la commande ouverte, les commandes annulées ou refusées et celles déjà liées.
+DiamantutilsLinkSOMonths = Période proposée dans la liste (mois)
+DiamantutilsLinkSOMonthsDesc = Commandes des N derniers mois (date de commande, sinon de validation ou de création). 0 = sans limite. Les plus anciennes se lient par leur référence si MAIN_LINK_BY_REF_IN_LINKTO = 1.
+DiamantutilsLinkSOStatus = État
+DiamantutilsLinkSOHookOk = Hook de la fiche commande fournisseur enregistré
+DiamantutilsLinkSOHookMissing = Hook de la fiche commande fournisseur non enregistré : désactivez puis réactivez le module.
+DiamantutilsLinkSOByRefOk = Saisie par référence active (MAIN_LINK_BY_REF_IN_LINKTO = 1)
+DiamantutilsLinkSOByRefOff = Saisie par référence inactive (MAIN_LINK_BY_REF_IN_LINKTO non défini) : seule la liste est proposée.
+DiamantutilsLinkSODone = Commande fournisseur %s liée
+DiamantutilsLinkSOAlreadyLinked = La commande fournisseur %s est déjà liée à cette commande.
+DiamantutilsLinkSOErrorSelf = Une commande ne peut pas être liée à elle-même.

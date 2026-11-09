@@ -18,16 +18,16 @@ class modDiamantutils extends DolibarrModules
 		$this->family = 'custom';
 		$this->module_position = '90';
 		$this->name = preg_replace('/^mod/i', '', get_class($this));
-		$this->description = "Module interne Diamant Industrie : ordres de transformation de stock par lots (menu GPAO), commandes sous-traitées livrées directement au client, listes personnalisées SQL (menu Outils) description pour devis sur la fiche produit et lots de produits ajoutés en une fois sur les devis et commandes (menu Commerce)";
-		$this->descriptionlong = "Transformation de stock par lots : consommation de N lots et production de M lots (découpe de profilés, peinture, changement d'unité), avec saisie en pièces × longueur, contrôle d'équilibre, gestion des restes et des pertes, calcul du coût et traçabilité des mouvements de stock. Commandes sous-traitées : réception sur l'entrepôt Sous-traitance avec lot = ref de la commande fournisseur, BL client prélevé sur ce lot. Listes personnalisées : requêtes SQL en lecture seule enregistrées par un administrateur, consultables avec recherche, tri, pagination et export CSV. Description pour devis : texte saisi sur la fiche produit, repris sur les lignes de propositions commerciales à la place de la description standard. Lots de produits : ensembles prédéfinis de produits et quantités, ajoutés en une fois (avec multiplicateur) sur un devis ou une commande client en brouillon, aux prix et descriptions de la saisie standard.";
+		$this->description = "Module interne Diamant Industrie : ordres de transformation de stock par lots (menu GPAO), commandes sous-traitées livrées directement au client, listes personnalisées SQL (menu Outils) description pour devis sur la fiche produit et lots de produits ajoutés en une fois sur les devis et commandes (menu Commerce), liaison d'une commande fournisseur à une commande d'un autre fournisseur";
+		$this->descriptionlong = "Transformation de stock par lots : consommation de N lots et production de M lots (découpe de profilés, peinture, changement d'unité), avec saisie en pièces × longueur, contrôle d'équilibre, gestion des restes et des pertes, calcul du coût et traçabilité des mouvements de stock. Commandes sous-traitées : réception sur l'entrepôt Sous-traitance avec lot = ref de la commande fournisseur, BL client prélevé sur ce lot. Listes personnalisées : requêtes SQL en lecture seule enregistrées par un administrateur, consultables avec recherche, tri, pagination et export CSV. Description pour devis : texte saisi sur la fiche produit, repris sur les lignes de propositions commerciales à la place de la description standard. Lots de produits : ensembles prédéfinis de produits et quantités, ajoutés en une fois (avec multiplicateur) sur un devis ou une commande client en brouillon, aux prix et descriptions de la saisie standard. Liaison des commandes fournisseurs : entrée « Lier à une commande fournisseur » du bloc Objets liés de la commande fournisseur, tous fournisseurs confondus (commande de transport liée aux commandes qu'elle enlève).";
 		$this->editor_name = 'Diamant Industrie';
-		$this->version = '2.8';
+		$this->version = '2.9';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'generic';
 
 		// Format plat (le format imbriqué data/entity casse l'enregistrement en v20)
 		$this->module_parts = array(
-			'hooks' => array('ordersupplierdispatch', 'receptioncard', 'ordershipmentcard', 'expeditioncard', 'productcard', 'propalcard', 'ordercard'),
+			'hooks' => array('ordersupplierdispatch', 'receptioncard', 'ordershipmentcard', 'expeditioncard', 'productcard', 'propalcard', 'ordercard', 'ordersuppliercard'),
 			'triggers' => 1,
 		);
 
@@ -116,6 +116,24 @@ class modDiamantutils extends DolibarrModules
 				'chaine',
 				'0',
 				'Prix de revient du produit mis à jour avec le prix unitaire de chaque réception fournisseur : 1 = active',
+				0,
+				'current',
+				0
+			),
+			9 => array(
+				'DIAMANTUTILS_LINK_SUPPLIER_ORDERS',
+				'chaine',
+				'0',
+				'Lier une commande fournisseur à une autre commande fournisseur, tous fournisseurs : 1 = active',
+				0,
+				'current',
+				0
+			),
+			10 => array(
+				'DIAMANTUTILS_LINK_SUPPLIER_ORDERS_MONTHS',
+				'chaine',
+				'24',
+				'Liaison des commandes fournisseurs : nombre de mois proposés dans la liste (0 = sans limite)',
 				0,
 				'current',
 				0

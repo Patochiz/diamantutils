@@ -1,5 +1,14 @@
 # Changelog — DiamantUtils
 
+## 2.9 — Liaison des commandes fournisseurs entre elles
+
+- Nouvelle option `DIAMANTUTILS_LINK_SUPPLIER_ORDERS` (désactivée par défaut), onglet **Liaison commandes fournisseurs** : « Permettre de lier une commande fournisseur à une autre commande fournisseur (tous fournisseurs) ».
+- Fiche commande fournisseur, bloc Objets liés : entrée **Lier à une commande fournisseur** dans le menu « Lier à… », sans filtre sur le tiers (commande de transport ↔ commandes enlevées). Hook `showLinkToObjectBlock`, clé `supplierorder` (la fiche exclut `order_supplier` du menu), lien enregistré en `order_supplier`.
+- Liste limitée aux N derniers mois (`DIAMANTUTILS_LINK_SUPPLIER_ORDERS_MONTHS`, 24 par défaut, 0 = sans limite), hors commande ouverte, annulées, refusées et déjà liées.
+- Compatible avec `MAIN_LINK_BY_REF_IN_LINKTO` : saisie par référence traitée par le hook `doActions` (la saisie native ne connaît pas la clé). Doublon refusé dans les deux sens.
+- Nouveau contexte de hook `ordersuppliercard`.
+- Mise à jour : déposer les fichiers, puis **désactiver et réactiver le module**, puis activer l'option dans l'onglet.
+
 ## 2.8 — Prix de revient à la réception fournisseur
 
 - Nouvelle option `DIAMANTUTILS_COSTPRICE_FROM_RECEIPT` (désactivée par défaut), onglet **Prix de revient** de la configuration : « Mettre à jour le prix de revient avec le prix de réception fournisseur ».

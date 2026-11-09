@@ -8,6 +8,7 @@ Module Dolibarr interne de Diamant Industrie (Dolibarr 20, PHP 8.2, déploiement
 - **Description pour devis** : description produit propre aux propositions commerciales, section ci-dessous.
 - **Lots de produits** (menu Commerce) : ensembles de produits ajoutés en une fois sur un devis ou une commande client, section ci-dessous.
 - **Prix de revient à la réception** : le prix de revient du produit prend le prix rendu saisi à chaque réception fournisseur, section ci-dessous.
+- **Liaison des commandes fournisseurs** : lier une commande fournisseur à une commande d'un autre fournisseur (transport ↔ marchandise), section ci-dessous.
 
 Chaque fonctionnalité a son onglet dans **Configuration → Modules → DiamantUtils**, avec une option pour l'activer ou la désactiver et ses réglages propres. Une fonctionnalité désactivée masque ses menus et pages ; ses données sont conservées.
 
@@ -277,4 +278,44 @@ Cas particulier : avec l'option Dolibarr d'entrée en stock à l'approbation de 
 | `core/triggers/interface_99_modDiamantutils_Diamantutilstriggers.class.php` | `STOCK_MOVEMENT` → `costPriceFromReceipt()` |
 | `admin/setup.php`, `lib/diamantutils.lib.php` | onglet de configuration |
 | `core/modules/modDiamantutils.class.php` | constante, version |
+| `langs/fr_FR/diamantutils.lang`, `langs/en_US/diamantutils.lang` | libellés |
+
+---
+
+## Liaison des commandes fournisseurs
+
+### Principe
+Lier une commande fournisseur à une autre, **même chez un autre fournisseur**, depuis le bloc **Objets liés → Lier à…** de la fiche commande fournisseur. Cas type : la commande de transport (GELIN, KUEHNE & NAGEL, DACHSER…) liée aux commandes Metalscreen qu'elle enlève (ex. PO2610-1043 ↔ PO2610-1029).
+
+Dolibarr 20 ne le permet pas : la fiche commande fournisseur retire le type « commande fournisseur » de son menu « Lier à… », et les autres listes sont limitées au même tiers.
+
+### Mise en service
+1. Déposer les fichiers par FTP dans `custom/diamantutils/`.
+2. **Désactiver puis réactiver le module** : enregistre le nouveau contexte de hook `ordersuppliercard`. L'onglet de configuration indique si c'est fait.
+3. Configuration du module → onglet **Liaison commandes fournisseurs** :
+   - `DIAMANTUTILS_LINK_SUPPLIER_ORDERS` : « Permettre de lier une commande fournisseur à une autre commande fournisseur (tous fournisseurs) » (désactivée par défaut) ;
+   - `DIAMANTUTILS_LINK_SUPPLIER_ORDERS_MONTHS` : période proposée dans la liste, en mois (24 par défaut, 0 = sans limite).
+
+### Fonctionnement
+- Menu **Lier à… → Lier à une commande fournisseur** (libellé natif `LinkToSupplierOrder`) : toutes les commandes fournisseurs de l'entité, tous fournisseurs, des N derniers mois (date de commande, sinon de validation ou de création), triées de la plus récente à la plus ancienne.
+- Exclues de la liste : la commande ouverte, les commandes annulées (`STATUS_CANCELED`, `STATUS_CANCELED_AFTER_ORDER`), refusées (`STATUS_REFUSED`) et celles déjà liées, dans un sens ou dans l'autre.
+- **Saisie par référence** (`MAIN_LINK_BY_REF_IN_LINKTO = 1`) : le champ « Réf. » de la même entrée accepte n'importe quelle commande fournisseur de l'entité, y compris hors période.
+- Le lien est enregistré comme un lien natif (`order_supplier` ↔ `order_supplier` dans `llx_element_element`) : visible et supprimable (corbeille) des deux côtés.
+- Doublon refusé dans les deux sens, avec un avertissement (l'index unique de Dolibarr ne couvre que le même sens). Lier une commande à elle-même est refusé.
+- Droits : l'entrée n'apparaît qu'avec le droit de lecture des commandes fournisseurs ; lier demande en plus le droit de créer / modifier (comme la liaison native de la fiche).
+- Seule la fiche commande fournisseur est concernée (contexte `ordersuppliercard`).
+
+### Détail technique
+- `fourn/commande/card.php` appelle `showLinkToObjectBlock($object, null, array('supplier_order', 'order_supplier'))` : l'exclusion est appliquée après la fusion des résultats du hook, donc une entrée `order_supplier` ajoutée par un hook serait masquée. Le module utilise la clé `supplierorder`, que `add_object_linked()` convertit en `order_supplier`.
+- `getElementProperties()` ne connaît pas `supplierorder` : la saisie par référence native planterait. Le hook `doActions` traite donc `addlink` et `addlinkbyref` pour cette clé (jeton CSRF, droits, doublon), puis vide l'action.
+- Les liaisons `addlink=order_supplier` envoyées directement (favori-script) ne passent pas par le module et fonctionnent comme avant.
+- Aucune modification du cœur Dolibarr.
+
+### Fichiers
+
+| Fichier | Rôle |
+|---|---|
+| `class/actions_diamantutils.class.php` | hooks `showLinkToObjectBlock` (entrée du menu) et `doActions` (liaison) |
+| `core/modules/modDiamantutils.class.php` | contexte `ordersuppliercard`, constantes, version |
+| `admin/setup.php`, `lib/diamantutils.lib.php` | onglet de configuration |
 | `langs/fr_FR/diamantutils.lang`, `langs/en_US/diamantutils.lang` | libellés |
