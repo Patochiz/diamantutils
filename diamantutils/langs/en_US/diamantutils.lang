@@ -267,3 +267,18 @@ DiamantutilsCostPricePrereq = Price editable at receipt
 DiamantutilsCostPricePrereqDesc = Dolibarr constant SUPPLIER_ORDER_EDIT_BUYINGPRICE_DURING_RECEIPT = 1. Leave the "update supplier price" box of the receipt screen unchecked.
 DiamantutilsCostPricePrereqOk = SUPPLIER_ORDER_EDIT_BUYINGPRICE_DURING_RECEIPT = 1
 DiamantutilsCostPricePrereqMissing = SUPPLIER_ORDER_EDIT_BUYINGPRICE_DURING_RECEIPT is not 1: the receipt price is the order price (Setup → Other setup).
+
+# Supplier order links (v2.9)
+DiamantutilsLinkSOTabTitle = Supplier order links
+DiamantutilsLinkSOEnabled = Allow linking a supplier order to another supplier order (any supplier)
+DiamantutilsLinkSOEnabledDesc = Adds "Link to supplier order" to the "Link to..." menu of the supplier order Linked objects block, without filtering on the supplier (e.g. a transport order linked to the orders it collects). Excluded from the list: the open order, canceled or refused orders and orders already linked.
+DiamantutilsLinkSOMonths = Period offered in the list (months)
+DiamantutilsLinkSOMonthsDesc = Orders of the last N months (order date, else validation or creation date). 0 = no limit. Older orders can be linked by their reference if MAIN_LINK_BY_REF_IN_LINKTO = 1.
+DiamantutilsLinkSOStatus = Status
+DiamantutilsLinkSOHookOk = Supplier order card hook registered
+DiamantutilsLinkSOHookMissing = Supplier order card hook not registered: disable then enable the module.
+DiamantutilsLinkSOByRefOk = Link by reference enabled (MAIN_LINK_BY_REF_IN_LINKTO = 1)
+DiamantutilsLinkSOByRefOff = Link by reference disabled (MAIN_LINK_BY_REF_IN_LINKTO not set): only the list is offered.
+DiamantutilsLinkSODone = Supplier order %s linked
+DiamantutilsLinkSOAlreadyLinked = Supplier order %s is already linked to this order.
+DiamantutilsLinkSOErrorSelf = An order cannot be linked to itself.

@@ -20,12 +20,22 @@
  *  - doActions : action addlot (insertion du lot par addline()), confirm_diamantutils_savelot ;
  *  - addMoreActionsButtons / formConfirm : « Enregistrer comme lot ».
  *
+ * Liaison des commandes fournisseurs (ordersuppliercard) :
+ *  - showLinkToObjectBlock : entrée « Lier à une commande fournisseur » (clé supplierorder,
+ *    tous fournisseurs). La fiche exclut les clés order_supplier et supplier_order du menu ;
+ *    add_object_linked() convertit supplierorder en order_supplier dans llx_element_element ;
+ *  - doActions : addlink / addlinkbyref pour cette clé traités ici (getElementProperties()
+ *    ne connaît pas supplierorder), avec contrôle des doublons dans les deux sens.
+ *
  * L'instance de cette classe est partagée par tous les hooks de la page et HookManager ne
  * vide pas resprints entre deux appels : chaque méthode le vide en entrée.
  */
 
 class ActionsDiamantutils
 {
+	/** Clé du type « commande fournisseur » ajouté au menu « Lier à… » (order_supplier est exclu par la fiche) */
+	const LINKSO_KEY = 'supplierorder';
+
 	/** @var DoliDB */
 	public $db;
 
@@ -56,6 +66,12 @@ class ActionsDiamantutils
 	{
 		$this->resprints = '';
 		$contexts = explode(':', (string) $parameters['context']);
+
+		// Liaison d'une commande fournisseur à une autre (clé propre au module)
+		if (in_array('ordersuppliercard', $contexts) && in_array($action, array('addlink', 'addlinkbyref'))
+			&& GETPOST('addlink', 'alpha') == self::LINKSO_KEY && !GETPOST('cancel', 'alpha')) {
+			return $this->doLinkSupplierOrder($object, $action);
+		}
 
 		// Lots de produits sur devis / commande client
 		$element = $this->lotPieceElement($contexts, $object);
@@ -599,6 +615,166 @@ jQuery(function ($) {
 			0,
 			550
 		);
+
+		return 0;
+	}
+
+	/**
+	 * Liaison des commandes fournisseurs : fonction active
+	 *
+	 * @return	bool
+	 */
+	private function linkSupplierOrdersEnabled()
+	{
+		return getDolGlobalInt('DIAMANTUTILS_LINK_SUPPLIER_ORDERS') > 0 && isModEnabled('supplier_order');
+	}
+
+	/**
+	 * Menu « Lier à… » : ajoute « Lier à une commande fournisseur », tous fournisseurs
+	 *
+	 * Liste : commandes de l'entité, hors commande ouverte, annulées, refusées et commandes
+	 * déjà liées (dans un sens ou dans l'autre), sur les N derniers mois. Les plus anciennes
+	 * se lient par la saisie de la référence (MAIN_LINK_BY_REF_IN_LINKTO).
+	 *
+	 * @param	array		$parameters		Paramètres du hook (listofidcompanytoscan, possiblelinks)
+	 * @param	Object		$object			Objet de la page
+	 * @param	string		$action			Action
+	 * @param	HookManager	$hookmanager	Gestionnaire de hooks
+	 * @return	int							0 = entrée ajoutée à la liste native
+	 */
+	public function showLinkToObjectBlock($parameters, &$object, &$action, $hookmanager)
+	{
+		global $user;
+
+		$this->resprints = '';
+		$contexts = explode(':', (string) $parameters['context']);
+		if (!in_array('ordersuppliercard', $contexts) || !$this->linkSupplierOrdersEnabled()
+			|| !is_object($object) || empty($object->element) || $object->element !== 'order_supplier' || empty($object->id)) {
+			return 0;
+		}
+
+		require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.commande.class.php';
+		require_once DOL_DOCUMENT_ROOT.'/core/lib/date.lib.php';
+
+		$id = (int) $object->id;
+		$months = getDolGlobalInt('DIAMANTUTILS_LINK_SUPPLIER_ORDERS_MONTHS', 24);
+
+		$sql = "SELECT s.rowid as socid, s.nom as name, s.client,";
+		$sql .= " t.rowid, t.ref, t.ref_supplier, t.total_ht";
+		$sql .= " FROM ".MAIN_DB_PREFIX."commande_fournisseur as t";
+		$sql .= " INNER JOIN ".MAIN_DB_PREFIX."societe as s ON s.rowid = t.fk_soc";
+		$sql .= " WHERE t.entity IN (".getEntity('supplier_order').")";
+		$sql .= " AND t.rowid <> ".$id;
+		$sql .= " AND t.fk_statut NOT IN (".((int) CommandeFournisseur::STATUS_CANCELED).", ".((int) CommandeFournisseur::STATUS_CANCELED_AFTER_ORDER).", ".((int) CommandeFournisseur::STATUS_REFUSED).")";
+		if ($months > 0) {
+			$sql .= " AND COALESCE(t.date_commande, t.date_valid, t.date_creation) >= '".$this->db->idate(dol_time_plus_duree(dol_now(), -$months, 'm'))."'";
+		}
+		// Déjà liées, dans un sens ou dans l'autre
+		$sql .= " AND NOT EXISTS (SELECT 1 FROM ".MAIN_DB_PREFIX."element_element as ee";
+		$sql .= " WHERE (ee.sourcetype = 'order_supplier' AND ee.fk_source = t.rowid AND ee.targettype = 'order_supplier' AND ee.fk_target = ".$id.")";
+		$sql .= " OR (ee.targettype = 'order_supplier' AND ee.fk_target = t.rowid AND ee.sourcetype = 'order_supplier' AND ee.fk_source = ".$id."))";
+		$sql .= " ORDER BY t.rowid DESC";
+
+		$this->results = array(
+			self::LINKSO_KEY => array(
+				'enabled' => 1,
+				'perms' => ($user->hasRight('fournisseur', 'commande', 'lire') ? 1 : 0),
+				'label' => 'LinkToSupplierOrder',
+				'sql' => $sql,
+			),
+		);
+
+		return 0;
+	}
+
+	/**
+	 * Lie la commande fournisseur de la page à une autre (choisie dans la liste ou par sa référence)
+	 *
+	 * Remplace le traitement natif (actions_dellink.inc.php) pour la clé supplierorder :
+	 * l'action est vidée en sortie.
+	 *
+	 * @param	CommandeFournisseur	$object		Commande fournisseur de la page
+	 * @param	string				$action		Action (vidée)
+	 * @return	int								0
+	 */
+	private function doLinkSupplierOrder($object, &$action)
+	{
+		global $langs, $user;
+
+		$byref = ($action == 'addlinkbyref');
+		$action = '';
+		$langs->load('diamantutils@diamantutils');
+
+		if (GETPOST('token', 'alpha') !== currentToken()) {
+			setEventMessages($langs->trans('DiamantutilsLotErrorToken'), null, 'errors');
+			return 0;
+		}
+		if (!$this->linkSupplierOrdersEnabled()) {
+			setEventMessages($langs->trans('DiamantutilsFeatureDisabled'), null, 'errors');
+			return 0;
+		}
+		// Mêmes droits que la liaison native de la fiche ($permissiondellink) + lecture des commandes
+		if (!$user->hasRight('fournisseur', 'commande', 'creer') || !$user->hasRight('fournisseur', 'commande', 'lire')) {
+			setEventMessages($langs->trans('NotEnoughPermissions'), null, 'errors');
+			return 0;
+		}
+
+		require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.commande.class.php';
+
+		$id = GETPOSTINT('id');
+		if (!is_object($object) || $object->element !== 'order_supplier' || empty($object->id) || $object->id != $id) {
+			setEventMessages($langs->trans('ErrorRecordNotFound'), null, 'errors');
+			return 0;
+		}
+
+		// Commande à lier (fetch filtré sur l'entité)
+		$other = new CommandeFournisseur($this->db);
+		if ($byref) {
+			$ref = trim(GETPOST('reftolinkto', 'alpha'));
+			$ret = ($ref !== '' ? $other->fetch(0, $ref) : 0);
+		} else {
+			$otherid = GETPOSTINT('idtolinkto');
+			$ret = ($otherid > 0 ? $other->fetch($otherid) : 0);
+		}
+		if ($ret < 0) {
+			setEventMessages($other->error, $other->errors, 'errors');
+			return 0;
+		}
+		if ($ret == 0 || empty($other->id)) {
+			$langs->load('errors');
+			setEventMessages($langs->trans('ErrorRecordNotFound'), null, 'errors');
+			return 0;
+		}
+		if ($other->id == $object->id) {
+			setEventMessages($langs->trans('DiamantutilsLinkSOErrorSelf'), null, 'errors');
+			return 0;
+		}
+
+		// Doublon, dans un sens ou dans l'autre (l'index unique ne couvre que le même sens)
+		$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."element_element";
+		$sql .= " WHERE sourcetype = 'order_supplier' AND targettype = 'order_supplier'";
+		$sql .= " AND ((fk_source = ".((int) $other->id)." AND fk_target = ".((int) $object->id).")";
+		$sql .= " OR (fk_source = ".((int) $object->id)." AND fk_target = ".((int) $other->id)."))";
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			setEventMessages($this->db->lasterror(), null, 'errors');
+			return 0;
+		}
+		$exists = ($this->db->num_rows($resql) > 0);
+		$this->db->free($resql);
+		if ($exists) {
+			setEventMessages($langs->trans('DiamantutilsLinkSOAlreadyLinked', $other->ref), null, 'warnings');
+			return 0;
+		}
+
+		if ($object->add_object_linked('order_supplier', $other->id) > 0) {
+			setEventMessages($langs->trans('DiamantutilsLinkSODone', $other->ref), null);
+			if (isset($_POST['reftolinkto'])) {
+				unset($_POST['reftolinkto']);
+			}
+		} else {
+			setEventMessages($object->error, $object->errors, 'errors');
+		}
 
 		return 0;
 	}

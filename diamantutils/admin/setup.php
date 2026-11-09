@@ -30,7 +30,7 @@ $langs->loadLangs(array("admin", "stocks", "diamantutils@diamantutils"));
 
 $action = GETPOST('action', 'aZ09');
 $tab = GETPOST('tab', 'aZ09');
-if (!in_array($tab, array('transfo', 'soustraitance', 'customlist', 'descpropal', 'lot', 'costprice'))) {
+if (!in_array($tab, array('transfo', 'soustraitance', 'customlist', 'descpropal', 'lot', 'costprice', 'linkso'))) {
 	$tab = 'transfo';
 }
 
@@ -140,6 +140,17 @@ if ($action == 'update') {
 	if ($tab == 'costprice') {
 		$enabled = GETPOSTINT('DIAMANTUTILS_COSTPRICE_FROM_RECEIPT') ? 1 : 0;
 		if (dolibarr_set_const($db, 'DIAMANTUTILS_COSTPRICE_FROM_RECEIPT', $enabled, 'chaine', 0, '', $conf->entity) < 0) {
+			$error++;
+		}
+	}
+
+	if ($tab == 'linkso') {
+		$enabled = GETPOSTINT('DIAMANTUTILS_LINK_SUPPLIER_ORDERS') ? 1 : 0;
+		if (dolibarr_set_const($db, 'DIAMANTUTILS_LINK_SUPPLIER_ORDERS', $enabled, 'chaine', 0, '', $conf->entity) < 0) {
+			$error++;
+		}
+		$months = max(0, GETPOSTINT('DIAMANTUTILS_LINK_SUPPLIER_ORDERS_MONTHS'));
+		if (dolibarr_set_const($db, 'DIAMANTUTILS_LINK_SUPPLIER_ORDERS_MONTHS', $months, 'chaine', 0, '', $conf->entity) < 0) {
 			$error++;
 		}
 	}
@@ -331,6 +342,37 @@ if ($tab == 'costprice') {
 		$status = img_warning('', 'class="pictofixedwidth"').'<span class="warning">'.$langs->trans('DiamantutilsCostPricePrereqMissing').'</span>';
 	}
 	diamantutils_setup_row($langs->trans('DiamantutilsCostPricePrereq'), $langs->trans('DiamantutilsCostPricePrereqDesc'), $status);
+}
+
+if ($tab == 'linkso') {
+	diamantutils_setup_row(
+		$langs->trans('DiamantutilsLinkSOEnabled'),
+		$langs->trans('DiamantutilsLinkSOEnabledDesc'),
+		$form->selectyesno('DIAMANTUTILS_LINK_SUPPLIER_ORDERS', getDolGlobalInt('DIAMANTUTILS_LINK_SUPPLIER_ORDERS'), 1)
+	);
+	diamantutils_setup_row(
+		$langs->trans('DiamantutilsLinkSOMonths'),
+		$langs->trans('DiamantutilsLinkSOMonthsDesc'),
+		'<input type="number" min="0" class="flat width75" name="DIAMANTUTILS_LINK_SUPPLIER_ORDERS_MONTHS" value="'.((int) getDolGlobalInt('DIAMANTUTILS_LINK_SUPPLIER_ORDERS_MONTHS', 24)).'">'
+	);
+
+	// État : hook enregistré (module réactivé), saisie par référence
+	$hooks = (isset($conf->modules_parts['hooks']['diamantutils']) ? $conf->modules_parts['hooks']['diamantutils'] : array());
+	if (!is_array($hooks)) {
+		$hooks = explode(':', (string) $hooks);
+	}
+	if (in_array('ordersuppliercard', $hooks)) {
+		$status = img_picto('', 'tick', 'class="pictofixedwidth"').$langs->trans('DiamantutilsLinkSOHookOk');
+	} else {
+		$status = img_warning('', 'class="pictofixedwidth"').'<span class="warning">'.$langs->trans('DiamantutilsLinkSOHookMissing').'</span>';
+	}
+	$status .= '<br>';
+	if (getDolGlobalString('MAIN_LINK_BY_REF_IN_LINKTO')) {
+		$status .= img_picto('', 'tick', 'class="pictofixedwidth"').$langs->trans('DiamantutilsLinkSOByRefOk');
+	} else {
+		$status .= '<span class="opacitymedium">'.$langs->trans('DiamantutilsLinkSOByRefOff').'</span>';
+	}
+	diamantutils_setup_row($langs->trans('DiamantutilsLinkSOStatus'), '', $status);
 }
 
 print '</table>';
