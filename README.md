@@ -344,6 +344,7 @@ Seuls les produits des **tags** (catégories produit) choisis dans la configurat
 ### Écran
 Menu **Produits → Stock → Tableau de stock par lots**.
 
+- **Une section par tag choisi** (« Plafond » HORIZON », « Plafond » LAMES »…), triées par libellé, repliables (mémorisé dans le navigateur), avec leur nombre de produits et de produits en écart. Les produits d'une sous-catégorie vont dans la section de leur tag. Un produit présent dans plusieurs tags n'apparaît qu'une fois, dans la première section. Les produits supprimés ou sortis des tags sont regroupés à la fin, dans « Hors périmètre ».
 - Un groupe repliable par produit : réf. et libellé, totaux **Tableau** (somme des lignes) / **Dolibarr** (stock réel, hors entrepôts ignorés) / **Écart**, pastille d'état. Si une partie du stock Dolibarr d'un produit à lots n'est rattachée à aucun lot, elle est indiquée dans l'en-tête et sur une ligne « (sans lot) ».
 - Une ligne par lot / colisage : lot, colisage calculé (« 5 colis de 28u », « 1 colis de 28u + 1 colis de 2u »), pièces, pièces par colis, largeur, longueur, quantité dans l'unité du produit, fournisseur ; sur la première ligne de chaque lot : stock Dolibarr du lot, écart, état. Un même lot peut occuper plusieurs lignes : elles sont additionnées.
 - Barre d'outils : recherche instantanée (produit, lot, fournisseur), « Écarts seulement », filtre par tag, tout replier / tout déplier (mémorisé dans le navigateur). En-tête de colonnes figé.
@@ -374,7 +375,7 @@ Produit supprimé ou sorti des tags : ses lignes restent affichées, marquées �
 - Écritures par `ajax/stocktable.php` : POST seulement, jeton CSRF vérifié, droits *write* / *delete* (403 sinon). Fonctionnalité désactivée : page et AJAX refusés.
 
 ### Détail technique
-- Données de l'écran en **3 requêtes**, quel que soit le nombre de produits : lignes du tableau ; stock par produit et par lot (`product_stock` / `product_batch`) ; produits des tags avec leur stock total. S'y ajoutent l'arbre des catégories et les listes de la page (libellés des tags, entrepôts ignorés, fournisseurs).
+- Données de l'écran en **4 requêtes**, quel que soit le nombre de produits : lignes du tableau ; stock par produit et par lot (`product_stock` / `product_batch`) ; produits des tags avec leur stock total ; tags des produits (sections). S'y ajoutent l'arbre des catégories et les listes de la page (libellés des tags, entrepôts ignorés, fournisseurs).
 - Aucun hook, trigger ni extrafield ; aucune écriture hors de `llx_diamantutils_stockline`.
 
 ### Fichiers

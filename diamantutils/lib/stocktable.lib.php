@@ -401,28 +401,11 @@ function diamantutils_stocktable_ids($raw)
  */
 function diamantutils_stocktable_category_ids($db, $only = 0)
 {
-	static $tree = null;
-
 	$roots = diamantutils_stocktable_ids(getDolGlobalString('DIAMANTUTILS_STOCKTABLE_CATEGORIES'));
 	if (empty($roots)) {
 		return array();
 	}
-
-	// Arbre des catégories produit (type 0), lu une fois
-	if ($tree === null) {
-		$tree = array();
-		$sql = "SELECT c.rowid, c.fk_parent FROM ".MAIN_DB_PREFIX."categorie as c";
-		$sql .= " WHERE c.type = 0 AND c.entity IN (".getEntity('category').")";
-		$resql = $db->query($sql);
-		if (!$resql) {
-			dol_syslog(__FUNCTION__.' '.$db->lasterror(), LOG_ERR);
-			return array();
-		}
-		while ($obj = $db->fetch_object($resql)) {
-			$tree[(int) $obj->rowid] = (int) $obj->fk_parent;
-		}
-		$db->free($resql);
-	}
+	$tree = diamantutils_stocktable_tree($db);
 
 	$withsub = !empty(getDolGlobalString('DIAMANTUTILS_STOCKTABLE_SUBCATEGORIES', '1'));
 	$scope = diamantutils_stocktable_expand($tree, $roots, $withsub);
@@ -433,6 +416,92 @@ function diamantutils_stocktable_category_ids($db, $only = 0)
 		return array_values(array_intersect(diamantutils_stocktable_expand($tree, array((int) $only), $withsub), $scope));
 	}
 	return $scope;
+}
+
+/**
+ * Arbre des catégories produit (type 0) de l'entité, lu une fois
+ *
+ * @param	DoliDB	$db		Base de données
+ * @return	array			array(id => id_parent)
+ */
+function diamantutils_stocktable_tree($db)
+{
+	static $tree = null;
+	if ($tree !== null) {
+		return $tree;
+	}
+	$tree = array();
+	$sql = "SELECT c.rowid, c.fk_parent FROM ".MAIN_DB_PREFIX."categorie as c";
+	$sql .= " WHERE c.type = 0 AND c.entity IN (".getEntity('category').")";
+	$resql = $db->query($sql);
+	if (!$resql) {
+		dol_syslog(__FUNCTION__.' '.$db->lasterror(), LOG_ERR);
+		return $tree;
+	}
+	while ($obj = $db->fetch_object($resql)) {
+		$tree[(int) $obj->rowid] = (int) $obj->fk_parent;
+	}
+	$db->free($resql);
+	return $tree;
+}
+
+/**
+ * Sections de l'écran : une par tag configuré (existant), triées par libellé complet
+ *
+ * @param	DoliDB	$db		Base de données
+ * @return	array			array(id_tag => libellé complet « Parent >> Tag »)
+ */
+function diamantutils_stocktable_sections($db)
+{
+	static $sections = null;
+	if ($sections !== null) {
+		return $sections;
+	}
+	$sections = array();
+	$roots = diamantutils_stocktable_ids(getDolGlobalString('DIAMANTUTILS_STOCKTABLE_CATEGORIES'));
+	if (empty($roots)) {
+		return $sections;
+	}
+	require_once DOL_DOCUMENT_ROOT.'/categories/class/categorie.class.php';
+	$cat = new Categorie($db);
+	$arbo = $cat->get_full_arbo(Categorie::TYPE_PRODUCT);
+	if (is_array($arbo)) {
+		foreach ($arbo as $c) {
+			if (in_array((int) $c['id'], $roots, true)) {
+				$sections[(int) $c['id']] = (string) $c['fulllabel'];
+			}
+		}
+	}
+	uasort($sections, function ($a, $b) {
+		return strnatcasecmp($a, $b);
+	});
+	return $sections;
+}
+
+/**
+ * Section (tag configuré) de chaque catégorie du périmètre : le tag configuré le plus proche
+ * en remontant l'arbre (une sous-catégorie va dans la section de son tag parent)
+ *
+ * @param	array	$tree		array(id => id_parent)
+ * @param	int[]	$roots		Tags configurés
+ * @param	int[]	$catids		Catégories du périmètre
+ * @return	array				array(id_categorie => id_tag)
+ */
+function diamantutils_stocktable_root_map($tree, $roots, $catids)
+{
+	$map = array();
+	$roots = array_flip($roots);
+	foreach ($catids as $id) {
+		$cur = (int) $id;
+		$guard = 0;
+		while ($cur > 0 && !isset($roots[$cur]) && $guard++ < 100) {
+			$cur = (isset($tree[$cur]) ? (int) $tree[$cur] : 0);
+		}
+		if ($cur > 0 && isset($roots[$cur])) {
+			$map[(int) $id] = $cur;
+		}
+	}
+	return $map;
 }
 
 /**
@@ -637,10 +706,11 @@ function diamantutils_stocktable_last_values($db, $fk_product)
  */
 
 /**
- * Données de l'écran, en 3 requêtes quel que soit le nombre de produits :
+ * Données de l'écran, en 4 requêtes quel que soit le nombre de produits :
  *  1. lignes du tableau (avec produit, unité, fournisseur, appartenance au périmètre) ;
  *  2. stock Dolibarr par produit et par lot (hors entrepôts exclus) ;
- *  3. produits du périmètre avec leur stock Dolibarr total (hors entrepôts exclus).
+ *  3. produits du périmètre avec leur stock Dolibarr total (hors entrepôts exclus) ;
+ *  4. tags des produits, pour les sections (une section par tag configuré).
  *
  * Groupes rendus : produits du périmètre ayant des lignes ou du stock (total ou par lot) non nul,
  * produits hors périmètre ayant encore des lignes (sans comparaison), et $fk_product s'il est donné.
@@ -785,6 +855,42 @@ function diamantutils_stocktable_load($db, $catids, $fk_product = 0)
 		$db->free($resql);
 	}
 
+	// 4. Section de chaque produit : premier tag configuré dans l'ordre d'affichage
+	// (un produit présent dans plusieurs tags n'apparaît qu'une fois)
+	$sections = diamantutils_stocktable_sections($db);
+	$order = array_flip(array_keys($sections));
+	$allcats = diamantutils_stocktable_category_ids($db);
+	$rootmap = diamantutils_stocktable_root_map(diamantutils_stocktable_tree($db), array_keys($sections), $allcats);
+	if (!empty($groups) && !empty($allcats)) {
+		$sql = "SELECT cp.fk_product, cp.fk_categorie FROM ".MAIN_DB_PREFIX."categorie_product as cp";
+		$sql .= " WHERE cp.fk_categorie IN (".implode(',', $allcats).")";
+		if ($fk_product > 0) {
+			$sql .= " AND cp.fk_product = ".$fk_product;
+		}
+		$resql = $db->query($sql);
+		if (!$resql) {
+			dol_syslog(__FUNCTION__.' '.$db->lasterror(), LOG_ERR);
+			return -1;
+		}
+		while ($obj = $db->fetch_object($resql)) {
+			$pid = (int) $obj->fk_product;
+			$root = (isset($rootmap[(int) $obj->fk_categorie]) ? $rootmap[(int) $obj->fk_categorie] : 0);
+			if (!isset($groups[$pid]) || !$root || !$groups[$pid]['inscope']) {
+				continue;
+			}
+			$cur = (isset($groups[$pid]['section']) ? $groups[$pid]['section'] : 0);
+			if (!$cur || $order[$root] < $order[$cur]) {
+				$groups[$pid]['section'] = $root;
+			}
+		}
+		$db->free($resql);
+	}
+	foreach ($groups as $pid => $group) {
+		if (!isset($group['section'])) {
+			$groups[$pid]['section'] = 0;	// hors périmètre
+		}
+	}
+
 	// Comparaison (produits du périmètre) ; hors périmètre : quantités seules
 	foreach ($groups as $pid => $group) {
 		if ($group['inscope']) {
@@ -803,9 +909,12 @@ function diamantutils_stocktable_load($db, $catids, $fk_product = 0)
 		}
 	}
 
-	uasort($groups, function ($a, $b) {
-		if ($a['inscope'] !== $b['inscope']) {
-			return ($a['inscope'] ? -1 : 1);
+	// Tri : sections dans l'ordre des tags, hors périmètre à la fin, puis réf. produit
+	uasort($groups, function ($a, $b) use ($order) {
+		$sa = ($a['section'] && isset($order[$a['section']]) ? $order[$a['section']] : PHP_INT_MAX);
+		$sb = ($b['section'] && isset($order[$b['section']]) ? $order[$b['section']] : PHP_INT_MAX);
+		if ($sa !== $sb) {
+			return ($sa < $sb ? -1 : 1);
 		}
 		return strnatcasecmp($a['ref'], $b['ref']);
 	});
@@ -924,7 +1033,7 @@ function diamantutils_stocktable_render_group($group, $perms)
 	}
 
 	$out = '<tbody class="dst-group" data-pid="'.((int) $group['id']).'" data-state="'.dol_escape_htmltag($state).'"';
-	$out .= ' data-ref="'.dol_escape_htmltag($group['ref']).'" data-tobatch="'.($group['tobatch'] ? 1 : 0).'"';
+	$out .= ' data-ref="'.dol_escape_htmltag($group['ref']).'" data-tobatch="'.($group['tobatch'] ? 1 : 0).'" data-section="'.((int) $group['section']).'"';
 	$out .= ' data-search="'.dol_escape_htmltag(dol_strtolower($search)).'">';
 
 	// En-tête du groupe : produit et totaux
@@ -1035,5 +1144,34 @@ function diamantutils_stocktable_render_group($group, $perms)
 	}
 
 	$out .= '</tbody>';
+	return $out;
+}
+
+/**
+ * Rendu HTML d'un en-tête de section (tag configuré, ou « hors périmètre » pour id 0).
+ * Les compteurs sont recalculés par le script à chaque filtrage.
+ *
+ * @param	int		$id			Id du tag (0 = hors périmètre)
+ * @param	string	$label		Libellé complet « Parent >> Tag »
+ * @param	int		$nb			Nombre de produits
+ * @param	int		$nbdiff		Nombre de produits en écart
+ * @return	string				HTML
+ */
+function diamantutils_stocktable_render_section($id, $label, $nb, $nbdiff)
+{
+	global $langs;
+
+	$parts = explode(' >> ', (string) $label);
+	$last = array_pop($parts);
+	$out = '<tbody class="dst-section" data-section="'.((int) $id).'">';
+	$out .= '<tr class="dst-section-head"><td colspan="'.DIAMANTUTILS_STOCKTABLE_NBCOLS.'">';
+	$out .= '<button type="button" class="dst-section-toggle" title="'.dol_escape_htmltag($langs->trans('DiamantutilsStockTableToggle')).'" aria-expanded="true"><span class="dst-caret"></span></button>';
+	$out .= img_picto('', 'category', 'class="pictofixedwidth"');
+	if (!empty($parts)) {
+		$out .= '<span class="dst-section-path">'.dol_escape_htmltag(implode(' » ', $parts)).' » </span>';
+	}
+	$out .= '<span class="dst-section-label">'.dol_escape_htmltag($last).'</span>';
+	$out .= ' <span class="dst-section-count opacitymedium">'.$langs->trans('DiamantutilsStockTableProducts', (int) $nb, (int) $nbdiff).'</span>';
+	$out .= '</td></tr></tbody>';
 	return $out;
 }

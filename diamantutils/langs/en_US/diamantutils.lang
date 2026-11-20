@@ -319,6 +319,7 @@ DiamantutilsStockTableAddLine = Add a line for this product
 DiamantutilsStockTableAddToTable = Add to table
 DiamantutilsStockTableOutOfScope = product out of scope
 DiamantutilsStockTableOutOfScopeHelp = This product was deleted or is no longer in the chosen tags: its lines remain visible but can no longer be edited.
+DiamantutilsStockTableOutOfScopeSection = Out of scope (deleted products or no longer in the tags)
 DiamantutilsStockTableProductDeleted = Deleted product (id %s)
 DiamantutilsStockTableNoLot = (no batch)
 DiamantutilsStockTableNoLotPart = of which %s without batch in Dolibarr

@@ -226,3 +226,36 @@
 .dst-line + .dst-line td.dst-cont {
 	border-top-color: transparent;
 }
+
+/* Sections par tag */
+.dst-section-head td {
+	background: var(--colorbacktitle1, #e6e9ee);
+	border-top: 3px solid #8c97a8;
+	padding: 8px 6px;
+	font-size: 1.05em;
+}
+.dst-section + .dst-group .dst-head td {
+	border-top-width: 1px;
+}
+.dst-section-toggle {
+	border: none;
+	background: transparent;
+	cursor: pointer;
+	padding: 0 6px 0 0;
+	vertical-align: middle;
+}
+.dst-section.dst-section-collapsed .dst-caret {
+	transform: rotate(-90deg);
+}
+.dst-section-path {
+	color: #777;
+}
+.dst-section-label {
+	font-weight: bold;
+	text-transform: uppercase;
+	letter-spacing: .02em;
+}
+.dst-group.dst-sec-hidden,
+.dst-section.dst-hidden {
+	display: none;
+}

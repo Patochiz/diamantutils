@@ -319,6 +319,7 @@ DiamantutilsStockTableAddLine = Ajouter une ligne pour ce produit
 DiamantutilsStockTableAddToTable = Ajouter au tableau
 DiamantutilsStockTableOutOfScope = produit hors périmètre
 DiamantutilsStockTableOutOfScopeHelp = Ce produit a été supprimé ou ne fait plus partie des tags choisis : ses lignes restent affichées mais ne sont plus modifiables.
+DiamantutilsStockTableOutOfScopeSection = Hors périmètre (produits supprimés ou sortis des tags)
 DiamantutilsStockTableProductDeleted = Produit supprimé (id %s)
 DiamantutilsStockTableNoLot = (sans lot)
 DiamantutilsStockTableNoLotPart = dont %s sans lot dans Dolibarr

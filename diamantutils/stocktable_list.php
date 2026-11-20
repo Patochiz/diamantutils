@@ -181,8 +181,29 @@ print '<th class="center"></th>';
 print '<th></th>';
 print '</tr></thead>';
 
-foreach ($groups as $group) {
-	print diamantutils_stocktable_render_group($group, $perms);
+// Une section par tag configuré (toutes sans filtre, sinon celles qui ont des produits),
+// puis « hors périmètre » ; les groupes sont déjà triés dans cet ordre
+$sections = diamantutils_stocktable_sections($db);
+$bysection = array();
+foreach ($groups as $pid => $group) {
+	$bysection[(int) $group['section']][] = $group;
+}
+$sections[0] = $langs->transnoentitiesnoconv('DiamantutilsStockTableOutOfScopeSection');
+foreach ($sections as $sectionid => $sectionlabel) {
+	$list = (isset($bysection[$sectionid]) ? $bysection[$sectionid] : array());
+	if (empty($list) && ($sectionid == 0 || $search_categ > 0)) {
+		continue;
+	}
+	$nbsectiondiff = 0;
+	foreach ($list as $group) {
+		if ($sectionid > 0 && $group['cmp']['state'] !== DIAMANTUTILS_STOCK_OK) {
+			$nbsectiondiff++;
+		}
+	}
+	print diamantutils_stocktable_render_section($sectionid, $sectionlabel, count($list), $nbsectiondiff);
+	foreach ($list as $group) {
+		print diamantutils_stocktable_render_group($group, $perms);
+	}
 }
 print '<tbody class="dst-empty'.(empty($groups) ? '' : ' hidden').'"><tr><td colspan="'.DIAMANTUTILS_STOCKTABLE_NBCOLS.'"><span class="opacitymedium">'.(empty($groups) ? $langs->trans('DiamantutilsStockTableEmpty') : $langs->trans('NoRecordFound')).'</span></td></tr></tbody>';
 
@@ -201,6 +222,7 @@ $jsconfig = array(
 	'suppliers' => $suppliers,
 	'colisFmt' => diamantutils_stocktable_rawtrans('DiamantutilsStockColisFmt'),
 	'labels' => array(
+		'products' => diamantutils_stocktable_rawtrans('DiamantutilsStockTableProducts'),
 		'save' => $langs->transnoentitiesnoconv('Save'),
 		'cancel' => $langs->transnoentitiesnoconv('Cancel'),
 		'chooseLot' => $langs->transnoentitiesnoconv('DiamantutilsStockTableChooseLot'),

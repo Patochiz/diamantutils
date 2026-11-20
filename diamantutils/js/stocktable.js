@@ -43,6 +43,42 @@
 	function groups() {
 		return Array.prototype.slice.call(table.querySelectorAll('tbody.dst-group'));
 	}
+	function sections() {
+		return Array.prototype.slice.call(table.querySelectorAll('tbody.dst-section'));
+	}
+
+	/* Sections (une par tag) : repli mémorisé à part */
+	var sectionKey = storeKey + '_sections';
+	function loadCollapsedSections() {
+		try {
+			var list = JSON.parse(window.localStorage.getItem(sectionKey) || '[]');
+			return Array.isArray(list) ? list.map(String) : [];
+		} catch (e) {
+			return [];
+		}
+	}
+	function saveCollapsedSections() {
+		var list = sections().filter(function (s) {
+			return s.classList.contains('dst-section-collapsed');
+		}).map(function (s) {
+			return s.getAttribute('data-section');
+		});
+		try {
+			window.localStorage.setItem(sectionKey, JSON.stringify(list));
+		} catch (e) {
+			/* stockage refusé : rien d'essentiel */
+		}
+	}
+	function setSectionCollapsed(section, collapsed) {
+		section.classList.toggle('dst-section-collapsed', collapsed);
+		var btn = section.querySelector('.dst-section-toggle');
+		if (btn) {
+			btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+		}
+	}
+	function sectionOf(group) {
+		return table.querySelector('tbody.dst-section[data-section="' + group.getAttribute('data-section') + '"]');
+	}
 
 	function setCollapsed(group, collapsed) {
 		group.classList.toggle('dst-collapsed', collapsed);
@@ -61,6 +97,8 @@
 		var terms = (search ? search.value : '').toLowerCase().split(/\s+/).filter(Boolean);
 		var diffOnly = onlyDiff && onlyDiff.checked;
 		var visible = 0;
+		var filtering = (terms.length > 0 || diffOnly);
+		var stats = {};
 		groups().forEach(function (g) {
 			var hay = g.getAttribute('data-search') || '';
 			var show = terms.every(function (t) {
@@ -76,6 +114,30 @@
 			if (show) {
 				visible++;
 			}
+			var sid = g.getAttribute('data-section');
+			var st = stats[sid] || (stats[sid] = { nb: 0, diff: 0, visible: 0 });
+			st.nb++;
+			if (['ok', 'outofscope'].indexOf(g.getAttribute('data-state')) === -1) {
+				st.diff++;
+			}
+			if (show) {
+				st.visible++;
+			}
+			// Section repliée : ses produits sont masqués (sauf saisie en cours)
+			var sec = sectionOf(g);
+			g.classList.toggle('dst-sec-hidden', !!(sec && sec.classList.contains('dst-section-collapsed') && !g.querySelector('.dst-editrow')));
+		});
+		sections().forEach(function (sec) {
+			var st = stats[sec.getAttribute('data-section')] || { nb: 0, diff: 0, visible: 0 };
+			var count = sec.querySelector('.dst-section-count');
+			if (count && cfg.labels && cfg.labels.products) {
+				var i = 0;
+				var args = [st.nb, st.diff];
+				count.textContent = '(' + cfg.labels.products.replace(/%s/g, function () {
+					return String(args[i++]);
+				}) + ')';
+			}
+			sec.classList.toggle('dst-hidden', filtering && st.visible === 0);
 		});
 		if (empty) {
 			empty.classList.toggle('hidden', visible > 0);
@@ -90,6 +152,14 @@
 	}
 
 	table.addEventListener('click', function (ev) {
+		var sbtn = ev.target.closest('.dst-section-toggle');
+		if (sbtn) {
+			var section = sbtn.closest('tbody.dst-section');
+			setSectionCollapsed(section, !section.classList.contains('dst-section-collapsed'));
+			saveCollapsedSections();
+			applyFilters();
+			return;
+		}
 		var btn = ev.target.closest('.dst-toggle');
 		if (btn) {
 			var group = btn.closest('tbody.dst-group');
@@ -112,10 +182,15 @@
 	}
 	if (expandAll) {
 		expandAll.addEventListener('click', function () {
+			sections().forEach(function (sec) {
+				setSectionCollapsed(sec, false);
+			});
 			groups().forEach(function (g) {
 				setCollapsed(g, false);
 			});
+			saveCollapsedSections();
 			saveCollapsed();
+			applyFilters();
 		});
 	}
 	if (search) {
@@ -130,6 +205,13 @@
 		onlyDiff.addEventListener('change', applyFilters);
 	}
 
+	var collapsedSections = loadCollapsedSections();
+	sections().forEach(function (sec) {
+		if (collapsedSections.indexOf(sec.getAttribute('data-section')) !== -1) {
+			setSectionCollapsed(sec, true);
+		}
+	});
+
 	var collapsed = loadCollapsed();
 	groups().forEach(function (g) {
 		initGroup(g, collapsed);
@@ -141,6 +223,9 @@
 		cfg: cfg,
 		table: table,
 		groups: groups,
+		sectionOf: sectionOf,
+		setSectionCollapsed: setSectionCollapsed,
+		saveCollapsedSections: saveCollapsedSections,
 		setCollapsed: setCollapsed,
 		saveCollapsed: saveCollapsed,
 		applyFilters: applyFilters
@@ -335,7 +420,13 @@
 	function openEditor(group, line, batch, after) {
 		closeEditor();
 		var pid = group.getAttribute('data-pid');
+		var sec = ui.sectionOf(group);
+		if (sec && sec.classList.contains('dst-section-collapsed')) {
+			ui.setSectionCollapsed(sec, false);
+			ui.saveCollapsedSections();
+		}
 		ui.setCollapsed(group, false);
+		ui.applyFilters();
 
 		var row = el('tr', { className: 'dst-editrow' });
 		var loading = el('td', { colspan: String(NBCOLS), className: 'opacitymedium', text: '…' });
@@ -569,18 +660,26 @@
 		return fresh;
 	}
 
-	/* Insertion d'un nouveau groupe à sa place (ordre des réf. parmi les produits du périmètre) */
+	/* Insertion d'un nouveau groupe dans sa section, à sa place (ordre des réf.) */
 	function insertGroup(fresh) {
 		var ref = (fresh.getAttribute('data-ref') || '').toLowerCase();
+		var sid = fresh.getAttribute('data-section');
+		var same = ui.groups().filter(function (g) {
+			return g.getAttribute('data-section') === sid;
+		});
 		var before = null;
-		ui.groups().some(function (g) {
-			var outOfScope = (g.getAttribute('data-state') === 'outofscope');
-			if (outOfScope || (g.getAttribute('data-ref') || '').toLowerCase().localeCompare(ref, undefined, { numeric: true }) > 0) {
+		same.some(function (g) {
+			if ((g.getAttribute('data-ref') || '').toLowerCase().localeCompare(ref, undefined, { numeric: true }) > 0) {
 				before = g;
 				return true;
 			}
 			return false;
 		});
+		var section = table.querySelector('tbody.dst-section[data-section="' + sid + '"]');
+		if (!before) {
+			var last = same.length ? same[same.length - 1] : section;
+			before = last ? last.nextElementSibling : table.querySelector('tbody.dst-empty');
+		}
 		table.insertBefore(fresh, before || table.querySelector('tbody.dst-empty'));
 		ui.applyFilters();
 	}
