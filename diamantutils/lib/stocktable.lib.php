@@ -968,14 +968,16 @@ function diamantutils_stocktable_render_group($group, $perms)
 		$batchlabel = ($batch === '' ? '<span class="opacitymedium">'.$langs->trans('DiamantutilsStockTableNoLot').'</span>' : dol_escape_htmltag($batch));
 		$nblines = count($lot['lines']);
 
-		$lotcells = '';
+		// Dolibarr / écart / état du lot : sur la première ligne du lot (cellules vides ensuite,
+		// pas de rowspan : une ligne de saisie peut s'insérer entre deux lignes du lot)
 		if ($group['inscope']) {
-			$lotcells .= '<td class="right"'.($nblines > 1 ? ' rowspan="'.$nblines.'"' : '').'>'.diamantutils_stocktable_qty_html($lot['doli'], $unit).'</td>';
-			$lotcells .= '<td class="right'.($lot['state'] == DIAMANTUTILS_STOCK_DIFF ? ' dst-diff-txt' : '').'"'.($nblines > 1 ? ' rowspan="'.$nblines.'"' : '').'>'.($nblines ? diamantutils_stocktable_qty_html($lot['diff'], $unit, true) : '').'</td>';
-			$lotcells .= '<td class="center"'.($nblines > 1 ? ' rowspan="'.$nblines.'"' : '').'>'.diamantutils_stocktable_badge($lot['state']).'</td>';
+			$lotcells = '<td class="right">'.diamantutils_stocktable_qty_html($lot['doli'], $unit).'</td>';
+			$lotcells .= '<td class="right'.($lot['state'] == DIAMANTUTILS_STOCK_DIFF ? ' dst-diff-txt' : '').'">'.($nblines ? diamantutils_stocktable_qty_html($lot['diff'], $unit, true) : '').'</td>';
+			$lotcells .= '<td class="center">'.diamantutils_stocktable_badge($lot['state']).'</td>';
 		} else {
-			$lotcells .= '<td'.($nblines > 1 ? ' rowspan="'.$nblines.'"' : '').'></td><td'.($nblines > 1 ? ' rowspan="'.$nblines.'"' : '').'></td><td'.($nblines > 1 ? ' rowspan="'.$nblines.'"' : '').'></td>';
+			$lotcells = '<td></td><td></td><td></td>';
 		}
+		$contcells = '<td class="dst-cont"></td><td class="dst-cont"></td><td class="dst-cont"></td>';
 
 		// Lot présent seulement dans Dolibarr : ligne grisée « à saisir »
 		if (!$nblines) {
@@ -1018,9 +1020,7 @@ function diamantutils_stocktable_render_group($group, $perms)
 			}
 			$out .= '</td>';
 			$out .= '<td class="tdoverflowmax150">'.($line['fk_soc'] ? '<a href="'.DOL_URL_ROOT.'/societe/card.php?socid='.((int) $line['fk_soc']).'">'.dol_escape_htmltag($line['soc_name']).'</a>' : '').'</td>';
-			if ($first) {
-				$out .= $lotcells;
-			}
+			$out .= ($first ? $lotcells : $contcells);
 			$out .= '<td class="right nowraponall">';
 			if ($editable && $unit['ok']) {
 				$out .= '<button type="button" class="dst-btn dst-edit" title="'.dol_escape_htmltag($langs->trans('Modify')).'">'.img_edit($langs->trans('Modify'), 0).'</button>';

@@ -219,3 +219,10 @@
 .dst-lot {
 	min-width: 90px;
 }
+.dst-table .hidden,
+.dst-editrow .hidden {
+	display: none !important;
+}
+.dst-line + .dst-line td.dst-cont {
+	border-top-color: transparent;
+}

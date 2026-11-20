@@ -181,7 +181,7 @@ class DiamantutilsStockLine extends CommonObject
 			$value = $this->{$dim.'_mm'};
 			if ($value === null) {
 				if ($required[$dim]) {
-					return $this->fail('DiamantutilsStockErrDimRequired', $langs->transnoentities($label), $unit['short']);
+					return $this->fail('DiamantutilsStockErrDimRequired', $langs->transnoentities($label), diamantutils_stocktable_unit_label($unit));
 				}
 				continue;
 			}

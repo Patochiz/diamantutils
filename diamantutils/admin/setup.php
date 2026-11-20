@@ -437,7 +437,7 @@ if ($tab == 'stocktable') {
 	diamantutils_setup_row(
 		$langs->trans('DiamantutilsStockTableTolerance'),
 		$langs->trans('DiamantutilsStockTableToleranceDesc'),
-		'<input type="text" class="flat width75" name="DIAMANTUTILS_STOCKTABLE_TOLERANCE" value="'.dol_escape_htmltag(price(diamantutils_stocktable_tolerance(), 0, '', 0, 0, 6)).'">'
+		'<input type="text" class="flat width75" name="DIAMANTUTILS_STOCKTABLE_TOLERANCE" value="'.dol_escape_htmltag(diamantutils_stock_num(diamantutils_stocktable_tolerance(), 6, $langs->transnoentitiesnoconv('SeparatorDecimal'))).'">'
 	);
 
 	// Entrepôts exclus du comparatif
