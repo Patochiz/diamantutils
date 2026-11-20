@@ -9,6 +9,7 @@ Module Dolibarr interne de Diamant Industrie (Dolibarr 20, PHP 8.2, déploiement
 - **Lots de produits** (menu Commerce) : ensembles de produits ajoutés en une fois sur un devis ou une commande client, section ci-dessous.
 - **Prix de revient à la réception** : le prix de revient du produit prend le prix rendu saisi à chaque réception fournisseur, section ci-dessous.
 - **Liaison des commandes fournisseurs** : lier une commande fournisseur à une commande d'un autre fournisseur (transport ↔ marchandise), section ci-dessous.
+- **Tableau de stock par lots** (menu Produits → Stock) : colisage constaté par lot, comparé au stock réel Dolibarr (remplace la base Airtable « Stock Bobine »), section ci-dessous.
 
 Chaque fonctionnalité a son onglet dans **Configuration → Modules → DiamantUtils**, avec une option pour l'activer ou la désactiver et ses réglages propres. Une fonctionnalité désactivée masque ses menus et pages ; ses données sont conservées.
 
@@ -317,5 +318,76 @@ Dolibarr 20 ne le permet pas : la fiche commande fournisseur retire le type « c
 |---|---|
 | `class/actions_diamantutils.class.php` | hooks `showLinkToObjectBlock` (entrée du menu) et `doActions` (liaison) |
 | `core/modules/modDiamantutils.class.php` | contexte `ordersuppliercard`, constantes, version |
+| `admin/setup.php`, `lib/diamantutils.lib.php` | onglet de configuration |
+| `langs/fr_FR/diamantutils.lang`, `langs/en_US/diamantutils.lang` | libellés |
+
+---
+
+## Tableau de stock par lots
+
+### Principe
+Remplace la base Airtable « Stock Bobine ». Le tableau enregistre le **colisage constaté** au dépôt : pour un produit Dolibarr et un lot, le nombre de pièces, les pièces par colis et les dimensions d'une pièce. **Dolibarr reste la référence du stock** : le tableau ne crée, ne corrige ni ne supprime aucun mouvement de stock ; il compare et signale les écarts.
+
+Seuls les produits des **tags** (catégories produit) choisis dans la configuration sont proposés, acceptés et comparés. Le produit d'une ligne est fixé par son groupe : il ne se tape pas et ne se change pas.
+
+### Mise en service
+1. Déposer les fichiers par FTP dans `custom/diamantutils/`.
+2. **Désactiver puis réactiver le module** : crée la table `llx_diamantutils_stockline`, les droits et le menu.
+3. Accorder les droits (Utilisateurs → Permissions → DiamantUtils) : *Voir le tableau de stock par lots*, *Ajouter et modifier les lignes*, *Supprimer les lignes*.
+4. Configuration du module → onglet **Tableau de stock** :
+   - **Tags produit concernés** (`DIAMANTUTILS_STOCKTABLE_CATEGORIES`) et **Inclure les sous-catégories** (`DIAMANTUTILS_STOCKTABLE_SUBCATEGORIES`, oui par défaut). Aucun tag = aucun produit ;
+   - **Écart toléré** (`DIAMANTUTILS_STOCKTABLE_TOLERANCE`, 0,01 dans l'unité du produit) ;
+   - **Entrepôts ignorés par le comparatif** (`DIAMANTUTILS_STOCKTABLE_EXCLUDE_WAREHOUSES`) : par défaut l'entrepôt Sous-traitance, dont le stock transitoire fausserait le comparatif ;
+   - **Activer cette fonctionnalité** (`DIAMANTUTILS_STOCKTABLE_ENABLED`, désactivée par défaut : le déploiement est inerte).
+5. Vérifier les calculs : `/custom/diamantutils/test/stocktable_calc_test.php` (administrateur, aucune donnée lue ni écrite).
+
+### Écran
+Menu **Produits → Stock → Tableau de stock par lots**.
+
+- Un groupe repliable par produit : réf. et libellé, totaux **Tableau** (somme des lignes) / **Dolibarr** (stock réel, hors entrepôts ignorés) / **Écart**, pastille d'état. Si une partie du stock Dolibarr d'un produit à lots n'est rattachée à aucun lot, elle est indiquée dans l'en-tête et sur une ligne « (sans lot) ».
+- Une ligne par lot / colisage : lot, colisage calculé (« 5 colis de 28u », « 1 colis de 28u + 1 colis de 2u »), pièces, pièces par colis, largeur, longueur, quantité dans l'unité du produit, fournisseur ; sur la première ligne de chaque lot : stock Dolibarr du lot, écart, état. Un même lot peut occuper plusieurs lignes : elles sont additionnées.
+- Barre d'outils : recherche instantanée (produit, lot, fournisseur), « Écarts seulement », filtre par tag, tout replier / tout déplier (mémorisé dans le navigateur). En-tête de colonnes figé.
+
+| État | Condition | Couleur |
+|---|---|---|
+| OK | écart ≤ tolérance | vert |
+| Écart | lot présent des deux côtés, écart > tolérance | rouge |
+| Dolibarr seul | stock Dolibarr non nul sur un lot absent du tableau (ligne grisée « à saisir ») | orange |
+| Tableau seul | lot du tableau sans stock Dolibarr | orange |
+| Non calculable | dimension manquante ou unité non gérée | gris |
+
+Produit sans gestion de lot : une seule ligne « (sans lot) » comparée au stock total.
+Produit supprimé ou sorti des tags : ses lignes restent affichées, marquées « produit hors périmètre », sans comparaison ; elles ne sont plus modifiables (suppression possible).
+
+### Saisie (droit *write*)
+- **« + »** d'un groupe : ligne de saisie sous l'en-tête, produit fixé. **« + Produit »** (en haut) : recherche limitée aux produits des tags, ouvre le groupe du produit.
+- **Lot** : liste des lots Dolibarr du produit avec leur stock. « Autre lot (pas encore en stock)… » permet un lot inconnu de Dolibarr, avec un avertissement visible ; sans ce choix explicite, le serveur refuse un lot inconnu.
+- **Pré-remplissage** : pièces par colis, largeur, longueur et fournisseur de la dernière ligne du même produit.
+- Colisage et quantité affichés pendant la frappe (indicatif) ; le serveur valide, recalcule et renvoie le groupe à jour. Entrée enregistre, Échap annule.
+- Modification (crayon), suppression (corbeille, droit *delete*, confirmation), **« Ajouter au tableau »** sur une ligne « Dolibarr seul » (lot déjà rempli).
+
+### Règles de calcul et de validation (le serveur fait foi)
+- Quantité dans l'unité du produit, jamais stockée : surface `pièces × larg × long × 1e-6 ÷ 10^échelle` ; longueur `pièces × long × 1e-3 ÷ 10^échelle` ; pièce `pièces`. Échelle des unités `c_units` (m² 0, dm² −2, m 0, mm −3…) ; unités impériales (échelle ≥ 80) et autres types (poids, volume…) refusés. Produit sans unité : compté en pièces.
+- Dimension manquante pour l'unité : quantité « Non calculable », jamais 0.
+- Arrondi d'affichage à 2 décimales, de comparaison à 3.
+- Refus avec message (jamais de correction muette) : produit inexistant, service ou hors tags ; pièces ou pièces par colis ≤ 0 ou décimales (sauf produit au mètre) ; dimension exigée absente ou ≤ 0 ; lot absent pour un produit à lots, lot renseigné pour un produit sans lot, lot inconnu de Dolibarr sans « Autre lot » ; fournisseur inconnu ; changement de produit d'une ligne existante.
+- Écritures par `ajax/stocktable.php` : POST seulement, jeton CSRF vérifié, droits *write* / *delete* (403 sinon). Fonctionnalité désactivée : page et AJAX refusés.
+
+### Détail technique
+- Données de l'écran en **3 requêtes**, quel que soit le nombre de produits : lignes du tableau ; stock par produit et par lot (`product_stock` / `product_batch`) ; produits des tags avec leur stock total. S'y ajoutent l'arbre des catégories et les listes de la page (libellés des tags, entrepôts ignorés, fournisseurs).
+- Aucun hook, trigger ni extrafield ; aucune écriture hors de `llx_diamantutils_stockline`.
+
+### Fichiers
+
+| Fichier | Rôle |
+|---|---|
+| `stocktable_list.php` | écran (rendu serveur) |
+| `ajax/stocktable.php` | recherche produit, infos produit, groupe, enregistrement, suppression (JSON) |
+| `class/stockline.class.php` | classe `DiamantutilsStockLine` : lecture, écriture, validation |
+| `lib/stocktable.lib.php` | calculs (fonctions pures), périmètre, lecture des données, rendu d'un groupe |
+| `js/stocktable.js`, `css/stocktable.css` | filtres, repli, saisie en ligne ; mise en forme |
+| `sql/llx_diamantutils_stockline.sql`, `.key.sql` | table (index `entity, fk_product, batch`, sans unicité) |
+| `test/stocktable_calc_test.php`, `test/stocktable_calc_cases.php` | test des calculs (navigateur, administrateur) |
+| `core/modules/modDiamantutils.class.php` | constantes, droits `stocktable`, menu, version |
 | `admin/setup.php`, `lib/diamantutils.lib.php` | onglet de configuration |
 | `langs/fr_FR/diamantutils.lang`, `langs/en_US/diamantutils.lang` | libellés |

@@ -8,8 +8,11 @@
 - Périmètre : produits des tags (catégories produit) choisis, sous-catégories comprises en option (`DIAMANTUTILS_STOCKTABLE_CATEGORIES`, `DIAMANTUTILS_STOCKTABLE_SUBCATEGORIES`). Aucun tag = aucun produit.
 - Comparatif : écart toléré `DIAMANTUTILS_STOCKTABLE_TOLERANCE` (0,01) ; entrepôts ignorés `DIAMANTUTILS_STOCKTABLE_EXCLUDE_WAREHOUSES` (par défaut l'entrepôt Sous-traitance).
 - Nouveaux droits `stocktable` : *read*, *write*, *delete*. Menu **Produits → Stock → Tableau de stock par lots**.
+- Écran `stocktable_list.php` : groupes repliables par produit, totaux Tableau / Dolibarr / Écart, état par lot (OK, Écart, Dolibarr seul, Tableau seul, Non calculable), part du stock Dolibarr sans lot, produits sortis des tags affichés « hors périmètre » sans modification possible. Recherche instantanée, filtre « écarts seulement », filtre par tag, tout replier / déplier (mémorisé dans le navigateur), en-tête figé. Données en 3 requêtes pour tout l'écran.
+- Saisie en ligne (`ajax/stocktable.php`, `js/stocktable.js`) : « + » par produit (produit fixé), « + Produit » limité aux tags, lot choisi dans la liste des lots Dolibarr avec leur stock (« Autre lot » explicite avec avertissement), pré-remplissage depuis la dernière ligne du produit, colisage et quantité calculés pendant la frappe, modification, suppression, « Ajouter au tableau » d'un lot Dolibarr seul. POST, jeton CSRF vérifié, droits contrôlés côté serveur.
 - Aucun mouvement de stock, aucun hook, trigger ni extrafield.
 - Test `test/stocktable_calc_test.php` (navigateur, administrateur, aucune donnée lue ni écrite).
+- Mise à jour : déposer les fichiers, **désactiver puis réactiver le module** (table, droits, menu), accorder les droits `stocktable`, choisir les tags dans l'onglet, puis activer la fonctionnalité.
 
 ## 2.9 — Liaison des commandes fournisseurs entre elles
 
