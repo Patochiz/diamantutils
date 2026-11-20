@@ -1,5 +1,16 @@
 # Changelog — DiamantUtils
 
+## 2.10 — Tableau de stock par lots
+
+- Nouvelle fonctionnalité `DIAMANTUTILS_STOCKTABLE_ENABLED` (désactivée par défaut), onglet **Tableau de stock** de la configuration : remplace la base Airtable « Stock Bobine ».
+- Nouvelle table `llx_diamantutils_stockline` (produit, lot, fournisseur facultatif, pièces, pièces par colis, largeur, longueur, note), sans contrainte d'unicité (un lot peut occuper plusieurs lignes). Classe `DiamantutilsStockLine` : toute écriture est validée côté serveur (produit des tags configurés, valeurs > 0, entiers sauf produit au mètre, dimensions exigées par l'unité, lot connu de Dolibarr sauf « autre lot » explicite).
+- `lib/stocktable.lib.php` : colisage (« 5 colis de 28u », « 1 colis de 28u + 1 colis de 2u »), quantité dans l'unité du produit (surface, longueur, pièce ; unités impériales refusées), états de comparaison. Les quantités calculées ne sont jamais stockées.
+- Périmètre : produits des tags (catégories produit) choisis, sous-catégories comprises en option (`DIAMANTUTILS_STOCKTABLE_CATEGORIES`, `DIAMANTUTILS_STOCKTABLE_SUBCATEGORIES`). Aucun tag = aucun produit.
+- Comparatif : écart toléré `DIAMANTUTILS_STOCKTABLE_TOLERANCE` (0,01) ; entrepôts ignorés `DIAMANTUTILS_STOCKTABLE_EXCLUDE_WAREHOUSES` (par défaut l'entrepôt Sous-traitance).
+- Nouveaux droits `stocktable` : *read*, *write*, *delete*. Menu **Produits → Stock → Tableau de stock par lots**.
+- Aucun mouvement de stock, aucun hook, trigger ni extrafield.
+- Test `test/stocktable_calc_test.php` (navigateur, administrateur, aucune donnée lue ni écrite).
+
 ## 2.9 — Liaison des commandes fournisseurs entre elles
 
 - Nouvelle option `DIAMANTUTILS_LINK_SUPPLIER_ORDERS` (désactivée par défaut), onglet **Liaison commandes fournisseurs** : « Permettre de lier une commande fournisseur à une autre commande fournisseur (tous fournisseurs) ».

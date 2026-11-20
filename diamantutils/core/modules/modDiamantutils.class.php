@@ -18,10 +18,10 @@ class modDiamantutils extends DolibarrModules
 		$this->family = 'custom';
 		$this->module_position = '90';
 		$this->name = preg_replace('/^mod/i', '', get_class($this));
-		$this->description = "Module interne Diamant Industrie : ordres de transformation de stock par lots (menu GPAO), commandes sous-traitées livrées directement au client, listes personnalisées SQL (menu Outils) description pour devis sur la fiche produit et lots de produits ajoutés en une fois sur les devis et commandes (menu Commerce), liaison d'une commande fournisseur à une commande d'un autre fournisseur";
-		$this->descriptionlong = "Transformation de stock par lots : consommation de N lots et production de M lots (découpe de profilés, peinture, changement d'unité), avec saisie en pièces × longueur, contrôle d'équilibre, gestion des restes et des pertes, calcul du coût et traçabilité des mouvements de stock. Commandes sous-traitées : réception sur l'entrepôt Sous-traitance avec lot = ref de la commande fournisseur, BL client prélevé sur ce lot. Listes personnalisées : requêtes SQL en lecture seule enregistrées par un administrateur, consultables avec recherche, tri, pagination et export CSV. Description pour devis : texte saisi sur la fiche produit, repris sur les lignes de propositions commerciales à la place de la description standard. Lots de produits : ensembles prédéfinis de produits et quantités, ajoutés en une fois (avec multiplicateur) sur un devis ou une commande client en brouillon, aux prix et descriptions de la saisie standard. Liaison des commandes fournisseurs : entrée « Lier à une commande fournisseur » du bloc Objets liés de la commande fournisseur, tous fournisseurs confondus (commande de transport liée aux commandes qu'elle enlève).";
+		$this->description = "Module interne Diamant Industrie : ordres de transformation de stock par lots (menu GPAO), commandes sous-traitées livrées directement au client, listes personnalisées SQL (menu Outils) description pour devis sur la fiche produit et lots de produits ajoutés en une fois sur les devis et commandes (menu Commerce), liaison d'une commande fournisseur à une commande d'un autre fournisseur, tableau de stock par lots comparé au stock Dolibarr";
+		$this->descriptionlong = "Transformation de stock par lots : consommation de N lots et production de M lots (découpe de profilés, peinture, changement d'unité), avec saisie en pièces × longueur, contrôle d'équilibre, gestion des restes et des pertes, calcul du coût et traçabilité des mouvements de stock. Commandes sous-traitées : réception sur l'entrepôt Sous-traitance avec lot = ref de la commande fournisseur, BL client prélevé sur ce lot. Listes personnalisées : requêtes SQL en lecture seule enregistrées par un administrateur, consultables avec recherche, tri, pagination et export CSV. Description pour devis : texte saisi sur la fiche produit, repris sur les lignes de propositions commerciales à la place de la description standard. Lots de produits : ensembles prédéfinis de produits et quantités, ajoutés en une fois (avec multiplicateur) sur un devis ou une commande client en brouillon, aux prix et descriptions de la saisie standard. Liaison des commandes fournisseurs : entrée « Lier à une commande fournisseur » du bloc Objets liés de la commande fournisseur, tous fournisseurs confondus (commande de transport liée aux commandes qu'elle enlève). Tableau de stock par lots (menu Produits → Stock) : colisage constaté par lot (pièces, pièces par colis, dimensions) pour les produits des tags choisis, comparé au stock réel Dolibarr par produit et par lot, sans aucun mouvement de stock.";
 		$this->editor_name = 'Diamant Industrie';
-		$this->version = '2.9';
+		$this->version = '2.10';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'generic';
 
@@ -138,6 +138,33 @@ class modDiamantutils extends DolibarrModules
 				'current',
 				0
 			),
+			11 => array(
+				'DIAMANTUTILS_STOCKTABLE_ENABLED',
+				'chaine',
+				'0',
+				'Tableau de stock par lots (menu Produits → Stock) : 1 = active',
+				0,
+				'current',
+				0
+			),
+			12 => array(
+				'DIAMANTUTILS_STOCKTABLE_TOLERANCE',
+				'chaine',
+				'0.01',
+				'Tableau de stock par lots : écart toléré avec le stock Dolibarr (unité du produit)',
+				0,
+				'current',
+				0
+			),
+			13 => array(
+				'DIAMANTUTILS_STOCKTABLE_SUBCATEGORIES',
+				'chaine',
+				'1',
+				'Tableau de stock par lots : inclure les sous-catégories des tags choisis (1 = oui)',
+				0,
+				'current',
+				0
+			),
 		);
 
 		// Le menu GPAO n'est affiché que si le module MRP (ou BOM) est actif
@@ -211,6 +238,27 @@ class modDiamantutils extends DolibarrModules
 		$this->rights[$r][2] = 'd';
 		$this->rights[$r][3] = 0;
 		$this->rights[$r][4] = 'lot';
+		$this->rights[$r][5] = 'delete';
+		$r++;
+		$this->rights[$r][0] = $this->numero.'10';
+		$this->rights[$r][1] = 'Voir le tableau de stock par lots';
+		$this->rights[$r][2] = 'r';
+		$this->rights[$r][3] = 0;
+		$this->rights[$r][4] = 'stocktable';
+		$this->rights[$r][5] = 'read';
+		$r++;
+		$this->rights[$r][0] = $this->numero.'11';
+		$this->rights[$r][1] = 'Ajouter et modifier les lignes du tableau de stock par lots';
+		$this->rights[$r][2] = 'w';
+		$this->rights[$r][3] = 0;
+		$this->rights[$r][4] = 'stocktable';
+		$this->rights[$r][5] = 'write';
+		$r++;
+		$this->rights[$r][0] = $this->numero.'12';
+		$this->rights[$r][1] = 'Supprimer les lignes du tableau de stock par lots';
+		$this->rights[$r][2] = 'd';
+		$this->rights[$r][3] = 0;
+		$this->rights[$r][4] = 'stocktable';
 		$this->rights[$r][5] = 'delete';
 		$r++;
 
@@ -349,6 +397,20 @@ class modDiamantutils extends DolibarrModules
 			'perms' => '$user->hasRight("diamantutils", "lot", "read")',
 			'target' => '',
 			'user' => 2,
+		);		// Menu gauche Produits/Stocks : tableau de stock par lots
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=products,fk_leftmenu=stock',
+			'type' => 'left',
+			'titre' => 'DiamantutilsStockTableTitle',
+			'mainmenu' => 'products',
+			'leftmenu' => 'diamantutils_stocktable',
+			'url' => '/diamantutils/stocktable_list.php?mainmenu=products&leftmenu=stock',
+			'langs' => 'diamantutils@diamantutils',
+			'position' => 1000 + $r,
+			'enabled' => 'isModEnabled("diamantutils") && getDolGlobalInt("DIAMANTUTILS_STOCKTABLE_ENABLED")',
+			'perms' => '$user->hasRight("diamantutils", "stocktable", "read")',
+			'target' => '',
+			'user' => 2,
 		);
 	}
 
@@ -360,7 +422,7 @@ class modDiamantutils extends DolibarrModules
 		$sql = "DELETE FROM ".MAIN_DB_PREFIX."const WHERE name = '".$this->db->escape('DIAMANTUTILS_INVOICE_CHECK_MODE')."'";
 		$this->db->query($sql);
 
-		// Création des tables (fichiers sql/ du module : transformations, listes, lots de produits)
+		// Création des tables (fichiers sql/ du module : transformations, listes, lots de produits, tableau de stock)
 		$result = $this->_load_tables('/diamantutils/sql/');
 		if ($result < 0) {
 			return -1;
