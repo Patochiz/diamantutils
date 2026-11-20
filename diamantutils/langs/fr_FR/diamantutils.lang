@@ -323,6 +323,7 @@ DiamantutilsStockTableProductDeleted = Produit supprimé (id %s)
 DiamantutilsStockTableNoLot = (sans lot)
 DiamantutilsStockTableNoLotPart = dont %s sans lot dans Dolibarr
 DiamantutilsStockTableToEnter = à saisir
+DiamantutilsStockTableNoLotStock = stock Dolibarr non rattaché à un lot
 DiamantutilsStockTableSameLot = même lot
 DiamantutilsStockTableChooseLot = Choisir le lot…
 DiamantutilsStockTableOtherLot = Autre lot (pas encore en stock)…

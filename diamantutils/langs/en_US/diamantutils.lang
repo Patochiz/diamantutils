@@ -323,6 +323,7 @@ DiamantutilsStockTableProductDeleted = Deleted product (id %s)
 DiamantutilsStockTableNoLot = (no batch)
 DiamantutilsStockTableNoLotPart = of which %s without batch in Dolibarr
 DiamantutilsStockTableToEnter = to enter
+DiamantutilsStockTableNoLotStock = Dolibarr stock not attached to a batch
 DiamantutilsStockTableSameLot = same batch
 DiamantutilsStockTableChooseLot = Choose the batch…
 DiamantutilsStockTableOtherLot = Other batch (not in stock yet)…

@@ -630,3 +630,410 @@ function diamantutils_stocktable_last_values($db, $fk_product)
 	}
 	return $out;
 }
+
+
+/*
+ * Lecture et affichage
+ */
+
+/**
+ * Données de l'écran, en 3 requêtes quel que soit le nombre de produits :
+ *  1. lignes du tableau (avec produit, unité, fournisseur, appartenance au périmètre) ;
+ *  2. stock Dolibarr par produit et par lot (hors entrepôts exclus) ;
+ *  3. produits du périmètre avec leur stock Dolibarr total (hors entrepôts exclus).
+ *
+ * Groupes rendus : produits du périmètre ayant des lignes ou du stock (total ou par lot) non nul,
+ * produits hors périmètre ayant encore des lignes (sans comparaison), et $fk_product s'il est donné.
+ *
+ * @param	DoliDB	$db				Base de données
+ * @param	int[]	$catids			Catégories affichées (filtre de l'écran compris)
+ * @param	int		$fk_product		Limiter à ce produit (0 = tous)
+ * @return	array|int				array(pid => groupe), trié par réf. produit ; <0 si erreur
+ */
+function diamantutils_stocktable_load($db, $catids, $fk_product = 0)
+{
+	$fk_product = (int) $fk_product;
+	$tolerance = diamantutils_stocktable_tolerance();
+	$exclude = diamantutils_stocktable_excluded_warehouses();
+	$scopesql = diamantutils_stocktable_scope_sql(diamantutils_stocktable_category_ids($db));
+	$filtersql = diamantutils_stocktable_scope_sql($catids);
+	$filtered = ($filtersql !== $scopesql);
+
+	$groups = array();
+	$newgroup = function ($pid, $obj, $inscope) {
+		return array(
+			'id' => (int) $pid,
+			'exists' => ($obj->pid !== null),
+			'ref' => (string) $obj->ref,
+			'label' => (string) $obj->label,
+			'tobatch' => ((int) $obj->tobatch > 0),
+			'unit' => diamantutils_stock_unit($obj->fk_unit, $obj->unit_type, $obj->unit_scale, $obj->unit_code, $obj->unit_short),
+			'inscope' => (bool) $inscope,
+			'lines' => array(),
+			'doli_lots' => array(),
+			'doli_total' => 0.0,
+		);
+	};
+
+	// 1. Lignes du tableau
+	$sql = "SELECT l.rowid, l.fk_product, l.batch, l.fk_soc, l.nb_pieces, l.pieces_per_colis, l.larg_mm, l.long_mm, l.note,";
+	$sql .= " p.rowid as pid, p.ref, p.label, p.fk_product_type, p.tobatch, p.fk_unit,";
+	$sql .= " u.code as unit_code, u.scale as unit_scale, u.unit_type, u.short_label as unit_short,";
+	$sql .= " s.nom as soc_name,";
+	$sql .= ($scopesql !== '' ? " (CASE WHEN p.fk_product_type = 0 AND p.rowid IN (".$scopesql.") THEN 1 ELSE 0 END)" : " 0")." as inscope";
+	$sql .= " FROM ".MAIN_DB_PREFIX."diamantutils_stockline as l";
+	$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."product as p ON p.rowid = l.fk_product AND p.entity IN (".getEntity('product').")";
+	$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."c_units as u ON u.rowid = p.fk_unit";
+	$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."societe as s ON s.rowid = l.fk_soc";
+	$sql .= " WHERE l.entity IN (".getEntity('diamantutils_stockline').")";
+	if ($filtered) {
+		// Filtre par tag : seulement les produits de ce tag (pas de ligne « hors périmètre »)
+		$sql .= ($filtersql !== '' ? " AND l.fk_product IN (".$filtersql.")" : " AND 1 = 0");
+	}
+	if ($fk_product > 0) {
+		$sql .= " AND l.fk_product = ".$fk_product;
+	}
+	$sql .= " ORDER BY l.rowid";
+	$resql = $db->query($sql);
+	if (!$resql) {
+		dol_syslog(__FUNCTION__.' '.$db->lasterror(), LOG_ERR);
+		return -1;
+	}
+	while ($obj = $db->fetch_object($resql)) {
+		$pid = (int) $obj->fk_product;
+		if (!isset($groups[$pid])) {
+			$groups[$pid] = $newgroup($pid, $obj, !empty($obj->inscope));
+		}
+		$groups[$pid]['lines'][] = array(
+			'id' => (int) $obj->rowid,
+			'batch' => (string) $obj->batch,
+			'fk_soc' => ($obj->fk_soc > 0 ? (int) $obj->fk_soc : 0),
+			'soc_name' => (string) $obj->soc_name,
+			'nb_pieces' => (float) $obj->nb_pieces,
+			'pieces_per_colis' => (float) $obj->pieces_per_colis,
+			'larg_mm' => ($obj->larg_mm === null ? null : (float) $obj->larg_mm),
+			'long_mm' => ($obj->long_mm === null ? null : (float) $obj->long_mm),
+			'note' => (string) $obj->note,
+		);
+	}
+	$db->free($resql);
+
+	if ($filtersql !== '') {
+		$whsql = "SELECT e.rowid FROM ".MAIN_DB_PREFIX."entrepot as e WHERE e.entity IN (".getEntity('stock').")";
+		if (!empty($exclude)) {
+			$whsql .= " AND e.rowid NOT IN (".implode(',', $exclude).")";
+		}
+
+		// 2. Stock Dolibarr par produit et par lot
+		$sql = "SELECT ps.fk_product, pb.batch, SUM(pb.qty) as qty";
+		$sql .= " FROM ".MAIN_DB_PREFIX."product_batch as pb";
+		$sql .= " INNER JOIN ".MAIN_DB_PREFIX."product_stock as ps ON ps.rowid = pb.fk_product_stock";
+		$sql .= " WHERE ps.fk_product IN (".$filtersql.")";
+		$sql .= " AND ps.fk_entrepot IN (".$whsql.")";
+		if ($fk_product > 0) {
+			$sql .= " AND ps.fk_product = ".$fk_product;
+		}
+		$sql .= " GROUP BY ps.fk_product, pb.batch";
+		$resql = $db->query($sql);
+		if (!$resql) {
+			dol_syslog(__FUNCTION__.' '.$db->lasterror(), LOG_ERR);
+			return -1;
+		}
+		$doli_lots = array();
+		while ($obj = $db->fetch_object($resql)) {
+			$doli_lots[(int) $obj->fk_product][(string) $obj->batch] = (float) $obj->qty;
+		}
+		$db->free($resql);
+
+		// 3. Produits du périmètre et stock Dolibarr total
+		$sql = "SELECT p.rowid as pid, p.ref, p.label, p.tobatch, p.fk_unit,";
+		$sql .= " u.code as unit_code, u.scale as unit_scale, u.unit_type, u.short_label as unit_short,";
+		$sql .= " SUM(ps.reel) as stock";
+		$sql .= " FROM ".MAIN_DB_PREFIX."product as p";
+		$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."c_units as u ON u.rowid = p.fk_unit";
+		$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."product_stock as ps ON ps.fk_product = p.rowid AND ps.fk_entrepot IN (".$whsql.")";
+		$sql .= " WHERE p.rowid IN (".$filtersql.")";
+		$sql .= " AND p.fk_product_type = 0";
+		$sql .= " AND p.entity IN (".getEntity('product').")";
+		if ($fk_product > 0) {
+			$sql .= " AND p.rowid = ".$fk_product;
+		}
+		$sql .= " GROUP BY p.rowid, p.ref, p.label, p.tobatch, p.fk_unit, u.code, u.scale, u.unit_type, u.short_label";
+		$resql = $db->query($sql);
+		if (!$resql) {
+			dol_syslog(__FUNCTION__.' '.$db->lasterror(), LOG_ERR);
+			return -1;
+		}
+		while ($obj = $db->fetch_object($resql)) {
+			$pid = (int) $obj->pid;
+			$lots = (isset($doli_lots[$pid]) ? $doli_lots[$pid] : array());
+			$total = (float) $obj->stock;
+			$hasstock = (abs($total) > 1e-6);
+			foreach ($lots as $qty) {
+				$hasstock = $hasstock || (abs($qty) > 1e-6);
+			}
+			if (!isset($groups[$pid])) {
+				if (!$hasstock && $pid !== $fk_product) {
+					continue;
+				}
+				$groups[$pid] = $newgroup($pid, $obj, true);
+			}
+			$groups[$pid]['inscope'] = true;
+			$groups[$pid]['doli_lots'] = $lots;
+			$groups[$pid]['doli_total'] = $total;
+		}
+		$db->free($resql);
+	}
+
+	// Comparaison (produits du périmètre) ; hors périmètre : quantités seules
+	foreach ($groups as $pid => $group) {
+		if ($group['inscope']) {
+			$groups[$pid]['cmp'] = diamantutils_stock_compare($group['unit'], $group['lines'], $group['doli_lots'], $group['doli_total'], $group['tobatch'], $tolerance);
+		} else {
+			$cmp = diamantutils_stock_compare($group['unit'], $group['lines'], array(), 0, true, $tolerance);
+			foreach ($cmp['lots'] as $batch => $lot) {
+				$cmp['lots'][$batch]['state'] = DIAMANTUTILS_STOCK_UNKNOWN;
+				$cmp['lots'][$batch]['doli'] = null;
+				$cmp['lots'][$batch]['diff'] = null;
+			}
+			$cmp['doli'] = null;
+			$cmp['diff'] = null;
+			$cmp['state'] = DIAMANTUTILS_STOCK_UNKNOWN;
+			$groups[$pid]['cmp'] = $cmp;
+		}
+	}
+
+	uasort($groups, function ($a, $b) {
+		if ($a['inscope'] !== $b['inscope']) {
+			return ($a['inscope'] ? -1 : 1);
+		}
+		return strnatcasecmp($a['ref'], $b['ref']);
+	});
+	return $groups;
+}
+
+/**
+ * Traduction brute, sans remplacement des %s (formats passés à sprintf ou au JS)
+ *
+ * @param	string	$key	Clé de langue
+ * @return	string
+ */
+function diamantutils_stocktable_rawtrans($key)
+{
+	global $langs;
+	if (isset($langs->tab_translate[$key])) {
+		return (string) $langs->tab_translate[$key];
+	}
+	return $key;
+}
+
+/**
+ * Quantité en texte simple (2 décimales) avec unité
+ *
+ * @param	float	$qty	Quantité
+ * @param	array	$unit	Unité
+ * @return	string
+ */
+function diamantutils_stocktable_qty_text($qty, $unit)
+{
+	return price(round((float) $qty, 2), 0, '', 0, 2, 2).' '.diamantutils_stocktable_unit_label($unit);
+}
+
+/**
+ * Libellé court d'unité affichable (m2 → m²)
+ *
+ * @param	array	$unit	Résultat de diamantutils_stock_unit()
+ * @return	string
+ */
+function diamantutils_stocktable_unit_label($unit)
+{
+	return str_replace(array('m2', 'm3'), array('m²', 'm³'), (string) $unit['short']);
+}
+
+/**
+ * Quantité affichée (2 décimales) avec unité
+ *
+ * @param	float|null	$qty		Quantité (null = non calculable)
+ * @param	array		$unit		Unité
+ * @param	bool		$signed		Afficher le signe +
+ * @return	string					HTML
+ */
+function diamantutils_stocktable_qty_html($qty, $unit, $signed = false)
+{
+	if ($qty === null) {
+		return '<span class="opacitymedium">—</span>';
+	}
+	$qty = round((float) $qty, 2);
+	if ($qty == 0) {
+		$qty = 0.0;
+	}
+	$txt = price($qty, 0, '', 0, 2, 2);
+	if ($signed && $qty > 0) {
+		$txt = '+'.$txt;
+	}
+	return '<span class="nowraponall">'.$txt.' <span class="opacitymedium small">'.dol_escape_htmltag(diamantutils_stocktable_unit_label($unit)).'</span></span>';
+}
+
+/**
+ * Pastille d'état
+ *
+ * @param	string	$state	DIAMANTUTILS_STOCK_*
+ * @return	string			HTML
+ */
+function diamantutils_stocktable_badge($state)
+{
+	global $langs;
+	return '<span class="dst-badge dst-'.dol_escape_htmltag($state).'">'.$langs->trans('DiamantutilsStockState'.$state).'</span>';
+}
+
+/**
+ * Nombre de colonnes du tableau
+ */
+if (!defined('DIAMANTUTILS_STOCKTABLE_NBCOLS')) {
+	define('DIAMANTUTILS_STOCKTABLE_NBCOLS', 12);
+}
+
+/**
+ * Rendu HTML d'un groupe produit (un <tbody>), utilisé par la page et par l'AJAX
+ *
+ * @param	array	$group		Groupe (diamantutils_stocktable_load())
+ * @param	array	$perms		array('write' => bool, 'delete' => bool)
+ * @return	string				HTML
+ */
+function diamantutils_stocktable_render_group($group, $perms)
+{
+	global $langs;
+
+	$cmp = $group['cmp'];
+	$unit = $group['unit'];
+	$editable = ($group['inscope'] && !empty($perms['write']));
+	$fmt = diamantutils_stocktable_rawtrans('DiamantutilsStockColisFmt');
+	$decsep = $langs->transnoentitiesnoconv('SeparatorDecimal');
+	if ($decsep === 'SeparatorDecimal' || $decsep === '') {
+		$decsep = ',';
+	}
+	$state = ($group['inscope'] ? $cmp['state'] : 'outofscope');
+
+	// Texte de recherche : produit, lots, fournisseurs
+	$search = $group['ref'].' '.$group['label'];
+	foreach ($cmp['lots'] as $batch => $lot) {
+		$search .= ' '.$batch;
+		foreach ($lot['lines'] as $line) {
+			$search .= ' '.$line['soc_name'];
+		}
+	}
+
+	$out = '<tbody class="dst-group" data-pid="'.((int) $group['id']).'" data-state="'.dol_escape_htmltag($state).'"';
+	$out .= ' data-ref="'.dol_escape_htmltag($group['ref']).'" data-tobatch="'.($group['tobatch'] ? 1 : 0).'"';
+	$out .= ' data-search="'.dol_escape_htmltag(dol_strtolower($search)).'">';
+
+	// En-tête du groupe : produit et totaux
+	$out .= '<tr class="dst-head">';
+	$out .= '<td colspan="6" class="dst-head-product">';
+	$out .= '<button type="button" class="dst-toggle" title="'.dol_escape_htmltag($langs->trans('DiamantutilsStockTableToggle')).'" aria-expanded="true"><span class="dst-caret"></span></button>';
+	if ($group['exists']) {
+		$out .= '<a href="'.DOL_URL_ROOT.'/product/card.php?id='.((int) $group['id']).'">'.img_picto('', 'product', 'class="pictofixedwidth"').'<strong>'.dol_escape_htmltag($group['ref']).'</strong></a>';
+		$out .= ' <span class="opacitymedium">'.dol_escape_htmltag($group['label']).'</span>';
+	} else {
+		$out .= '<strong>'.$langs->trans('DiamantutilsStockTableProductDeleted', (int) $group['id']).'</strong>';
+	}
+	if (!$group['inscope']) {
+		$out .= ' <span class="dst-badge dst-outofscope" title="'.dol_escape_htmltag($langs->trans('DiamantutilsStockTableOutOfScopeHelp')).'">'.$langs->trans('DiamantutilsStockTableOutOfScope').'</span>';
+	} elseif (!$unit['ok']) {
+		$out .= ' <span class="dst-badge dst-unknown">'.$langs->trans($unit['error'], dol_escape_htmltag($group['ref'])).'</span>';
+	}
+	if ($group['inscope'] && $group['tobatch'] && abs($cmp['doli_nolot']) > 1e-6) {
+		$out .= ' <span class="dst-nolot">'.dol_escape_htmltag($langs->transnoentities('DiamantutilsStockTableNoLotPart', diamantutils_stocktable_qty_text($cmp['doli_nolot'], $unit))).'</span>';
+	}
+	$out .= '</td>';
+	$out .= '<td class="right dst-total">'.diamantutils_stocktable_qty_html($cmp['table'], $unit).'</td>';
+	$out .= '<td></td>';
+	if ($group['inscope']) {
+		$out .= '<td class="right dst-total"><a href="'.DOL_URL_ROOT.'/product/stock/product.php?id='.((int) $group['id']).'" title="'.dol_escape_htmltag($langs->trans('Stock')).'">'.diamantutils_stocktable_qty_html($cmp['doli'], $unit).'</a></td>';
+		$out .= '<td class="right dst-total'.($cmp['state'] == DIAMANTUTILS_STOCK_DIFF ? ' dst-diff-txt' : '').'">'.diamantutils_stocktable_qty_html($cmp['diff'], $unit, true).'</td>';
+		$out .= '<td class="center">'.diamantutils_stocktable_badge($cmp['state']).'</td>';
+	} else {
+		$out .= '<td></td><td></td><td></td>';
+	}
+	$out .= '<td class="right nowraponall">';
+	if ($editable && $unit['ok']) {
+		$out .= '<button type="button" class="dst-btn dst-add" title="'.dol_escape_htmltag($langs->trans('DiamantutilsStockTableAddLine')).'">+</button>';
+	}
+	$out .= '</td>';
+	$out .= '</tr>';
+
+	// Lignes, regroupées par lot
+	foreach ($cmp['lots'] as $batch => $lot) {
+		$batch = (string) $batch;
+		$batchlabel = ($batch === '' ? '<span class="opacitymedium">'.$langs->trans('DiamantutilsStockTableNoLot').'</span>' : dol_escape_htmltag($batch));
+		$nblines = count($lot['lines']);
+
+		$lotcells = '';
+		if ($group['inscope']) {
+			$lotcells .= '<td class="right"'.($nblines > 1 ? ' rowspan="'.$nblines.'"' : '').'>'.diamantutils_stocktable_qty_html($lot['doli'], $unit).'</td>';
+			$lotcells .= '<td class="right'.($lot['state'] == DIAMANTUTILS_STOCK_DIFF ? ' dst-diff-txt' : '').'"'.($nblines > 1 ? ' rowspan="'.$nblines.'"' : '').'>'.($nblines ? diamantutils_stocktable_qty_html($lot['diff'], $unit, true) : '').'</td>';
+			$lotcells .= '<td class="center"'.($nblines > 1 ? ' rowspan="'.$nblines.'"' : '').'>'.diamantutils_stocktable_badge($lot['state']).'</td>';
+		} else {
+			$lotcells .= '<td'.($nblines > 1 ? ' rowspan="'.$nblines.'"' : '').'></td><td'.($nblines > 1 ? ' rowspan="'.$nblines.'"' : '').'></td><td'.($nblines > 1 ? ' rowspan="'.$nblines.'"' : '').'></td>';
+		}
+
+		// Lot présent seulement dans Dolibarr : ligne grisée « à saisir »
+		if (!$nblines) {
+			$out .= '<tr class="dst-line dst-toenter" data-batch="'.dol_escape_htmltag($batch).'">';
+			$out .= '<td class="dst-lot nowraponall">'.img_picto('', 'lot', 'class="pictofixedwidth"').$batchlabel.'</td>';
+			$out .= '<td colspan="7"><span class="opacitymedium">'.($batch === '' ? $langs->trans('DiamantutilsStockTableNoLotStock') : $langs->trans('DiamantutilsStockTableToEnter')).'</span></td>';
+			$out .= $lotcells;
+			$out .= '<td class="right nowraponall">';
+			if ($editable && $unit['ok'] && $batch !== '') {
+				$out .= '<button type="button" class="dst-btn dst-addlot" title="'.dol_escape_htmltag($langs->trans('DiamantutilsStockTableAddToTable')).'">'.$langs->trans('DiamantutilsStockTableAddToTable').'</button>';
+			}
+			$out .= '</td></tr>';
+			continue;
+		}
+
+		$first = true;
+		foreach ($lot['lines'] as $line) {
+			$colis = diamantutils_stock_colis($line['nb_pieces'], $line['pieces_per_colis'], $fmt, ' + ', $decsep);
+			$out .= '<tr class="dst-line" data-id="'.((int) $line['id']).'" data-batch="'.dol_escape_htmltag($batch).'"';
+			$out .= ' data-nb="'.dol_escape_htmltag((string) $line['nb_pieces']).'" data-per="'.dol_escape_htmltag((string) $line['pieces_per_colis']).'"';
+			$out .= ' data-larg="'.dol_escape_htmltag((string) $line['larg_mm']).'" data-long="'.dol_escape_htmltag((string) $line['long_mm']).'"';
+			$out .= ' data-soc="'.((int) $line['fk_soc']).'" data-note="'.dol_escape_htmltag($line['note']).'">';
+			$out .= '<td class="dst-lot nowraponall">'.($first ? img_picto('', 'lot', 'class="pictofixedwidth"').$batchlabel : '<span class="opacitymedium small dst-samelot">'.$batchlabel.'</span>');
+			if ($line['note'] !== '') {
+				$out .= '<br><span class="opacitymedium small">'.dol_escape_htmltag($line['note']).'</span>';
+			}
+			$out .= '</td>';
+			$out .= '<td class="nowraponall">'.dol_escape_htmltag($colis['text']);
+			if ($colis['warn'] === 'partial') {
+				$out .= ' '.img_warning($langs->trans('DiamantutilsStockColisPartial'));
+			}
+			$out .= '</td>';
+			$out .= '<td class="right">'.diamantutils_stock_num($line['nb_pieces'], 3, $decsep).'</td>';
+			$out .= '<td class="right">'.diamantutils_stock_num($line['pieces_per_colis'], 3, $decsep).'</td>';
+			$out .= '<td class="right">'.($line['larg_mm'] === null ? '' : diamantutils_stock_num($line['larg_mm'], 1, $decsep)).'</td>';
+			$out .= '<td class="right">'.($line['long_mm'] === null ? '' : diamantutils_stock_num($line['long_mm'], 1, $decsep)).'</td>';
+			$out .= '<td class="right">'.diamantutils_stocktable_qty_html($line['qty'], $unit);
+			if ($line['qty'] === null && $line['qty_error'] !== '') {
+				$out .= ' '.img_warning($langs->trans($line['qty_error'], $group['ref']));
+			}
+			$out .= '</td>';
+			$out .= '<td class="tdoverflowmax150">'.($line['fk_soc'] ? '<a href="'.DOL_URL_ROOT.'/societe/card.php?socid='.((int) $line['fk_soc']).'">'.dol_escape_htmltag($line['soc_name']).'</a>' : '').'</td>';
+			if ($first) {
+				$out .= $lotcells;
+			}
+			$out .= '<td class="right nowraponall">';
+			if ($editable && $unit['ok']) {
+				$out .= '<button type="button" class="dst-btn dst-edit" title="'.dol_escape_htmltag($langs->trans('Modify')).'">'.img_edit($langs->trans('Modify'), 0).'</button>';
+			}
+			if (!empty($perms['delete'])) {
+				$out .= '<button type="button" class="dst-btn dst-delete" title="'.dol_escape_htmltag($langs->trans('Delete')).'">'.img_delete($langs->trans('Delete')).'</button>';
+			}
+			$out .= '</td>';
+			$out .= '</tr>';
+			$first = false;
+		}
+	}
+
+	$out .= '</tbody>';
+	return $out;
+}
