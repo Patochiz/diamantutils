@@ -1,0 +1,261 @@
+/* DiamantUtils — tableau de stock par lots */
+
+.dst-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 14px;
+	margin: 12px 0 8px;
+}
+.dst-toolbar-right {
+	margin-left: auto;
+	display: flex;
+	gap: 6px;
+}
+.dst-onlydiff-label {
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+/* En-tête de colonnes figé : défilement dans la zone du tableau */
+.dst-wrap {
+	max-height: calc(100vh - 230px);
+	min-height: 300px;
+	overflow: auto;
+	border: 1px solid #ddd;
+	/* Ne pas élargir la page (#id-container est une table) : défilement horizontal ici */
+	contain: inline-size;
+}
+.dst-table {
+	border-collapse: separate;
+	border-spacing: 0;
+	margin: 0 !important;
+}
+.dst-table thead th {
+	position: sticky;
+	top: 0;
+	z-index: 3;
+	background: var(--colorbacktitle1, #f0f0f0);
+	box-shadow: 0 1px 0 #ccc;
+}
+.dst-table td {
+	padding: 4px 6px;
+	border-bottom: 1px solid #eee;
+	vertical-align: middle;
+}
+
+/* Groupe produit */
+.dst-head td {
+	background: var(--colorbacklinepair2, #f6f7f9);
+	border-top: 2px solid #c9ced6;
+	padding-top: 6px;
+	padding-bottom: 6px;
+}
+.dst-head-product {
+	white-space: normal;
+}
+.dst-total {
+	font-weight: bold;
+}
+.dst-toggle {
+	border: none;
+	background: transparent;
+	cursor: pointer;
+	padding: 0 6px 0 0;
+	vertical-align: middle;
+}
+.dst-caret {
+	display: inline-block;
+	width: 0;
+	height: 0;
+	border-left: 5px solid transparent;
+	border-right: 5px solid transparent;
+	border-top: 7px solid #555;
+	transition: transform .15s;
+}
+.dst-group.dst-collapsed .dst-caret {
+	transform: rotate(-90deg);
+}
+.dst-group.dst-collapsed tr:not(.dst-head) {
+	display: none;
+}
+.dst-group.dst-hidden,
+.dst-empty.hidden,
+.dst-productpicker.hidden {
+	display: none;
+}
+.dst-nolot {
+	margin-left: 8px;
+	font-size: 0.9em;
+	color: #8a5a00;
+}
+
+/* Lignes */
+.dst-line:hover td {
+	background: rgba(0, 0, 0, 0.025);
+}
+.dst-toenter td {
+	background: #f3f3f3;
+	color: #777;
+	font-style: italic;
+}
+.dst-samelot {
+	padding-left: 22px;
+}
+.dst-diff-txt {
+	color: #b3261e;
+	font-weight: bold;
+}
+
+/* Pastilles d'état */
+.dst-badge {
+	display: inline-block;
+	padding: 1px 7px;
+	border-radius: 9px;
+	font-size: 0.85em;
+	font-weight: bold;
+	white-space: nowrap;
+	color: #fff;
+	background: #888;
+}
+.dst-ok { background: #2e7d32; }
+.dst-diff { background: #c62828; }
+.dst-doli_only, .dst-table_only { background: #ef6c00; }
+.dst-unknown { background: #757575; }
+.dst-outofscope { background: #9e9e9e; }
+
+/* Boutons */
+.dst-btn {
+	border: 1px solid #c9ced6;
+	background: #fff;
+	border-radius: 4px;
+	cursor: pointer;
+	padding: 1px 7px;
+	margin-left: 3px;
+	line-height: 1.4;
+}
+.dst-btn:hover {
+	background: #eef2f7;
+}
+.dst-add {
+	font-weight: bold;
+	font-size: 1.1em;
+	min-width: 26px;
+}
+
+/* Saisie en ligne */
+.dst-editrow td {
+	background: #fffbe6;
+	border-top: 1px solid #f0d36b;
+	border-bottom: 1px solid #f0d36b;
+}
+.dst-editrow input[type="text"],
+.dst-editrow input[type="number"] {
+	width: 70px;
+	box-sizing: border-box;
+}
+.dst-editrow input.dst-f-newlot,
+.dst-editrow input.dst-f-note {
+	width: 150px;
+}
+.dst-editrow select {
+	max-width: 190px;
+}
+.dst-editrow .dst-warn {
+	display: block;
+	color: #8a5a00;
+	font-size: 0.85em;
+	margin-top: 3px;
+	white-space: normal;
+}
+.dst-editrow .dst-err {
+	display: block;
+	color: #b3261e;
+	font-weight: bold;
+	white-space: normal;
+}
+.dst-editrow .dst-hint {
+	display: block;
+	font-size: 0.8em;
+	color: #777;
+	white-space: normal;
+}
+.dst-required::after {
+	content: " *";
+	color: #b3261e;
+}
+
+/* Recherche « + Produit » */
+.dst-productpicker {
+	margin: 0 0 8px;
+	padding: 8px;
+	border: 1px solid #c9ced6;
+	background: #fafbfc;
+}
+.dst-productpicker ul {
+	list-style: none;
+	margin: 6px 0 0;
+	padding: 0;
+	max-height: 260px;
+	overflow: auto;
+}
+.dst-productpicker li {
+	padding: 4px 6px;
+	cursor: pointer;
+}
+.dst-productpicker li:hover,
+.dst-productpicker li.dst-active {
+	background: #e3ecf7;
+}
+
+@media (max-width: 768px) {
+	.dst-wrap {
+		max-height: none;
+	}
+	.dst-toolbar-right {
+		margin-left: 0;
+	}
+}
+.dst-lot {
+	min-width: 90px;
+}
+.dst-table .hidden,
+.dst-editrow .hidden {
+	display: none !important;
+}
+.dst-line + .dst-line td.dst-cont {
+	border-top-color: transparent;
+}
+
+/* Sections par tag */
+.dst-section-head td {
+	background: var(--colorbacktitle1, #e6e9ee);
+	border-top: 3px solid #8c97a8;
+	padding: 8px 6px;
+	font-size: 1.05em;
+}
+.dst-section + .dst-group .dst-head td {
+	border-top-width: 1px;
+}
+.dst-section-toggle {
+	border: none;
+	background: transparent;
+	cursor: pointer;
+	padding: 0 6px 0 0;
+	vertical-align: middle;
+}
+.dst-section.dst-section-collapsed .dst-caret {
+	transform: rotate(-90deg);
+}
+.dst-section-path {
+	color: #777;
+}
+.dst-section-label {
+	font-weight: bold;
+	text-transform: uppercase;
+	letter-spacing: .02em;
+}
+.dst-group.dst-sec-hidden,
+.dst-section.dst-hidden {
+	display: none;
+}
