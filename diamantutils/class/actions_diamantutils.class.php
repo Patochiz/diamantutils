@@ -20,6 +20,10 @@
  *  - doActions : action addlot (insertion du lot par addline()), confirm_diamantutils_savelot ;
  *  - addMoreActionsButtons / formConfirm : « Enregistrer comme lot ».
  *
+ * Colisage sur l'onglet Stock (stockproductcard, product/stock/product.php) :
+ *  - addMoreActionsButtons : tableau de remplacement (lib/stockcolisage.lib.php) pour un
+ *    produit à lots, colonne Colisage modifiable ; tableau natif masqué par JS ensuite.
+ *
  * Liaison des commandes fournisseurs (ordersuppliercard) :
  *  - showLinkToObjectBlock : entrée « Lier à une commande fournisseur » (clé supplierorder,
  *    tous fournisseurs). La fiche exclut les clés order_supplier et supplier_order du menu ;
@@ -554,6 +558,13 @@ jQuery(function ($) {
 
 		$this->resprints = '';
 		$contexts = explode(':', (string) $parameters['context']);
+
+		// Onglet Stock de la fiche produit : tableau de remplacement avec colonne Colisage
+		if (in_array('stockproductcard', $contexts)) {
+			$this->printStockColisage($object, $action);
+			return 0;	// boutons natifs « Transférer / Corriger le stock » affichés aussi
+		}
+
 		if ($this->lotPieceElement($contexts, $object) === '' || in_array($action, array('editline', 'presend'))) {
 			return 0;
 		}
@@ -567,6 +578,33 @@ jQuery(function ($) {
 		print dolGetButtonAction($langs->trans('DiamantutilsLotSaveAs'), '', 'default', $url, 'diamantutils-savelot', 1);
 
 		return 0;
+	}
+
+	/**
+	 * Onglet Stock d'un produit à lots : affiche le tableau du module (colonne Colisage).
+	 *
+	 * Le bloc est affiché masqué ; js/stockcolisage.js le place devant le tableau natif et ne
+	 * masque celui-ci qu'ensuite. Toute erreur est journalisée et rien n'est affiché : le
+	 * tableau natif reste alors visible.
+	 *
+	 * @param	Object	$object		Produit de la page
+	 * @param	string	$action		Action de la page
+	 * @return	void
+	 */
+	private function printStockColisage($object, $action)
+	{
+		if ($action == 'editline') {
+			return;	// édition native d'une ligne de lot (désactivée dans le cœur) : tableau natif
+		}
+		try {
+			dol_include_once('/diamantutils/lib/stockcolisage.lib.php');
+			if (!function_exists('diamantutils_stockcolisage_applies') || !diamantutils_stockcolisage_applies($object)) {
+				return;
+			}
+			print diamantutils_stockcolisage_render($this->db, $object);
+		} catch (Throwable $e) {
+			dol_syslog(__METHOD__.' '.$e->getMessage(), LOG_ERR);
+		}
 	}
 
 	/**

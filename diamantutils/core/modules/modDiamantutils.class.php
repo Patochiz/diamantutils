@@ -18,16 +18,16 @@ class modDiamantutils extends DolibarrModules
 		$this->family = 'custom';
 		$this->module_position = '90';
 		$this->name = preg_replace('/^mod/i', '', get_class($this));
-		$this->description = "Module interne Diamant Industrie : ordres de transformation de stock par lots (menu GPAO), commandes sous-traitées livrées directement au client, listes personnalisées SQL (menu Outils) description pour devis sur la fiche produit et lots de produits ajoutés en une fois sur les devis et commandes (menu Commerce), liaison d'une commande fournisseur à une commande d'un autre fournisseur, tableau de stock par lots comparé au stock Dolibarr";
-		$this->descriptionlong = "Transformation de stock par lots : consommation de N lots et production de M lots (découpe de profilés, peinture, changement d'unité), avec saisie en pièces × longueur, contrôle d'équilibre, gestion des restes et des pertes, calcul du coût et traçabilité des mouvements de stock. Commandes sous-traitées : réception sur l'entrepôt Sous-traitance avec lot = ref de la commande fournisseur, BL client prélevé sur ce lot. Listes personnalisées : requêtes SQL en lecture seule enregistrées par un administrateur, consultables avec recherche, tri, pagination et export CSV. Description pour devis : texte saisi sur la fiche produit, repris sur les lignes de propositions commerciales à la place de la description standard. Lots de produits : ensembles prédéfinis de produits et quantités, ajoutés en une fois (avec multiplicateur) sur un devis ou une commande client en brouillon, aux prix et descriptions de la saisie standard. Liaison des commandes fournisseurs : entrée « Lier à une commande fournisseur » du bloc Objets liés de la commande fournisseur, tous fournisseurs confondus (commande de transport liée aux commandes qu'elle enlève). Tableau de stock par lots (menu Produits → Stock) : colisage constaté par lot (pièces, pièces par colis, dimensions) pour les produits des tags choisis, comparé au stock réel Dolibarr par produit et par lot, sans aucun mouvement de stock.";
+		$this->description = "Module interne Diamant Industrie : ordres de transformation de stock par lots (menu GPAO), commandes sous-traitées livrées directement au client, listes personnalisées SQL (menu Outils) description pour devis sur la fiche produit et lots de produits ajoutés en une fois sur les devis et commandes (menu Commerce), liaison d'une commande fournisseur à une commande d'un autre fournisseur, tableau de stock par lots comparé au stock Dolibarr, colonne Colisage modifiable sur l'onglet Stock de la fiche produit";
+		$this->descriptionlong = "Transformation de stock par lots : consommation de N lots et production de M lots (découpe de profilés, peinture, changement d'unité), avec saisie en pièces × longueur, contrôle d'équilibre, gestion des restes et des pertes, calcul du coût et traçabilité des mouvements de stock. Commandes sous-traitées : réception sur l'entrepôt Sous-traitance avec lot = ref de la commande fournisseur, BL client prélevé sur ce lot. Listes personnalisées : requêtes SQL en lecture seule enregistrées par un administrateur, consultables avec recherche, tri, pagination et export CSV. Description pour devis : texte saisi sur la fiche produit, repris sur les lignes de propositions commerciales à la place de la description standard. Lots de produits : ensembles prédéfinis de produits et quantités, ajoutés en une fois (avec multiplicateur) sur un devis ou une commande client en brouillon, aux prix et descriptions de la saisie standard. Liaison des commandes fournisseurs : entrée « Lier à une commande fournisseur » du bloc Objets liés de la commande fournisseur, tous fournisseurs confondus (commande de transport liée aux commandes qu'elle enlève). Tableau de stock par lots (menu Produits → Stock) : colisage constaté par lot (pièces, pièces par colis, dimensions) pour les produits des tags choisis, comparé au stock réel Dolibarr par produit et par lot, sans aucun mouvement de stock. Colisage sur l'onglet Stock : pour un produit géré par lots, tableau du stock par entrepôt et par lot sans les colonnes de dates et de valorisation, avec l'attribut colisage du lot modifiable directement dans le tableau.";
 		$this->editor_name = 'Diamant Industrie';
-		$this->version = '2.10';
+		$this->version = '2.12';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'generic';
 
 		// Format plat (le format imbriqué data/entity casse l'enregistrement en v20)
 		$this->module_parts = array(
-			'hooks' => array('ordersupplierdispatch', 'receptioncard', 'ordershipmentcard', 'expeditioncard', 'productcard', 'propalcard', 'ordercard', 'ordersuppliercard'),
+			'hooks' => array('ordersupplierdispatch', 'receptioncard', 'ordershipmentcard', 'expeditioncard', 'productcard', 'propalcard', 'ordercard', 'ordersuppliercard', 'stockproductcard'),
 			'triggers' => 1,
 		);
 
@@ -161,6 +161,33 @@ class modDiamantutils extends DolibarrModules
 				'chaine',
 				'1',
 				'Tableau de stock par lots : inclure les sous-catégories des tags choisis (1 = oui)',
+				0,
+				'current',
+				0
+			),
+			14 => array(
+				'DIAMANTUTILS_STOCKCOLISAGE_ENABLED',
+				'chaine',
+				'0',
+				'Onglet Stock de la fiche produit : colonne Colisage modifiable pour les produits à lots (1 = active)',
+				0,
+				'current',
+				0
+			),
+			15 => array(
+				'DIAMANTUTILS_STOCKCOLISAGE_EXTRAFIELD',
+				'chaine',
+				'colisage',
+				'Onglet Stock de la fiche produit : code de l\'attribut supplémentaire du lot affiché dans la colonne Colisage',
+				0,
+				'current',
+				0
+			),
+			16 => array(
+				'DIAMANTUTILS_STOCKCOLISAGE_AUTO',
+				'chaine',
+				'1',
+				'Colisage du lot calculé (pièces par colis, qté par pièce, quantité du lot) et tenu à jour à chaque mouvement de stock : 1 = actif',
 				0,
 				'current',
 				0
@@ -465,12 +492,19 @@ class modDiamantutils extends DolibarrModules
 			return -1;
 		}
 
+		// Colisage calculé : attributs du lot pieces_par_colis et qte_par_piece
+		dol_include_once('/diamantutils/lib/stockcolisage.lib.php');
+		if (diamantutils_colisage_install_extrafields($this->db, $error) < 0) {
+			$this->error = $error;
+			return -1;
+		}
+
 		return $this->_init(array(), $options);
 	}
 
 	public function remove($options = '')
 	{
-		// Les extrafields diam_livraison_directe et desc_propal et l'entrepôt Sous-traitance
+		// Les extrafields diam_livraison_directe, desc_propal, pieces_par_colis, qte_par_piece et l'entrepôt Sous-traitance
 		// portent des données : conservés
 		return $this->_remove(array(), $options);
 	}
