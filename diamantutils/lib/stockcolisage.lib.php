@@ -352,6 +352,32 @@ function diamantutils_stockcolisage_num_title($colisage)
 }
 
 /**
+ * Libellés de l'édition en ligne (js/stockcolisage.js), communs à l'onglet Stock et au tableau
+ * de stock par lots
+ *
+ * @return	array
+ */
+function diamantutils_stockcolisage_js_lang()
+{
+	global $langs;
+
+	$langs->loadLangs(array('diamantutils@diamantutils'));
+	return array(
+		'save' => $langs->transnoentitiesnoconv('DiamantutilsStockColisageSaved'),
+		'error' => $langs->transnoentitiesnoconv('Error'),
+		'network' => $langs->transnoentitiesnoconv('DiamantutilsStockColisageErrNetwork'),
+		'refused' => $langs->transnoentitiesnoconv('DiamantutilsStockColisageErrRefused'),
+		'htmlWarning' => $langs->transnoentitiesnoconv('DiamantutilsStockColisageHtmlWarning'),
+		'placeholder' => $langs->transnoentitiesnoconv('DiamantutilsStockColisagePlaceholder'),
+		'editTitle' => $langs->transnoentitiesnoconv('DiamantutilsStockColisageEditTitle'),
+		'autoTitle' => $langs->transnoentitiesnoconv('DiamantutilsColisageAutoTitle'),
+		'numTitle' => $langs->transnoentitiesnoconv('DiamantutilsColisageNumTitle'),
+		// Format avec %s complété par le script : texte brut (transnoentitiesnoconv() viderait le %s)
+		'replaced' => (isset($langs->tab_translate['DiamantutilsColisageReplaced']) ? (string) $langs->tab_translate['DiamantutilsColisageReplaced'] : 'DiamantutilsColisageReplaced'),
+	);
+}
+
+/**
  * HTML du tableau de remplacement (bloc #dut-stockcolisage, masqué jusqu'à son placement par JS)
  *
  * @param	DoliDB	$db		Base de données
@@ -433,18 +459,7 @@ function diamantutils_stockcolisage_render($db, $object)
 		'canEditNum' => $caneditnum,
 		'maxLength' => 200,
 		'showAll' => $showall,
-		'lang' => array(
-			'save' => $langs->transnoentitiesnoconv('DiamantutilsStockColisageSaved'),
-			'error' => $langs->transnoentitiesnoconv('Error'),
-			'network' => $langs->transnoentitiesnoconv('DiamantutilsStockColisageErrNetwork'),
-			'refused' => $langs->transnoentitiesnoconv('DiamantutilsStockColisageErrRefused'),
-			'htmlWarning' => $langs->transnoentitiesnoconv('DiamantutilsStockColisageHtmlWarning'),
-			'placeholder' => $langs->transnoentitiesnoconv('DiamantutilsStockColisagePlaceholder'),
-			'editTitle' => $langs->transnoentitiesnoconv('DiamantutilsStockColisageEditTitle'),
-			'autoTitle' => $langs->transnoentitiesnoconv('DiamantutilsColisageAutoTitle'),
-			'numTitle' => $langs->transnoentitiesnoconv('DiamantutilsColisageNumTitle'),
-			'replaced' => $langs->transnoentitiesnoconv('DiamantutilsColisageReplaced'),
-		),
+		'lang' => diamantutils_stockcolisage_js_lang(),
 	);
 
 	$out = '<link rel="stylesheet" href="'.dol_buildpath('/diamantutils/css/stockcolisage.css', 1).'?v=2.12">'."\n";
@@ -1208,7 +1223,7 @@ function diamantutils_stockcolisage_lot_rows($db, $fk_product, $batch)
  * @param	string		$field			DIAMANTUTILS_STOCKCOLISAGE_PPC ou DIAMANTUTILS_STOCKCOLISAGE_QPP
  * @param	string|null	$value			Valeur validée (diamantutils_stockcolisage_parse_num)
  * @param	string		$error			Message d'erreur en sortie
- * @return	array|false					array('mode', 'ppc', 'qpp', 'colisage', 'replaced'), false si erreur
+ * @return	array|false					array('mode', 'ppc', 'qpp', 'colisage', 'replaced', 'warn'), false si erreur
  */
 function diamantutils_stockcolisage_save_num($db, $user, $fk_product, $lot, $field, $value, &$error)
 {
@@ -1240,10 +1255,11 @@ function diamantutils_stockcolisage_save_num($db, $user, $fk_product, $lot, $fie
 	$qpp = (isset($productlot->array_options['options_'.DIAMANTUTILS_STOCKCOLISAGE_QPP]) ? $productlot->array_options['options_'.DIAMANTUTILS_STOCKCOLISAGE_QPP] : null);
 	$old = (isset($productlot->array_options['options_'.$code]) ? $productlot->array_options['options_'.$code] : null);
 
-	$res = array('mode' => 'manual', 'ppc' => $ppc, 'qpp' => $qpp, 'colisage' => $old, 'replaced' => '');
+	$res = array('mode' => 'manual', 'ppc' => $ppc, 'qpp' => $qpp, 'colisage' => $old, 'replaced' => '', 'warn' => '');
 	$calc = diamantutils_colisage_compute(diamantutils_stockcolisage_lot_total_qty($db, $fk_product, $lot['batch']), $qpp, $ppc);
 	if ($calc['mode'] == 'auto') {
 		$res['mode'] = 'auto';
+		$res['warn'] = $calc['warn'];
 		$new = diamantutils_stockcolisage_storage_value($calc['text']);
 		// Lot qui passe en mode automatique : texte saisi à la main remplacé, signalé en retour
 		$wasauto = ($lot['lotid'] > 0 && diamantutils_stockcolisage_lot_was_auto($db, $lot['lotid']));

@@ -7,7 +7,8 @@
  *      → {ok: true, field, mode: 'manual', value: "<texte affiché>"} ;
  *  - field=pieces_par_colis|qte_par_piece, value=<nombre ou vide> : attribut du lot, puis
  *    colisage recalculé (quantité totale du lot) dans la même écriture
- *      → {ok: true, field, mode, value, ppc, qpp, colisage, replaced, numTitle, rows: [{warehouse, text, warn}]} ;
+ *      → {ok: true, field, mode, value, ppc, qpp, colisage, warn (quantité totale), replaced, numTitle,
+ *         rows: [{warehouse, text, warn}]} ;
  *  - erreur → {ok: false, error: "<message>"}.
  * Le lot est retrouvé ici à partir de (produit, numéro de lot, entité) : aucun identifiant de
  * lot envoyé par le navigateur n'est utilisé. Jeton CSRF vérifié ici (NOCSRFCHECK défini).
@@ -167,6 +168,7 @@ try {
 		'ppc' => diamantutils_stockcolisage_num_display(DIAMANTUTILS_STOCKCOLISAGE_PPC, $res['ppc']),
 		'qpp' => diamantutils_stockcolisage_num_display(DIAMANTUTILS_STOCKCOLISAGE_QPP, $res['qpp']),
 		'colisage' => diamantutils_stockcolisage_text($res['colisage']),
+		'warn' => $res['warn'],
 		'colisageHtml' => diamantutils_stockcolisage_is_html($res['colisage']),
 		'replaced' => $res['replaced'],
 		'numTitle' => ($res['mode'] == 'auto' ? '' : diamantutils_stockcolisage_num_title($res['colisage'])),

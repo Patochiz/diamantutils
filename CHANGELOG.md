@@ -1,5 +1,15 @@
 # Changelog — DiamantUtils
 
+## 2.13 — Tableau de stock par lots : données Dolibarr seules
+
+- Colonnes **Lot, Colisage, Pièces par colis, Qté par pièce, Quantité** : attributs du lot et stock réel, à la place des lignes saisies (pièces, pièces par colis, largeur, longueur, fournisseur, note) et du comparatif (écart, états, tolérance, filtre « écarts seulement »).
+- Quantité d'un lot : stock réel hors entrepôts ignorés du colisage (`DIAMANTUTILS_STOCKCOLISAGE_EXCLUDE_WAREHOUSES`), la même que celle du colisage enregistré. Stock non rattaché à un lot affiché sur une ligne à part. Produits sans stock non affichés.
+- Pièces par colis, qté par pièce et colisage manuel modifiables dans le tableau, avec le même mécanisme et les mêmes droits que l'onglet Stock (`js/stockcolisage.js` partagé, `ajax/lotcolisage.php`).
+- Conservés : tags et sous-catégories, sections, recherche (produit, lot, colisage), filtre par tag, repli mémorisé.
+- Supprimés : `ajax/stocktable.php`, `class/stockline.class.php`, `test/stocktable_calc_*.php`, droits `stocktable` *write* et *delete*, réglages tolérance et entrepôts exclus du tableau. **La table `llx_diamantutils_stockline` et ses lignes sont conservées** (plus affichées ; nombre rappelé dans l'onglet de configuration).
+- Correction (onglet Stock, v2.12) : le message « colisage saisi à la main remplacé » affichait un texte vide au lieu de l'ancien colisage.
+- Mise à jour : déposer les fichiers, **supprimer sur le serveur** `ajax/stocktable.php`, `class/stockline.class.php`, `test/stocktable_calc_cases.php` et `test/stocktable_calc_test.php` (un dépôt FTP ne les retire pas), puis **désactiver et réactiver le module** (droits).
+
 ## 2.12 — Colisage calculé et tenu à jour
 
 - Nouveaux attributs du lot **Pièces par colis** (`pieces_par_colis`, entier) et **Qté par pièce** (`qte_par_piece`, décimal 24,8), créés à l'activation du module (idempotent).

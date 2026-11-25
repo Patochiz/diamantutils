@@ -1,7 +1,9 @@
 /**
- * DiamantUtils — onglet Stock de la fiche produit : tableau avec colonne Colisage
+ * DiamantUtils — colisage des lots : onglet Stock de la fiche produit et tableau de stock par lots
  *
- * Sans bibliothèque externe. Configuration : attribut data-config du bloc #dut-stockcolisage.
+ * Sans bibliothèque externe. Configuration : attribut data-config du bloc #dut-stockcolisage
+ * (onglet Stock) ou du bloc .dut-sc-standalone (tableau de stock par lots : pas de placement,
+ * produit de chaque cellule lu sur l'élément [data-product] qui la contient).
  *  - place le bloc juste avant le tableau natif, l'affiche, puis masque le tableau natif ;
  *    tableau natif introuvable ou erreur : le bloc est retiré, le tableau natif reste visible ;
  *  - repli / dépli des lots par entrepôt, « Afficher tous les lots » / « Masquer les lots » ;
@@ -13,6 +15,11 @@
 	'use strict';
 
 	var block = document.getElementById('dut-stockcolisage');
+	var standalone = false;
+	if (!block) {
+		block = document.querySelector('.dut-sc-standalone');
+		standalone = !!block;
+	}
 	if (!block) {
 		return;
 	}
@@ -21,7 +28,9 @@
 	try {
 		cfg = JSON.parse(block.getAttribute('data-config') || '{}');
 	} catch (e) {
-		block.parentNode.removeChild(block);
+		if (!standalone) {
+			block.parentNode.removeChild(block);
+		}
 		return;
 	}
 	var lang = cfg.lang || {};
@@ -119,9 +128,13 @@
 	}
 
 	/* Édition en ligne : colisage (mode manuel), pièces par colis, qté par pièce */
-	function cellsOf(batch, field) {
+	function productOf(td) {
+		var holder = td.closest('[data-product]');
+		return holder ? String(holder.getAttribute('data-product')) : String(cfg.product);
+	}
+	function cellsOf(product, batch, field) {
 		return Array.prototype.filter.call(block.querySelectorAll('td[data-field="' + field + '"]'), function (td) {
-			return td.getAttribute('data-batch') === batch;
+			return td.getAttribute('data-batch') === batch && productOf(td) === product;
 		});
 	}
 
@@ -182,13 +195,14 @@
 		}
 	}
 
-	/* Réponse d'un champ numérique : valeurs du lot et colisage de toutes ses lignes */
-	function applyNumResult(batch, data) {
-		cellsOf(batch, 'pieces_par_colis').forEach(function (td) {
+	/* Réponse d'un champ numérique : valeurs du lot et colisage de toutes ses lignes
+	   (ligne d'un entrepôt, ou ligne « 0 » = quantité totale du lot dans le tableau de stock) */
+	function applyNumResult(product, batch, data) {
+		cellsOf(product, batch, 'pieces_par_colis').forEach(function (td) {
 			setView(td, data.ppc || '');
 			td.setAttribute('title', data.numTitle || '');
 		});
-		cellsOf(batch, 'qte_par_piece').forEach(function (td) {
+		cellsOf(product, batch, 'qte_par_piece').forEach(function (td) {
 			setView(td, data.qpp || '');
 			td.setAttribute('title', data.numTitle || '');
 		});
@@ -196,9 +210,10 @@
 		(data.rows || []).forEach(function (r) {
 			rows[String(r.warehouse)] = r;
 		});
-		cellsOf(batch, 'colisage').forEach(function (td) {
+		cellsOf(product, batch, 'colisage').forEach(function (td) {
 			if (data.mode === 'auto') {
-				var r = rows[td.getAttribute('data-warehouse')] || {text: '', warn: ''};
+				var wh = td.getAttribute('data-warehouse');
+				var r = (wh === '0') ? {text: data.colisage || '', warn: data.warn || ''} : (rows[wh] || {text: '', warn: ''});
 				setColisageAuto(td, r.text, r.warn);
 			} else {
 				setColisageManual(td, data.colisage || '', !!data.colisageHtml);
@@ -209,11 +224,12 @@
 	function save(td, input, value, original) {
 		var field = td.getAttribute('data-field') || 'colisage';
 		var batch = td.getAttribute('data-batch');
+		var product = productOf(td);
 		td.classList.add('dut-sc-saving');
 		input.disabled = true;
 		var body = new URLSearchParams();
 		body.append('token', cfg.token);
-		body.append('fk_product', String(cfg.product));
+		body.append('fk_product', product);
 		body.append('batch', batch);
 		body.append('field', field);
 		body.append(field === 'colisage' ? 'colisage' : 'value', value);
@@ -241,7 +257,7 @@
 					td.setAttribute('data-html', '0');
 					flash(td, '✓', false);
 				} else {
-					applyNumResult(batch, data);
+					applyNumResult(product, batch, data);
 					flash(td, data.replaced ? '✓ ' + (lang.replaced || '').replace('%s', data.replaced) : '✓', false);
 				}
 			} else {
@@ -337,9 +353,17 @@
 		});
 	}
 
+	function init() {
+		if (!standalone) {
+			place();
+		} else if (cfg.canEdit || cfg.canEditNum) {
+			bindEdit();
+		}
+	}
+
 	if (document.readyState === 'loading') {
-		document.addEventListener('DOMContentLoaded', place);
+		document.addEventListener('DOMContentLoaded', init);
 	} else {
-		place();
+		init();
 	}
 })();
