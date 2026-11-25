@@ -404,6 +404,7 @@ DiamantutilsStockColisageEditTitle = Click to edit the packing (Enter: save, Esc
 DiamantutilsStockColisagePlaceholder = Packing…
 DiamantutilsStockColisageHtmlWarning = Formatting entered on the lot card will be lost: the text will be saved without tags.
 DiamantutilsStockColisageErrNetwork = Communication error with the server
+DiamantutilsStockColisageErrRefused = Value refused by the Dolibarr protection (forbidden tag or script): enter plain text.
 DiamantutilsStockColisageErrToken = Invalid or expired security token: reload the page.
 DiamantutilsStockColisageErrMethod = Request refused (POST expected).
 DiamantutilsStockColisageErrProduct = Product not found or not batch-managed.

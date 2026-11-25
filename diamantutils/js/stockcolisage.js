@@ -169,7 +169,8 @@
 				try {
 					data = JSON.parse(txt);
 				} catch (e) {
-					data = {ok: false, error: (lang.network || 'Error') + ' (HTTP ' + resp.status + ')'};
+					// Réponse non JSON : refus de la protection anti-injection de Dolibarr (403) ou erreur serveur
+					data = {ok: false, error: (resp.status === 403 && lang.refused) ? lang.refused : (lang.network || 'Error') + ' (HTTP ' + resp.status + ')'};
 				}
 				return data;
 			});

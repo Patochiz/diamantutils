@@ -93,6 +93,10 @@ function diamantutils_stockcolisage_is_html($raw)
 /**
  * Texte affiché et édité pour une valeur enregistrée : sans balises, sur une ligne
  *
+ * Valeur saisie ici (échappée, sans balise) : entités décodées, le texte saisi revient tel
+ * quel (« <unité> » reste visible). Valeur avec balises (saisie depuis la fiche lot) :
+ * aplatie par dol_string_nohtmltag().
+ *
  * @param	string|null	$raw	Valeur enregistrée (attribut « Texte HTML »)
  * @return	string				Texte brut (à échapper à l'affichage)
  */
@@ -101,7 +105,26 @@ function diamantutils_stockcolisage_text($raw)
 	if ($raw === null || $raw === '') {
 		return '';
 	}
-	return trim(dol_string_nohtmltag((string) $raw, 1));
+	if (diamantutils_stockcolisage_is_html($raw)) {
+		$text = dol_string_nohtmltag((string) $raw, 1);
+	} else {
+		$text = dol_html_entity_decode((string) $raw, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+		$text = str_replace(array("\r\n", "\r", "\n", "\t"), ' ', $text);
+	}
+	return trim(preg_replace('/\s{2,}/u', ' ', $text));
+}
+
+/**
+ * Valeur enregistrée pour un texte saisi : échappée (attribut « Texte HTML »), aucune balise
+ * active ; <b> et <strong> saisis restent du texte (keepb).
+ *
+ * @param	string	$text	Texte nettoyé
+ * @return	string|null		Valeur à enregistrer, null pour vider l'attribut
+ */
+function diamantutils_stockcolisage_storage_value($text)
+{
+	$text = (string) $text;
+	return ($text === '' ? null : dol_escape_htmltag($text, 1));
 }
 
 /**
@@ -252,10 +275,10 @@ function diamantutils_stockcolisage_cell($raw, $batch, $editable)
 		$attrs .= ' tabindex="0"';
 	}
 	if ($text !== '') {
-		$attrs .= ' title="'.dol_escape_htmltag($text).'"';
+		$attrs .= ' title="'.dol_escape_htmltag($text, 1).'"';
 	}
 
-	return '<td'.$attrs.'><span class="dut-sc-text">'.dol_escape_htmltag($text).'</span></td>';
+	return '<td'.$attrs.'><span class="dut-sc-text">'.dol_escape_htmltag($text, 1).'</span></td>';
 }
 
 /**
@@ -284,7 +307,7 @@ function diamantutils_stockcolisage_render($db, $object)
 
 	$code = diamantutils_stockcolisage_extrafield_code();
 	$hasfield = diamantutils_stockcolisage_extrafield_exists($db, $code);
-	$canedit = false;	// édition du colisage : phase 2
+	$canedit = ($hasfield && $user->hasRight('produit', 'creer'));
 
 	$lotids = array();
 	foreach ($data['warehouses'] as $wh) {
@@ -321,6 +344,7 @@ function diamantutils_stockcolisage_render($db, $object)
 			'save' => $langs->transnoentitiesnoconv('DiamantutilsStockColisageSaved'),
 			'error' => $langs->transnoentitiesnoconv('Error'),
 			'network' => $langs->transnoentitiesnoconv('DiamantutilsStockColisageErrNetwork'),
+			'refused' => $langs->transnoentitiesnoconv('DiamantutilsStockColisageErrRefused'),
 			'htmlWarning' => $langs->transnoentitiesnoconv('DiamantutilsStockColisageHtmlWarning'),
 			'placeholder' => $langs->transnoentitiesnoconv('DiamantutilsStockColisagePlaceholder'),
 			'editTitle' => $langs->transnoentitiesnoconv('DiamantutilsStockColisageEditTitle'),
@@ -419,4 +443,126 @@ function diamantutils_stockcolisage_render($db, $object)
 	$out .= '<script src="'.dol_buildpath('/diamantutils/js/stockcolisage.js', 1).'?v=2.11"></script>'."\n";
 
 	return $out;
+}
+
+/**
+ * Lot d'un produit retrouvé côté serveur à partir de (produit, numéro de lot, entité)
+ *
+ * Le lot doit exister dans le stock du produit (llx_product_batch, entrepôts de l'entité) ou
+ * dans les lots connus du produit (llx_product_lot de l'entité).
+ *
+ * @param	DoliDB	$db				Base de données
+ * @param	int		$fk_product		Id produit
+ * @param	string	$batch			Numéro de lot
+ * @return	array|null|false		array('lotid' => int (0 = pas de ligne product_lot), 'batch' => string),
+ *									null si lot inconnu, false si erreur SQL
+ */
+function diamantutils_stockcolisage_find_lot($db, $fk_product, $batch)
+{
+	$batch = (string) $batch;
+	if ((int) $fk_product <= 0 || $batch === '') {
+		return null;
+	}
+
+	$sql = "SELECT pl.rowid, pl.batch FROM ".MAIN_DB_PREFIX."product_lot as pl";
+	$sql .= " WHERE pl.fk_product = ".((int) $fk_product);
+	$sql .= " AND pl.batch = '".$db->escape($batch)."'";
+	$sql .= " AND pl.entity IN (".getEntity('productlot').")";
+	$sql .= " ORDER BY pl.rowid";
+	$resql = $db->query($sql);
+	if (!$resql) {
+		dol_syslog(__FUNCTION__.' '.$db->lasterror(), LOG_ERR);
+		return false;
+	}
+	$obj = $db->fetch_object($resql);
+	$db->free($resql);
+	if ($obj) {
+		return array('lotid' => (int) $obj->rowid, 'batch' => (string) $obj->batch);
+	}
+
+	$sql = "SELECT pb.batch FROM ".MAIN_DB_PREFIX."product_batch as pb";
+	$sql .= " INNER JOIN ".MAIN_DB_PREFIX."product_stock as ps ON ps.rowid = pb.fk_product_stock";
+	$sql .= " INNER JOIN ".MAIN_DB_PREFIX."entrepot as e ON e.rowid = ps.fk_entrepot";
+	$sql .= " WHERE ps.fk_product = ".((int) $fk_product);
+	$sql .= " AND pb.batch = '".$db->escape($batch)."'";
+	$sql .= " AND e.entity IN (".getEntity('stock').")";
+	$resql = $db->query($sql);
+	if (!$resql) {
+		dol_syslog(__FUNCTION__.' '.$db->lasterror(), LOG_ERR);
+		return false;
+	}
+	$obj = $db->fetch_object($resql);
+	$db->free($resql);
+	if ($obj) {
+		// Numéro exact du stock (la comparaison SQL peut ignorer la casse)
+		return array('lotid' => 0, 'batch' => (string) $obj->batch);
+	}
+	return null;
+}
+
+/**
+ * Texte saisi nettoyé : une ligne, sans caractères de contrôle, espaces superflus retirés
+ *
+ * @param	string	$text	Texte reçu
+ * @return	string
+ */
+function diamantutils_stockcolisage_clean_input($text)
+{
+	$text = preg_replace('/[\x00-\x1F\x7F]+/u', ' ', (string) $text);
+	return trim(preg_replace('/\s{2,}/u', ' ', (string) $text));
+}
+
+/**
+ * Enregistre le colisage d'un lot. Lot sans ligne product_lot : la ligne est créée
+ * (Productlot::create, attribut compris) ; sinon l'attribut du lot existant est mis à jour
+ * (array_options + insertExtraFields, comme la fiche lot).
+ *
+ * La valeur est enregistrée échappée (attribut de type « Texte HTML ») : aucune balise.
+ *
+ * @param	DoliDB	$db				Base de données
+ * @param	User	$user			Utilisateur
+ * @param	int		$fk_product		Id produit
+ * @param	array	$lot			Résultat de diamantutils_stockcolisage_find_lot()
+ * @param	string	$text			Texte nettoyé (diamantutils_stockcolisage_clean_input)
+ * @param	string	$code			Code de l'attribut (vérifié existant)
+ * @param	string	$error			Message d'erreur en sortie
+ * @return	string|false			Texte affiché après enregistrement, false si erreur
+ */
+function diamantutils_stockcolisage_save($db, $user, $fk_product, $lot, $text, $code, &$error)
+{
+	require_once DOL_DOCUMENT_ROOT.'/product/stock/class/productlot.class.php';
+
+	$error = '';
+	$value = diamantutils_stockcolisage_storage_value($text);
+	$key = 'options_'.$code;
+
+	$productlot = new Productlot($db);
+	if ($lot['lotid'] > 0) {
+		if ($productlot->fetch($lot['lotid']) <= 0) {
+			$error = ($productlot->error ? $productlot->error : implode(', ', $productlot->errors));
+			return false;
+		}
+		if (!is_array($productlot->array_options)) {
+			$productlot->array_options = array();
+		}
+		$productlot->array_options[$key] = $value;
+		if ($productlot->insertExtraFields('PRODUCT_LOT_MODIFY', $user) < 0) {
+			$error = ($productlot->error ? $productlot->error : implode(', ', $productlot->errors));
+			return false;
+		}
+	} else {
+		if ($value === null) {
+			return '';	// rien à enregistrer : la ligne product_lot n'est pas créée pour une valeur vide
+		}
+		$productlot->fk_product = (int) $fk_product;
+		$productlot->batch = $lot['batch'];
+		$productlot->fk_user_creat = (int) $user->id;
+		$productlot->array_options = array($key => $value);
+		if ($productlot->create($user) <= 0) {
+			$error = ($productlot->error ? $productlot->error : implode(', ', $productlot->errors));
+			return false;
+		}
+	}
+
+	return diamantutils_stockcolisage_text($value);
 }

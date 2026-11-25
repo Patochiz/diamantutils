@@ -404,6 +404,7 @@ DiamantutilsStockColisageEditTitle = Cliquer pour modifier le colisage (Entrée 
 DiamantutilsStockColisagePlaceholder = Colisage…
 DiamantutilsStockColisageHtmlWarning = La mise en forme saisie depuis la fiche du lot sera perdue : le texte sera enregistré sans balises.
 DiamantutilsStockColisageErrNetwork = Erreur de communication avec le serveur
+DiamantutilsStockColisageErrRefused = Valeur refusée par la protection de Dolibarr (balise ou script interdit) : saisissez du texte simple.
 DiamantutilsStockColisageErrToken = Jeton de sécurité invalide ou expiré : rechargez la page.
 DiamantutilsStockColisageErrMethod = Requête refusée (POST attendu).
 DiamantutilsStockColisageErrProduct = Produit introuvable ou non géré par lots.
