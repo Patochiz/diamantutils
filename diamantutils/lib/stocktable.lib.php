@@ -9,7 +9,12 @@
  *
  * Quantité d'un lot : stock réel total, hors entrepôts ignorés du colisage
  * (DIAMANTUTILS_STOCKCOLISAGE_EXCLUDE_WAREHOUSES) : c'est la quantité sur laquelle le colisage
- * enregistré est calculé.
+ * enregistré est calculé. Le stock des entrepôts ignorés est affiché sur une ligne à part.
+ *
+ * Par produit (v2.14) : stock physique (tous entrepôts), commandes client en cours (commandes
+ * validées ou en cours, moins les quantités des expéditions validées), commandes fournisseur
+ * en cours (commandes approuvées ou commandées, moins les quantités réceptionnées) et stock
+ * virtuel = physique − client + fournisseur.
  *
  * Les lignes saisies avant la v2.13 (llx_diamantutils_stockline) sont conservées en base, mais
  * ne sont plus lues ni modifiées.
@@ -17,7 +22,7 @@
 
 /** Nombre de colonnes du tableau */
 if (!defined('DIAMANTUTILS_STOCKTABLE_NBCOLS')) {
-	define('DIAMANTUTILS_STOCKTABLE_NBCOLS', 5);
+	define('DIAMANTUTILS_STOCKTABLE_NBCOLS', 8);
 }
 
 /**
@@ -215,8 +220,8 @@ function diamantutils_stocktable_scope_sql($catids)
 }
 
 /**
- * Données de l'écran : produits du périmètre ayant du stock, leurs lots en stock et les
- * attributs de ces lots. 4 requêtes quel que soit le nombre de produits.
+ * Données de l'écran : produits du périmètre ayant du stock ou des commandes en cours, leurs
+ * lots en stock et les attributs de ces lots. 7 requêtes quel que soit le nombre de produits.
  *
  * @param	DoliDB	$db			Base de données
  * @param	int[]	$catids		Catégories affichées (filtre par tag ou tout le périmètre)
@@ -237,12 +242,14 @@ function diamantutils_stocktable_load($db, $catids)
 		$whsql .= " AND e.rowid NOT IN (".implode(',', array_map('intval', $exclude)).")";
 	}
 
-	// 1. Produits du périmètre et stock réel total (hors entrepôts ignorés)
+	// 1. Produits du périmètre : stock physique (tous entrepôts) et stock hors entrepôts ignorés
+	$allwhsql = "SELECT e.rowid FROM ".MAIN_DB_PREFIX."entrepot as e WHERE e.entity IN (".getEntity('stock').")";
 	$sql = "SELECT p.rowid as pid, p.ref, p.label, p.tobatch, u.short_label as unit_short,";
-	$sql .= " SUM(ps.reel) as stock";
+	$sql .= " SUM(ps.reel) as stock_all,";
+	$sql .= " SUM(CASE WHEN ps.fk_entrepot IN (".$whsql.") THEN ps.reel ELSE 0 END) as stock";
 	$sql .= " FROM ".MAIN_DB_PREFIX."product as p";
 	$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."c_units as u ON u.rowid = p.fk_unit";
-	$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."product_stock as ps ON ps.fk_product = p.rowid AND ps.fk_entrepot IN (".$whsql.")";
+	$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."product_stock as ps ON ps.fk_product = p.rowid AND ps.fk_entrepot IN (".$allwhsql.")";
 	$sql .= " WHERE p.rowid IN (".$filtersql.")";
 	$sql .= " AND p.fk_product_type = 0";
 	$sql .= " AND p.entity IN (".getEntity('product').")";
@@ -260,6 +267,9 @@ function diamantutils_stocktable_load($db, $catids)
 			'tobatch' => ((int) $obj->tobatch > 0),
 			'unit' => (string) $obj->unit_short,
 			'total' => (float) $obj->stock,
+			'physical' => (float) $obj->stock_all,
+			'customer' => 0.0,
+			'supplier' => 0.0,
 			'lots' => array(),
 			'section' => 0,
 		);
@@ -296,16 +306,59 @@ function diamantutils_stocktable_load($db, $catids)
 	}
 	$db->free($resql);
 
-	// Produits sans stock : non affichés
+	// 3. Commandes en cours : client (validées ou en cours, moins expédié par des expéditions
+	// validées) et fournisseur (approuvées ou commandées, moins réceptionné)
+	if (!empty($groups)) {
+		$pids = implode(',', array_keys($groups));
+		$queries = array(
+			'customer' => "SELECT cd.fk_product, SUM(cd.qty) as qty FROM ".MAIN_DB_PREFIX."commandedet as cd"
+				." INNER JOIN ".MAIN_DB_PREFIX."commande as c ON c.rowid = cd.fk_commande"
+				." WHERE cd.fk_product IN (".$pids.") AND c.fk_statut IN (1, 2) AND c.entity IN (".getEntity('commande').")"
+				." GROUP BY cd.fk_product",
+			'shipped' => "SELECT cd.fk_product, SUM(ed.qty) as qty FROM ".MAIN_DB_PREFIX."expeditiondet as ed"
+				." INNER JOIN ".MAIN_DB_PREFIX."expedition as e ON e.rowid = ed.fk_expedition"
+				." INNER JOIN ".MAIN_DB_PREFIX."commandedet as cd ON cd.rowid = ed.fk_elementdet"
+				." INNER JOIN ".MAIN_DB_PREFIX."commande as c ON c.rowid = cd.fk_commande"
+				." WHERE cd.fk_product IN (".$pids.") AND c.fk_statut IN (1, 2) AND e.fk_statut >= 1 AND c.entity IN (".getEntity('commande').")"
+				." GROUP BY cd.fk_product",
+			'supplier' => "SELECT cfd.fk_product, SUM(cfd.qty - COALESCE(rec.qty, 0)) as qty FROM ".MAIN_DB_PREFIX."commande_fournisseurdet as cfd"
+				." INNER JOIN ".MAIN_DB_PREFIX."commande_fournisseur as cf ON cf.rowid = cfd.fk_commande"
+				." LEFT JOIN (SELECT rdb.fk_elementdet, SUM(rdb.qty) as qty FROM ".MAIN_DB_PREFIX."receptiondet_batch as rdb"
+				." INNER JOIN ".MAIN_DB_PREFIX."reception as r ON r.rowid = rdb.fk_reception GROUP BY rdb.fk_elementdet) as rec ON rec.fk_elementdet = cfd.rowid"
+				." WHERE cfd.fk_product IN (".$pids.") AND cf.fk_statut IN (3, 4) AND cf.entity IN (".getEntity('supplier_order').")"
+				." GROUP BY cfd.fk_product",
+		);
+		foreach ($queries as $key => $sql) {
+			$resql = $db->query($sql);
+			if (!$resql) {
+				dol_syslog(__FUNCTION__.' '.$db->lasterror(), LOG_ERR);
+				return -1;
+			}
+			while ($obj = $db->fetch_object($resql)) {
+				$pid = (int) $obj->fk_product;
+				if (!isset($groups[$pid])) {
+					continue;
+				}
+				if ($key == 'shipped') {
+					$groups[$pid]['customer'] -= (float) $obj->qty;
+				} else {
+					$groups[$pid][$key] += (float) $obj->qty;
+				}
+			}
+			$db->free($resql);
+		}
+	}
+
+	// Produits sans stock ni commande en cours : non affichés
 	foreach ($groups as $pid => $group) {
-		if (abs($group['total']) < 1e-9 && empty($group['lots'])) {
+		if (abs($group['physical']) < 1e-9 && empty($group['lots']) && abs($group['customer']) < 1e-9 && abs($group['supplier']) < 1e-9) {
 			unset($groups[$pid]);
 		} else {
 			uksort($groups[$pid]['lots'], 'strnatcasecmp');
 		}
 	}
 
-	// 3. Attributs des lots (colisage, pièces par colis, qté par pièce)
+	// 4. Attributs des lots (colisage, pièces par colis, qté par pièce)
 	try {
 		$attrs = diamantutils_stockcolisage_lot_attributes($db, $lotids);
 	} catch (Throwable $e) {
@@ -318,7 +371,7 @@ function diamantutils_stocktable_load($db, $catids)
 		}
 	}
 
-	// 4. Section de chaque produit : premier tag configuré dans l'ordre d'affichage
+	// 5. Section de chaque produit : premier tag configuré dans l'ordre d'affichage
 	$sections = diamantutils_stocktable_sections($db);
 	$order = array_flip(array_keys($sections));
 	$allcats = diamantutils_stocktable_category_ids($db);
@@ -372,10 +425,26 @@ function diamantutils_stocktable_qty_html($qty, $unit)
 }
 
 /**
+ * Quantité d'une colonne de commandes : vide si nulle, lien vers les commandes du produit
+ *
+ * @param	float	$qty	Quantité
+ * @param	string	$unit	Unité courte
+ * @param	string	$url	Lien (commandes du produit)
+ * @return	string			HTML
+ */
+function diamantutils_stocktable_order_html($qty, $unit, $url)
+{
+	if (abs($qty) < 1e-9) {
+		return '';
+	}
+	return '<a href="'.$url.'">'.diamantutils_stocktable_qty_html($qty, $unit).'</a>';
+}
+
+/**
  * Rendu HTML d'un groupe produit (un <tbody>)
  *
  * @param	array	$group		Groupe (diamantutils_stocktable_load())
- * @param	array	$perms		array('colisage' => bool, 'num' => bool, 'auto' => bool)
+ * @param	array	$perms		array('colisage' => bool, 'num' => bool, 'auto' => bool, 'excluded' => libellé des entrepôts ignorés)
  * @return	string				HTML
  */
 function diamantutils_stocktable_render_group($group, $perms)
@@ -390,15 +459,20 @@ function diamantutils_stocktable_render_group($group, $perms)
 	$out = '<tbody class="dst-group" data-pid="'.((int) $group['id']).'" data-product="'.((int) $group['id']).'" data-section="'.((int) $group['section']).'"';
 	$out .= ' data-search="'.dol_escape_htmltag(dol_strtolower($search)).'">';
 
-	// En-tête : produit et stock total
+	// En-tête : produit, stock physique, commandes en cours, stock virtuel
+	$virtual = $group['physical'] - $group['customer'] + $group['supplier'];
 	$out .= '<tr class="dst-head">';
-	$out .= '<td colspan="'.(DIAMANTUTILS_STOCKTABLE_NBCOLS - 1).'" class="dst-head-product">';
+	$out .= '<td colspan="'.(DIAMANTUTILS_STOCKTABLE_NBCOLS - 4).'" class="dst-head-product">';
 	$out .= '<button type="button" class="dst-toggle" title="'.dol_escape_htmltag($langs->trans('DiamantutilsStockTableToggle')).'" aria-expanded="true"><span class="dst-caret"></span></button>';
 	$out .= '<a href="'.DOL_URL_ROOT.'/product/card.php?id='.((int) $group['id']).'">'.img_picto('', 'product', 'class="pictofixedwidth"').'<strong>'.dol_escape_htmltag($group['ref']).'</strong></a>';
 	$out .= ' <span class="opacitymedium">'.dol_escape_htmltag($group['label']).'</span>';
 	$out .= '</td>';
-	$out .= '<td class="right dst-total nowraponall"><a href="'.DOL_URL_ROOT.'/product/stock/product.php?id='.((int) $group['id']).'" title="'.dol_escape_htmltag($langs->trans('Stock')).'">'.diamantutils_stocktable_qty_html($group['total'], $group['unit']).'</a></td>';
+	$out .= '<td class="right dst-total nowraponall"><a href="'.DOL_URL_ROOT.'/product/stock/product.php?id='.((int) $group['id']).'" title="'.dol_escape_htmltag($langs->trans('Stock')).'">'.diamantutils_stocktable_qty_html($group['physical'], $group['unit']).'</a></td>';
+	$out .= '<td class="right dst-total nowraponall">'.diamantutils_stocktable_order_html($group['customer'], $group['unit'], DOL_URL_ROOT.'/product/stats/commande.php?id='.((int) $group['id'])).'</td>';
+	$out .= '<td class="right dst-total nowraponall">'.diamantutils_stocktable_order_html($group['supplier'], $group['unit'], DOL_URL_ROOT.'/product/stats/commande_fournisseur.php?id='.((int) $group['id'])).'</td>';
+	$out .= '<td class="right dst-total nowraponall">'.diamantutils_stocktable_qty_html($virtual, $group['unit']).'</td>';
 	$out .= '</tr>';
+	$empty3 = '<td></td><td></td><td></td>';
 
 	// Lots en stock
 	$sumlots = 0.0;
@@ -424,6 +498,7 @@ function diamantutils_stocktable_render_group($group, $perms)
 		$out .= diamantutils_stockcolisage_num_cell(DIAMANTUTILS_STOCKCOLISAGE_PPC, $attr['ppc'], $lot['batch'], 0, $perms['num'], $numtitle);
 		$out .= diamantutils_stockcolisage_num_cell(DIAMANTUTILS_STOCKCOLISAGE_QPP, $attr['qpp'], $lot['batch'], 0, $perms['num'], $numtitle);
 		$out .= '<td class="right nowraponall">'.diamantutils_stocktable_qty_html($lot['qty'], $group['unit']).'</td>';
+		$out .= $empty3;
 		$out .= '</tr>';
 	}
 
@@ -431,8 +506,19 @@ function diamantutils_stocktable_render_group($group, $perms)
 	$nolot = $group['total'] - $sumlots;
 	if (abs($nolot) > 1e-6) {
 		$out .= '<tr class="dst-line dst-nolotline">';
-		$out .= '<td colspan="'.(DIAMANTUTILS_STOCKTABLE_NBCOLS - 1).'"><span class="opacitymedium">'.$langs->trans($group['tobatch'] ? 'DiamantutilsStockTableNoLotPartLine' : 'DiamantutilsStockTableNoLotProduct').'</span></td>';
+		$out .= '<td colspan="'.(DIAMANTUTILS_STOCKTABLE_NBCOLS - 4).'"><span class="opacitymedium">'.$langs->trans($group['tobatch'] ? 'DiamantutilsStockTableNoLotPartLine' : 'DiamantutilsStockTableNoLotProduct').'</span></td>';
 		$out .= '<td class="right nowraponall">'.diamantutils_stocktable_qty_html($nolot, $group['unit']).'</td>';
+		$out .= $empty3;
+		$out .= '</tr>';
+	}
+
+	// Stock des entrepôts ignorés : compris dans le stock physique, pas dans les lots affichés
+	$ignored = $group['physical'] - $group['total'];
+	if (abs($ignored) > 1e-6) {
+		$out .= '<tr class="dst-line dst-nolotline">';
+		$out .= '<td colspan="'.(DIAMANTUTILS_STOCKTABLE_NBCOLS - 4).'"><span class="opacitymedium">'.dol_escape_htmltag($langs->transnoentities('DiamantutilsStockTableIgnoredLine', (string) $perms['excluded'])).'</span></td>';
+		$out .= '<td class="right nowraponall">'.diamantutils_stocktable_qty_html($ignored, $group['unit']).'</td>';
+		$out .= $empty3;
 		$out .= '</tr>';
 	}
 

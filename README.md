@@ -9,7 +9,7 @@ Module Dolibarr interne de Diamant Industrie (Dolibarr 20, PHP 8.2, déploiement
 - **Lots de produits** (menu Commerce) : ensembles de produits ajoutés en une fois sur un devis ou une commande client, section ci-dessous.
 - **Prix de revient à la réception** : le prix de revient du produit prend le prix rendu saisi à chaque réception fournisseur, section ci-dessous.
 - **Liaison des commandes fournisseurs** : lier une commande fournisseur à une commande d'un autre fournisseur (transport ↔ marchandise), section ci-dessous.
-- **Tableau de stock par lots** (menu Produits → Stock) : lots en stock des produits des tags choisis, avec colisage, pièces par colis, qté par pièce et quantité, données Dolibarr seules, section ci-dessous.
+- **Tableau de stock par lots** (menu Produits → Stock) : pour les produits des tags choisis, stock physique, commandes en cours et stock virtuel, et lots en stock avec colisage, pièces par colis et qté par pièce, données Dolibarr seules, section ci-dessous.
 - **Colisage sur l'onglet Stock** de la fiche produit : pour un produit à lots, tableau du stock sans dates ni valorisations, avec le colisage du lot modifiable directement ou **calculé et tenu à jour** à chaque mouvement de stock, section ci-dessous.
 
 Chaque fonctionnalité a son onglet dans **Configuration → Modules → DiamantUtils**, avec une option pour l'activer ou la désactiver et ses réglages propres. Une fonctionnalité désactivée masque ses menus et pages ; ses données sont conservées.
@@ -346,15 +346,19 @@ Menu **Produits → Stock → Tableau de stock par lots**.
 | Colisage | attribut `colisage` du lot : calculé (∑, lecture seule, avertissement si la quantité n'est pas un multiple de la pièce) ou saisi à la main |
 | Pièces par colis | attribut `pieces_par_colis` du lot |
 | Qté par pièce | attribut `qte_par_piece` du lot (unité du produit) |
-| Quantité | stock réel du lot, hors entrepôts ignorés |
+| Stock physique | produit : stock réel tous entrepôts ; lot : stock réel du lot hors entrepôts ignorés |
+| Cdes client | produit : commandes client validées ou en cours, moins les quantités des expéditions validées (lien vers les commandes du produit) |
+| Cdes fournisseur | produit : commandes fournisseur approuvées ou commandées, moins les quantités réceptionnées (lien vers les commandes du produit) |
+| Stock virtuel | produit : stock physique − cdes client + cdes fournisseur |
 
-- Une section repliable par tag choisi, un groupe repliable par produit (réf., libellé, stock total avec lien vers l'onglet Stock). Produits sans stock non affichés. Stock non rattaché à un lot (produit sans lots, ou part sans lot) : ligne en italique.
-- **Quantité** : stock réel total du lot, tous entrepôts sauf les **entrepôts ignorés du colisage** (onglet **Stock produit**, par défaut Sous-traitance). C'est la quantité sur laquelle le colisage enregistré est calculé : colisage et quantité affichés concordent.
+- Une section repliable par tag choisi, un groupe repliable par produit : réf., libellé, stock physique (lien vers l'onglet Stock), commandes en cours, stock virtuel. Les commandes ne sont pas réparties par lot : elles figurent sur la ligne du produit seulement. Produits sans stock ni commande en cours non affichés.
+- **Stock physique d'un lot** : stock réel total du lot, tous entrepôts sauf les **entrepôts ignorés du colisage** (onglet **Stock produit**, par défaut Sous-traitance). C'est la quantité sur laquelle le colisage enregistré est calculé : colisage et quantité affichés concordent. Le stock des entrepôts ignorés et le stock non rattaché à un lot (produit sans lots, ou part sans lot) sont sur des lignes en italique : les lignes d'un produit totalisent son stock physique.
+- Calculs des commandes repris de la requête de suivi de Diamant Industrie (statuts client 1 et 2, expéditions de statut ≥ 1, statuts fournisseur 3 et 4, réceptions `llx_receptiondet_batch`), avec filtre d'entité ; ils peuvent différer du stock virtuel natif de Dolibarr, qui dépend de ses propres options.
 - Recherche instantanée (produit, lot, colisage), filtre par tag, tout replier / tout déplier (mémorisé dans le navigateur).
 - **Modification en ligne** (droit Produits → Créer/modifier) : pièces par colis et qté par pièce, colisage d'un lot en mode manuel. Même mécanisme que l'onglet Stock (`js/stockcolisage.js`, `ajax/lotcolisage.php`) : Entrée ou sortie du champ = enregistrer, Échap = annuler, colisage recalculé aussitôt. Sans le droit, ou fonctionnalité Stock produit inactive : lecture seule.
 
 ### Détail technique
-- Données en **4 requêtes**, quel que soit le nombre de produits : produits des tags avec leur stock total ; lots en stock avec leur fiche lot ; attributs des lots ; tags des produits (sections).
+- Données en **7 requêtes**, quel que soit le nombre de produits : produits des tags avec leur stock ; lots en stock avec leur fiche lot ; commandes client, expéditions, commandes fournisseur moins réceptions ; attributs des lots ; tags des produits (sections).
 - Aucune écriture propre au tableau : les attributs du lot sont écrits par `ajax/lotcolisage.php` (droits, jeton, validation : voir la section suivante).
 
 ### Fichiers

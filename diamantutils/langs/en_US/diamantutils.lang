@@ -446,7 +446,7 @@ DiamantutilsColisageRecalcNoWarning = No warning.
 
 # Stock table by lot v2.13 (Dolibarr data only)
 DiamantutilsStockTableNbProducts = %s product(s)
-DiamantutilsStockTableDescDoli = Dolibarr data: lots in stock, packing, pieces per package and qty per piece (lot attributes, editable here as on the product Stock tab), real quantity.
+DiamantutilsStockTableDescDoli = Dolibarr data: per product, physical stock, open customer and supplier orders, virtual stock; per lot in stock, packing, pieces per package and qty per piece (lot attributes, editable here as on the product Stock tab) and physical stock.
 DiamantutilsStockTableAutoOff = Computed packing disabled: enable it in the "Product stock" setup tab to edit pieces per package and qty per piece.
 DiamantutilsStockTableSearchDoli = Search (product, lot, packing)…
 DiamantutilsStockTableEmptyDoli = No stock for the products of these tags.
@@ -456,3 +456,8 @@ DiamantutilsStockTableRightsDoli = Access: DiamantUtils permission "See the stoc
 DiamantutilsStockTableColisageOk = "Product stock" feature enabled: packing editable in the table
 DiamantutilsStockTableColisageOff = "Product stock" feature disabled: packing, pieces per package and qty per piece read only
 DiamantutilsStockTableOldLines = %s line(s) entered before v2.13 kept in the database (llx_diamantutils_stockline), no longer shown.
+DiamantutilsStockTablePhysical = Physical stock
+DiamantutilsStockTableCustomerOrders = Customer orders
+DiamantutilsStockTableSupplierOrders = Supplier orders
+DiamantutilsStockTableVirtual = Virtual stock
+DiamantutilsStockTableIgnoredLine = Warehouses ignored for packing (%s)

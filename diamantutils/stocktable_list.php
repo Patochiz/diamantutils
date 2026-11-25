@@ -2,9 +2,10 @@
 /**
  * Tableau de stock par lots
  *
- * Données Dolibarr seules (v2.13) : un groupe repliable par produit des tags configurés, une
- * ligne par lot en stock avec son colisage, ses pièces par colis et sa qté par pièce (attributs
- * du lot) et sa quantité réelle (hors entrepôts ignorés du colisage).
+ * Données Dolibarr seules : un groupe repliable par produit des tags configurés (stock physique,
+ * commandes client et fournisseur en cours, stock virtuel), une ligne par lot en stock avec son
+ * colisage, ses pièces par colis et sa qté par pièce (attributs du lot) et son stock physique
+ * (hors entrepôts ignorés du colisage, dont le stock est affiché sur une ligne à part).
  *
  * Rendu côté serveur ; recherche, filtre par tag et repli côté client (js/stocktable.js).
  * Attributs du lot modifiables en ligne (js/stockcolisage.js, ajax/lotcolisage.php), avec les
@@ -109,6 +110,9 @@ if (!empty($excluded)) {
 }
 
 
+$perms['excluded'] = implode(', ', $excludednames);
+
+
 /*
  * Vue
  */
@@ -160,7 +164,10 @@ print '<th>'.$langs->trans('DiamantutilsStockColLot').'</th>';
 print '<th>'.$langs->trans('DiamantutilsStockColColisage').'</th>';
 print '<th class="right">'.$langs->trans('DiamantutilsColisagePpcCol').'</th>';
 print '<th class="right">'.$langs->trans('DiamantutilsColisageQppCol').'</th>';
-print '<th class="right">'.$langs->trans('DiamantutilsStockColQty').'</th>';
+print '<th class="right">'.$langs->trans('DiamantutilsStockTablePhysical').'</th>';
+print '<th class="right">'.$langs->trans('DiamantutilsStockTableCustomerOrders').'</th>';
+print '<th class="right">'.$langs->trans('DiamantutilsStockTableSupplierOrders').'</th>';
+print '<th class="right">'.$langs->trans('DiamantutilsStockTableVirtual').'</th>';
 print '</tr></thead>';
 
 // Une section par tag configuré (toutes sans filtre, sinon celles qui ont des produits)
@@ -192,8 +199,8 @@ $jsconfig = array(
 	),
 );
 print '<script>window.diamantutilsStockTable = '.json_encode($jsconfig, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT).';</script>';
-print '<script src="'.dol_buildpath('/diamantutils/js/stocktable.js', 1).'?v=2.13"></script>';
-print '<script src="'.dol_buildpath('/diamantutils/js/stockcolisage.js', 1).'?v=2.13"></script>';
+print '<script src="'.dol_buildpath('/diamantutils/js/stocktable.js', 1).'?v=2.14"></script>';
+print '<script src="'.dol_buildpath('/diamantutils/js/stockcolisage.js', 1).'?v=2.14"></script>';
 
 llxFooter();
 $db->close();

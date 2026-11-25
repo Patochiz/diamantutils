@@ -445,7 +445,7 @@ DiamantutilsColisageRecalcNoWarning = Aucun avertissement.
 
 # Tableau de stock par lots v2.13 (données Dolibarr seules)
 DiamantutilsStockTableNbProducts = %s produit(s)
-DiamantutilsStockTableDescDoli = Données Dolibarr : lots en stock, colisage, pièces par colis et qté par pièce (attributs du lot, modifiables ici comme sur l'onglet Stock du produit), quantité réelle.
+DiamantutilsStockTableDescDoli = Données Dolibarr : par produit, stock physique, commandes client et fournisseur en cours, stock virtuel ; par lot en stock, colisage, pièces par colis et qté par pièce (attributs du lot, modifiables ici comme sur l'onglet Stock du produit) et stock physique.
 DiamantutilsStockTableAutoOff = Colisage calculé inactif : activez-le dans l'onglet « Stock produit » de la configuration pour modifier pièces par colis et qté par pièce.
 DiamantutilsStockTableSearchDoli = Rechercher (produit, lot, colisage)…
 DiamantutilsStockTableEmptyDoli = Aucun stock pour les produits de ces tags.
@@ -455,3 +455,8 @@ DiamantutilsStockTableRightsDoli = Accès : droit DiamantUtils « Voir le tablea
 DiamantutilsStockTableColisageOk = Fonctionnalité « Stock produit » active : colisage modifiable dans le tableau
 DiamantutilsStockTableColisageOff = Fonctionnalité « Stock produit » inactive : colisage, pièces par colis et qté par pièce en lecture seule
 DiamantutilsStockTableOldLines = %s ligne(s) saisie(s) avant la v2.13 conservée(s) en base (llx_diamantutils_stockline), plus affichée(s).
+DiamantutilsStockTablePhysical = Stock physique
+DiamantutilsStockTableCustomerOrders = Cdes client
+DiamantutilsStockTableSupplierOrders = Cdes fournisseur
+DiamantutilsStockTableVirtual = Stock virtuel
+DiamantutilsStockTableIgnoredLine = Entrepôts ignorés pour le colisage (%s)
