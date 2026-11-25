@@ -23,6 +23,19 @@
  *  - tableau affiché si !$variants || VARIANT_ALLOW_STOCK_MOVEMENT_ON_VARIANT_PARENT.
  * Différences v23 : action « transfer » (au lieu de « transfert ») dans les liens, et tableau
  * masqué aussi pour un kit (hasFatherOrChild(1)) sans PRODUIT_SOUSPRODUITS_ALSO_ENABLE_PARENT_STOCK_MOVE.
+ *
+ * Colisage calculé (v2.12), références vérifiées dans le cœur 20.0.0 et 23.0.0 :
+ *  - attributs du lot : élément « product_lot » (Productlot::$table_element), table
+ *    llx_product_lot_extrafields (fk_object = llx_product_lot.rowid) ;
+ *  - MouvementStock::_create() : begin(), fiche lot créée si absente, mise à jour de
+ *    product_stock puis product_batch (createBatch), puis call_trigger('STOCK_MOVEMENT') avant
+ *    commit() : le trigger lit le stock déjà à jour et son écriture suit le rollback éventuel
+ *    (y compris le contrôle « numéro de série unique » fait après le trigger) ;
+ *  - propriétés du mouvement disponibles : product_id, warehouse_id (entrepot_id), qty, type,
+ *    batch ;
+ *  - v23 : trigger non appelé pour un produit dont le stock est désactivé (stockable_product).
+ * Un transfert appelle _create() deux fois (sortie puis entrée) : deux recalculs, le dernier
+ * laisse l'état exact.
  */
 
 /**
