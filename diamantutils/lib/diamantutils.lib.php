@@ -487,6 +487,7 @@ function diamantutils_admin_prepare_head()
 		'costprice' => array('DiamantutilsCostPriceTabTitle', isModEnabled('diamantutils') && getDolGlobalInt('DIAMANTUTILS_COSTPRICE_FROM_RECEIPT') > 0),
 		'linkso' => array('DiamantutilsLinkSOTabTitle', isModEnabled('diamantutils') && getDolGlobalInt('DIAMANTUTILS_LINK_SUPPLIER_ORDERS') > 0),
 		'stocktable' => array('DiamantutilsStockTableTabTitle', isModEnabled('diamantutils') && getDolGlobalInt('DIAMANTUTILS_STOCKTABLE_ENABLED') > 0),
+		'stockcolisage' => array('DiamantutilsStockColisageTabTitle', isModEnabled('diamantutils') && getDolGlobalInt('DIAMANTUTILS_STOCKCOLISAGE_ENABLED') > 0),
 	);
 
 	$h = 0;

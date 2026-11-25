@@ -22,6 +22,7 @@ dol_include_once('/diamantutils/lib/descpropal.lib.php');
 dol_include_once('/diamantutils/lib/lot.lib.php');
 dol_include_once('/diamantutils/class/diamantlot.class.php');
 dol_include_once('/diamantutils/lib/stocktable.lib.php');
+dol_include_once('/diamantutils/lib/stockcolisage.lib.php');
 require_once DOL_DOCUMENT_ROOT.'/categories/class/categorie.class.php';
 
 if (!$user->admin) {
@@ -32,7 +33,7 @@ $langs->loadLangs(array("admin", "stocks", "diamantutils@diamantutils"));
 
 $action = GETPOST('action', 'aZ09');
 $tab = GETPOST('tab', 'aZ09');
-if (!in_array($tab, array('transfo', 'soustraitance', 'customlist', 'descpropal', 'lot', 'costprice', 'linkso', 'stocktable'))) {
+if (!in_array($tab, array('transfo', 'soustraitance', 'customlist', 'descpropal', 'lot', 'costprice', 'linkso', 'stocktable', 'stockcolisage'))) {
 	$tab = 'transfo';
 }
 
@@ -190,6 +191,24 @@ if ($action == 'update') {
 		// Entrepôts exclus : '0' = aucun (constante absente = entrepôt Sous-traitance)
 		$warehouses = diamantutils_stocktable_ids(GETPOST('DIAMANTUTILS_STOCKTABLE_EXCLUDE_WAREHOUSES', 'array'));
 		if (dolibarr_set_const($db, 'DIAMANTUTILS_STOCKTABLE_EXCLUDE_WAREHOUSES', (empty($warehouses) ? '0' : implode(',', $warehouses)), 'chaine', 0, '', $conf->entity) < 0) {
+			$error++;
+		}
+	}
+
+	if ($tab == 'stockcolisage') {
+		$enabled = GETPOSTINT('DIAMANTUTILS_STOCKCOLISAGE_ENABLED') ? 1 : 0;
+		if (dolibarr_set_const($db, 'DIAMANTUTILS_STOCKCOLISAGE_ENABLED', $enabled, 'chaine', 0, '', $conf->entity) < 0) {
+			$error++;
+		}
+		// Code de l'attribut du lot : lettres, chiffres et _ (comme les codes d'extrafields)
+		$code = trim(GETPOST('DIAMANTUTILS_STOCKCOLISAGE_EXTRAFIELD', 'alphanohtml'));
+		if ($code === '') {
+			$code = 'colisage';
+		}
+		if (!preg_match('/^[a-z0-9_]{1,64}$/i', $code)) {
+			setEventMessages($langs->trans('DiamantutilsStockColisageCodeInvalid'), null, 'errors');
+			$error++;
+		} elseif (dolibarr_set_const($db, 'DIAMANTUTILS_STOCKCOLISAGE_EXTRAFIELD', $code, 'chaine', 0, '', $conf->entity) < 0) {
 			$error++;
 		}
 	}
@@ -490,6 +509,44 @@ if ($tab == 'stocktable') {
 		$status .= img_warning('', 'class="pictofixedwidth"').'<span class="warning">'.$langs->trans('DiamantutilsStockTableNoTable').'</span>';
 	}
 	diamantutils_setup_row($langs->trans('DiamantutilsStockTableStatus'), $langs->trans('DiamantutilsStockTableRights'), $status);
+}
+
+if ($tab == 'stockcolisage') {
+	diamantutils_setup_row(
+		$langs->trans('DiamantutilsFeatureEnabled'),
+		$langs->trans('DiamantutilsStockColisageEnabledDesc'),
+		$form->selectyesno('DIAMANTUTILS_STOCKCOLISAGE_ENABLED', diamantutils_stockcolisage_enabled() ? 1 : 0, 1)
+	);
+	$sc_code = diamantutils_stockcolisage_extrafield_code();
+	diamantutils_setup_row(
+		$langs->trans('DiamantutilsStockColisageExtrafield'),
+		$langs->trans('DiamantutilsStockColisageExtrafieldDesc'),
+		'<input type="text" class="flat minwidth150" maxlength="64" name="DIAMANTUTILS_STOCKCOLISAGE_EXTRAFIELD" value="'.dol_escape_htmltag(getDolGlobalString('DIAMANTUTILS_STOCKCOLISAGE_EXTRAFIELD', 'colisage')).'">'
+	);
+
+	// État : attribut du lot, module Lot/série, hook enregistré (module réactivé)
+	if ($sc_code !== '' && diamantutils_stockcolisage_extrafield_exists($db, $sc_code)) {
+		$status = img_picto('', 'tick', 'class="pictofixedwidth"').$langs->trans('DiamantutilsStockColisageExtrafieldOk', $sc_code);
+	} else {
+		$status = img_warning('', 'class="pictofixedwidth"').'<span class="warning">'.$langs->trans('DiamantutilsStockColisageExtrafieldMissing', ($sc_code !== '' ? $sc_code : '?')).'</span>';
+	}
+	$status .= '<br>';
+	if (isModEnabled('productbatch')) {
+		$status .= img_picto('', 'tick', 'class="pictofixedwidth"').$langs->trans('DiamantutilsStockColisageBatchOk');
+	} else {
+		$status .= img_warning('', 'class="pictofixedwidth"').'<span class="warning">'.$langs->trans('DiamantutilsStockColisageBatchMissing').'</span>';
+	}
+	$status .= '<br>';
+	$hooks = (isset($conf->modules_parts['hooks']['diamantutils']) ? $conf->modules_parts['hooks']['diamantutils'] : array());
+	if (!is_array($hooks)) {
+		$hooks = explode(':', (string) $hooks);
+	}
+	if (in_array('stockproductcard', $hooks)) {
+		$status .= img_picto('', 'tick', 'class="pictofixedwidth"').$langs->trans('DiamantutilsStockColisageHookOk');
+	} else {
+		$status .= img_warning('', 'class="pictofixedwidth"').'<span class="warning">'.$langs->trans('DiamantutilsStockColisageHookMissing').'</span>';
+	}
+	diamantutils_setup_row($langs->trans('DiamantutilsStockColisageStatus'), $langs->trans('DiamantutilsStockColisageRights'), $status);
 }
 
 print '</table>';

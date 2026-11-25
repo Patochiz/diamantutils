@@ -1,0 +1,71 @@
+/* DiamantUtils — onglet Stock de la fiche produit : colonne Colisage (js/stockcolisage.js) */
+
+#dut-stockcolisage .dut-sc-toggleall {
+	margin-left: 1em;
+	font-weight: normal;
+}
+
+#dut-stockcolisage tr.dut-sc-lot td.dut-sc-lotname {
+	padding-left: 2.5em;
+}
+
+/* Colisage : texte sur une ligne, complet en infobulle */
+#dut-stockcolisage td.dut-sc-colisage {
+	min-width: 12em;
+	max-width: 28em;
+	position: relative;
+}
+#dut-stockcolisage td.dut-sc-colisage .dut-sc-text {
+	display: inline-block;
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	vertical-align: middle;
+}
+
+/* Modifiable : curseur, survol, indicateur « — » sur cellule vide, crayon au survol */
+#dut-stockcolisage td.dut-sc-editable {
+	cursor: text;
+}
+#dut-stockcolisage td.dut-sc-editable:hover,
+#dut-stockcolisage td.dut-sc-editable:focus {
+	outline: 1px dashed rgba(128, 128, 128, 0.6);
+	outline-offset: -3px;
+}
+#dut-stockcolisage td.dut-sc-editable.dut-sc-empty .dut-sc-text::before {
+	content: "\2014";
+	opacity: 0.4;
+}
+#dut-stockcolisage td.dut-sc-editable:not(.dut-sc-editing):hover::after {
+	content: "\270E";
+	opacity: 0.5;
+	margin-left: 0.4em;
+}
+
+#dut-stockcolisage input.dut-sc-input {
+	width: 95%;
+	min-width: 10em;
+	box-sizing: border-box;
+}
+#dut-stockcolisage td.dut-sc-saving {
+	opacity: 0.6;
+}
+
+/* Retour d'enregistrement */
+#dut-stockcolisage .dut-sc-msg {
+	margin-left: 0.5em;
+	font-size: 0.9em;
+}
+#dut-stockcolisage .dut-sc-msg-ok {
+	color: #2e7d32;
+}
+#dut-stockcolisage .dut-sc-msg-error {
+	color: #c62828;
+	white-space: normal;
+}
+#dut-stockcolisage .dut-sc-warn {
+	font-size: 0.85em;
+	color: #a66300;
+	white-space: normal;
+}
