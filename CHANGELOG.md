@@ -1,5 +1,15 @@
 # Changelog — DiamantUtils
 
+## 2.11 — Colisage sur l'onglet Stock de la fiche produit
+
+- Nouvelle fonctionnalité `DIAMANTUTILS_STOCKCOLISAGE_ENABLED` (désactivée par défaut), onglet **Stock produit** de la configuration, avec le code de l'attribut du lot (`DIAMANTUTILS_STOCKCOLISAGE_EXTRAFIELD`, `colisage`) et l'état de l'attribut, du module Lot/série et du hook.
+- Fiche produit, onglet Stock, produit géré par lots : tableau du module à la place du tableau standard (Entrepôt / Lot, Colisage, Quantité, Transférer stock, Corriger le stock), sans les colonnes DLC, DMD/DLUO, PMP, valorisation, prix et valeur à la vente. Quantités, total, liens d'action, repli des lots et avertissements identiques au cœur. Produits sans lots inchangés.
+- Colisage modifiable en ligne (droit produit / créer) : Entrée ou sortie du champ = enregistrer, Échap = annuler, sans rechargement. Valeur enregistrée échappée ; valeur HTML saisie sur la fiche lot affichée aplatie avec avertissement. Fiche lot créée à la première saisie pour un lot en stock qui n'en a pas.
+- `ajax/lotcolisage.php` : POST, jeton CSRF vérifié, droits et fonctionnalité contrôlés (403), lot retrouvé côté serveur par (produit, lot, entité), refus motivés.
+- Repli de sécurité : le tableau standard n'est masqué qu'après l'affichage du tableau du module ; toute erreur laisse le tableau standard visible (log `LOG_ERR`). Constante de contrôle `DIAMANTUTILS_STOCKCOLISAGE_FORCE_ERROR`.
+- Nouveau contexte de hook `stockproductcard` (méthode `addMoreActionsButtons`). Cœur de Dolibarr non modifié ; liens compatibles Dolibarr 23 (action `transfer`).
+- Mise à jour : déposer les fichiers, **désactiver puis réactiver le module**, puis activer la fonctionnalité dans l'onglet.
+
 ## 2.10 — Tableau de stock par lots
 
 - Nouvelle fonctionnalité `DIAMANTUTILS_STOCKTABLE_ENABLED` (désactivée par défaut), onglet **Tableau de stock** de la configuration : remplace la base Airtable « Stock Bobine ».

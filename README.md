@@ -10,6 +10,7 @@ Module Dolibarr interne de Diamant Industrie (Dolibarr 20, PHP 8.2, déploiement
 - **Prix de revient à la réception** : le prix de revient du produit prend le prix rendu saisi à chaque réception fournisseur, section ci-dessous.
 - **Liaison des commandes fournisseurs** : lier une commande fournisseur à une commande d'un autre fournisseur (transport ↔ marchandise), section ci-dessous.
 - **Tableau de stock par lots** (menu Produits → Stock) : colisage constaté par lot, comparé au stock réel Dolibarr (remplace la base Airtable « Stock Bobine »), section ci-dessous.
+- **Colisage sur l'onglet Stock** de la fiche produit : pour un produit à lots, tableau du stock sans dates ni valorisations, avec le colisage du lot modifiable directement, section ci-dessous.
 
 Chaque fonctionnalité a son onglet dans **Configuration → Modules → DiamantUtils**, avec une option pour l'activer ou la désactiver et ses réglages propres. Une fonctionnalité désactivée masque ses menus et pages ; ses données sont conservées.
 
@@ -391,4 +392,52 @@ Produit supprimé ou sorti des tags : ses lignes restent affichées, marquées �
 | `test/stocktable_calc_test.php`, `test/stocktable_calc_cases.php` | test des calculs (navigateur, administrateur) |
 | `core/modules/modDiamantutils.class.php` | constantes, droits `stocktable`, menu, version |
 | `admin/setup.php`, `lib/diamantutils.lib.php` | onglet de configuration |
+| `langs/fr_FR/diamantutils.lang`, `langs/en_US/diamantutils.lang` | libellés |
+
+---
+
+## Colisage sur l'onglet Stock de la fiche produit
+
+### Principe
+Sur la fiche produit, onglet **Stock**, pour un produit **géré par lots** : le tableau du stock par entrepôt est remplacé par celui du module, sans les colonnes DLC, DMD/DLUO, Prix moyen pondéré, Valorisation achat, Prix de vente unitaire et Valeur à la vente, avec une colonne **Colisage** modifiable directement dans le tableau.
+
+Colonnes : **Entrepôt / Lot**, **Colisage**, **Quantité** (unité courte du produit), liens **Transférer stock** et **Corriger le stock**. Le reste est inchangé : boutons au-dessus du tableau, entrepôts et lots repliables (« Afficher tous les lots » / « Masquer les lots », état initial selon `STOCK_SHOW_ALL_BATCH_BY_DEFAULT`), quantités et total identiques au tableau standard, avertissements (quantité négative, numéro de série en quantité > 1), pas de lien d'action sur un entrepôt fermé.
+
+Le colisage est l'attribut supplémentaire existant des lots (code `colisage`, type « Texte HTML », Configuration du module Lot/série → Attributs supplémentaires), stocké dans `llx_product_lot_extrafields`. Le module ne le crée pas.
+
+Les produits sans lots, les produits parents de variantes (sans `VARIANT_ALLOW_STOCK_MOVEMENT_ON_VARIANT_PARENT`) et, en v23, les kits gardent le tableau standard. Le cœur de Dolibarr n'est pas modifié.
+
+### Mise en service
+1. Déposer les fichiers par FTP dans `custom/diamantutils/`.
+2. **Désactiver puis réactiver le module** : enregistre le hook `stockproductcard` de l'onglet Stock.
+3. Configuration du module → onglet **Stock produit** : vérifier l'état (attribut « colisage » présent, module Lot/série actif, hook enregistré), puis **Activer cette fonctionnalité** (`DIAMANTUTILS_STOCKCOLISAGE_ENABLED`, désactivée par défaut : le déploiement est inerte).
+4. Code de l'attribut (`DIAMANTUTILS_STOCKCOLISAGE_EXTRAFIELD`, `colisage` par défaut) : à changer seulement si l'attribut des lots porte un autre code.
+
+### Modifier le colisage
+- Droit **Produits → Créer/modifier** (le même que la fiche lot). Sans ce droit : texte seul.
+- Clic sur la cellule (ou Entrée / F2 au clavier) : champ texte, 200 caractères au plus. **Entrée** ou sortie du champ = enregistrer, **Échap** = annuler. ✓ discret après l'enregistrement, message d'erreur dans la cellule sinon ; la page n'est pas rechargée. Cellule vide : « — » et crayon au survol.
+- Texte simple : la valeur est enregistrée échappée (aucune balise active). Une valeur mise en forme depuis la fiche du lot est affichée aplatie (texte complet en infobulle) ; un avertissement prévient qu'elle sera enregistrée sans mise en forme. Une saisie contenant une balise de script est refusée par la protection de Dolibarr, avec un message dans la cellule.
+- Lot en stock sans fiche lot (`llx_product_lot`) : la fiche lot est créée à la première saisie, avec le colisage.
+
+### Repli de sécurité
+- Le tableau du module est affiché masqué, placé par `js/stockcolisage.js` juste avant le tableau standard, qui n'est masqué qu'ensuite. Tableau standard introuvable, erreur JavaScript, JavaScript désactivé : le tableau standard reste affiché.
+- Erreur au rendu côté serveur (exception, erreur SQL) : journalisée (`LOG_ERR`), rien n'est affiché, le tableau standard reste visible. Pour le vérifier : constante `DIAMANTUTILS_STOCKCOLISAGE_FORCE_ERROR = 1` (Configuration → Divers), à supprimer ensuite.
+- Fonctionnalité désactivée : la page est strictement celle de Dolibarr.
+
+### Détail technique
+- Hook `addMoreActionsButtons` (contexte `stockproductcard`), appelé juste avant les boutons et le tableau ; la page n'affiche pas `resPrint`, le module affiche par `print` et retourne 0 (boutons standard conservés).
+- Données : requête des entrepôts du cœur (`entrepot` × `product_stock`, `reel != 0`, entité, tri par réf.) et `Productbatch::findAll()` par entrepôt, comme le cœur ; colisage des lots en une requête.
+- Liens des lots : `?id=…&id_entrepot=…&action=transfert|correction&pdluoid=…` (action `transfer` à partir de Dolibarr 23).
+- `ajax/lotcolisage.php` : POST, jeton CSRF vérifié, droit produit / créer et fonctionnalité active (403 sinon). Le lot est retrouvé côté serveur par (produit, numéro de lot, entité), en stock ou parmi les lots du produit : lot inconnu, lot d'un autre produit, produit sans lots, valeur trop longue, attribut absent sont refusés avec un message. Écriture par `Productlot::create()` (fiche lot absente) ou `array_options` + `insertExtraFields('PRODUCT_LOT_MODIFY')`. Aucun mouvement de stock.
+
+### Fichiers
+
+| Fichier | Rôle |
+|---|---|
+| `lib/stockcolisage.lib.php` | conditions, lecture des données, rendu du tableau, recherche du lot, enregistrement |
+| `class/actions_diamantutils.class.php` | hook `addMoreActionsButtons` (contexte `stockproductcard`) |
+| `ajax/lotcolisage.php` | enregistrement du colisage (JSON) |
+| `js/stockcolisage.js`, `css/stockcolisage.css` | placement, repli, édition en ligne ; mise en forme |
+| `core/modules/modDiamantutils.class.php` | hook `stockproductcard`, constantes, version |
+| `admin/setup.php`, `lib/diamantutils.lib.php` | onglet de configuration **Stock produit** |
 | `langs/fr_FR/diamantutils.lang`, `langs/en_US/diamantutils.lang` | libellés |
