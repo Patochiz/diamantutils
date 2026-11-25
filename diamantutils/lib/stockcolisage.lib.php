@@ -64,10 +64,11 @@ function diamantutils_stockcolisage_extrafield_code()
  * L'attribut du lot existe-t-il (élément product_lot) ?
  *
  * @param	DoliDB	$db		Base de données
- * @param	string	$code	Code de l'attribut ('' = code configuré)
+ * @param	string	$code		Code de l'attribut ('' = code configuré)
+ * @param	bool	$refresh	Relire la base (après création)
  * @return	bool
  */
-function diamantutils_stockcolisage_extrafield_exists($db, $code = '')
+function diamantutils_stockcolisage_extrafield_exists($db, $code = '', $refresh = false)
 {
 	static $cache = array();
 
@@ -77,7 +78,7 @@ function diamantutils_stockcolisage_extrafield_exists($db, $code = '')
 	if ($code === '') {
 		return false;
 	}
-	if (!array_key_exists($code, $cache)) {
+	if ($refresh || !array_key_exists($code, $cache)) {
 		$cache[$code] = false;
 		$sql = "SELECT COUNT(*) as nb FROM ".MAIN_DB_PREFIX."extrafields";
 		$sql .= " WHERE name = '".$db->escape($code)."' AND elementtype = 'product_lot'";
@@ -578,4 +579,194 @@ function diamantutils_stockcolisage_save($db, $user, $fk_product, $lot, $text, $
 	}
 
 	return diamantutils_stockcolisage_text($value);
+}
+
+/*
+ * Colisage calculé (v2.12)
+ *
+ * colisage = f(quantité réelle du lot, qte_par_piece, pieces_par_colis), recalculé à chaque
+ * mouvement de stock (trigger STOCK_MOVEMENT), à l'affichage de l'onglet Stock et par le
+ * bouton « Recalculer tous les colisages ». Une seule règle : diamantutils_colisage_compute().
+ */
+
+/** Code de l'attribut du lot « Pièces par colis » (entier > 0) */
+if (!defined('DIAMANTUTILS_STOCKCOLISAGE_PPC')) {
+	define('DIAMANTUTILS_STOCKCOLISAGE_PPC', 'pieces_par_colis');
+}
+/** Code de l'attribut du lot « Qté par pièce » (décimal > 0, unité du produit) */
+if (!defined('DIAMANTUTILS_STOCKCOLISAGE_QPP')) {
+	define('DIAMANTUTILS_STOCKCOLISAGE_QPP', 'qte_par_piece');
+}
+/** Écart toléré sur le nombre de pièces (erreurs d'arrondi des flottants) */
+if (!defined('DIAMANTUTILS_STOCKCOLISAGE_TOLERANCE')) {
+	define('DIAMANTUTILS_STOCKCOLISAGE_TOLERANCE', 0.02);
+}
+
+/**
+ * Calcul du colisage : fonction pure (aucune lecture en base), utilisée partout.
+ *
+ * @param	mixed	$qty			Quantité du lot (unité du produit)
+ * @param	mixed	$qteParPiece	Quantité d'une pièce (unité du produit)
+ * @param	mixed	$piecesParColis	Pièces par colis complet
+ * @return	array					array('mode' => 'auto'|'manual', 'text' => string, 'warn' => string)
+ */
+function diamantutils_colisage_compute($qty, $qteParPiece, $piecesParColis)
+{
+	global $langs;
+
+	$res = array('mode' => 'manual', 'text' => '', 'warn' => '');
+
+	$qpp = diamantutils_colisage_number($qteParPiece);
+	$ppc = diamantutils_colisage_number($piecesParColis);
+	if ($qpp === null || $ppc === null || $qpp <= 0 || $ppc <= 0 || abs($ppc - round($ppc)) > 1e-9) {
+		return $res;
+	}
+	$res['mode'] = 'auto';
+	$ppc = (int) round($ppc);
+
+	$q = diamantutils_colisage_number($qty);
+	$q = ($q === null ? 0.0 : (float) price2num($q, 'MS'));
+	if ($q < 0) {
+		$res['warn'] = (is_object($langs) ? $langs->transnoentitiesnoconv('DiamantutilsColisageWarnNegative') : 'negative quantity');
+		return $res;
+	}
+
+	$pieces = $q / $qpp;
+	$rounded = round($pieces);
+	if (abs($pieces - $rounded) > DIAMANTUTILS_STOCKCOLISAGE_TOLERANCE) {
+		$res['warn'] = (is_object($langs) ? $langs->transnoentitiesnoconv('DiamantutilsColisageWarnNotMultiple', diamantutils_colisage_format_number($pieces, 2)) : 'not a multiple');
+		return $res;
+	}
+	$pieces = (int) $rounded;
+	if ($pieces <= 0) {
+		return $res;	// lot vide : colisage vidé
+	}
+
+	$px = (is_object($langs) ? $langs->transnoentitiesnoconv('DiamantutilsColisagePx') : 'px');
+	if ($px === 'DiamantutilsColisagePx') {
+		$px = 'px';
+	}
+	$complets = intdiv($pieces, $ppc);
+	$reste = $pieces - $complets * $ppc;
+	if ($complets > 0) {
+		$res['text'] = $complets.' colis de '.$ppc.$px;
+		if ($reste > 0) {
+			$res['text'] .= ' + 1 colis de '.$reste.$px;
+		}
+	} else {
+		$res['text'] = '1 colis de '.$reste.$px;
+	}
+	return $res;
+}
+
+/**
+ * Nombre lu en base ou saisi : float, ou null si vide / non numérique. Virgule acceptée.
+ *
+ * @param	mixed	$value	Valeur
+ * @return	float|null
+ */
+function diamantutils_colisage_number($value)
+{
+	if ($value === null || is_bool($value)) {
+		return null;
+	}
+	if (is_int($value) || is_float($value)) {
+		return (float) $value;
+	}
+	$value = str_replace(array(' ', "\xc2\xa0", ','), array('', '', '.'), trim((string) $value));
+	if ($value === '' || !is_numeric($value)) {
+		return null;
+	}
+	return (float) $value;
+}
+
+/**
+ * Nombre affiché : décimales utiles seulement, séparateur décimal de l'utilisateur
+ *
+ * @param	float	$value		Nombre
+ * @param	int		$maxdec		Décimales au plus
+ * @return	string
+ */
+function diamantutils_colisage_format_number($value, $maxdec = 8)
+{
+	global $langs;
+
+	$txt = number_format((float) $value, $maxdec, '.', '');
+	if (strpos($txt, '.') !== false) {
+		$txt = rtrim(rtrim($txt, '0'), '.');
+	}
+	if ($txt === '-0') {
+		$txt = '0';
+	}
+	$sep = (is_object($langs) ? $langs->transnoentitiesnoconv('SeparatorDecimal') : ',');
+	if ($sep === 'SeparatorDecimal' || $sep === '') {
+		$sep = ',';
+	}
+	return str_replace('.', $sep, $txt);
+}
+
+/**
+ * Attributs « Pièces par colis » et « Qté par pièce » présents (élément product_lot) ?
+ *
+ * @param	DoliDB	$db		Base de données
+ * @return	array			array(code => bool)
+ */
+function diamantutils_colisage_fields_status($db)
+{
+	return array(
+		DIAMANTUTILS_STOCKCOLISAGE_PPC => diamantutils_stockcolisage_extrafield_exists($db, DIAMANTUTILS_STOCKCOLISAGE_PPC),
+		DIAMANTUTILS_STOCKCOLISAGE_QPP => diamantutils_stockcolisage_extrafield_exists($db, DIAMANTUTILS_STOCKCOLISAGE_QPP),
+	);
+}
+
+/**
+ * Crée les attributs du lot « Pièces par colis » et « Qté par pièce » s'ils n'existent pas
+ * (idempotent, appelé à l'activation du module et à l'enregistrement de l'onglet).
+ *
+ * @param	DoliDB	$db		Base de données
+ * @param	string	$error	Message d'erreur en sortie
+ * @return	int				Nombre d'attributs créés, -1 si erreur
+ */
+function diamantutils_colisage_install_extrafields($db, &$error)
+{
+	require_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
+
+	$defs = array(
+		DIAMANTUTILS_STOCKCOLISAGE_PPC => array('Pièces par colis', 'int', '10', 110),
+		DIAMANTUTILS_STOCKCOLISAGE_QPP => array('Qté par pièce', 'double', '24,8', 111),
+	);
+	$nb = 0;
+	foreach ($defs as $code => $def) {
+		if (diamantutils_stockcolisage_extrafield_exists($db, $code, true)) {
+			continue;
+		}
+		$extrafields = new ExtraFields($db);
+		$result = $extrafields->addExtraField(
+			$code,
+			$def[0],		// libellé (texte : l'attribut reste lisible module désactivé)
+			$def[1],
+			$def[3],		// position
+			$def[2],		// taille
+			'product_lot',	// attributs des lots (Productlot::$table_element)
+			0,				// unique
+			0,				// obligatoire
+			'',				// valeur par défaut
+			'',				// paramètres
+			1,				// alwayseditable
+			'',				// perms
+			'1',			// visible
+			'',				// aide
+			'',				// computed
+			'',				// entity
+			'',				// langfile
+			'1'				// enabled
+		);
+		if ($result < 0) {
+			$error = $extrafields->error;
+			return -1;
+		}
+		diamantutils_stockcolisage_extrafield_exists($db, $code, true);
+		$nb++;
+	}
+	return $nb;
 }

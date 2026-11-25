@@ -411,3 +411,8 @@ DiamantutilsStockColisageErrProduct = Produit introuvable ou non géré par lots
 DiamantutilsStockColisageErrBatch = Lot « %s » inconnu pour ce produit (ni en stock, ni dans les lots du produit).
 DiamantutilsStockColisageErrLength = Colisage trop long (%s caractères au plus).
 DiamantutilsStockColisageErrExtrafield = L'attribut « %s » n'existe pas pour les lots : créez-le dans la configuration du module Lot/série (Attributs supplémentaires).
+
+# Colisage calculé (pièces par colis, qté par pièce)
+DiamantutilsColisagePx = px
+DiamantutilsColisageWarnNegative = Quantité négative : colisage non calculé.
+DiamantutilsColisageWarnNotMultiple = Quantité non multiple de la pièce (%s pièces) : colisage non calculé.

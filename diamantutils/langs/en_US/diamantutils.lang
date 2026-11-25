@@ -411,3 +411,9 @@ DiamantutilsStockColisageErrProduct = Product not found or not batch-managed.
 DiamantutilsStockColisageErrBatch = Lot "%s" unknown for this product (neither in stock nor among the product lots).
 DiamantutilsStockColisageErrLength = Packing too long (%s characters at most).
 DiamantutilsStockColisageErrExtrafield = Attribute "%s" does not exist for lots: create it in the Lot/serial module setup (Complementary attributes).
+
+# Computed packing (pieces per package, quantity per piece)
+# The computed text is business data stored in the lot: same wording in every language.
+DiamantutilsColisagePx = px
+DiamantutilsColisageWarnNegative = Negative quantity: packing not computed.
+DiamantutilsColisageWarnNotMultiple = Quantity is not a multiple of the piece (%s pieces): packing not computed.
