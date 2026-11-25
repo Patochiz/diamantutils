@@ -480,6 +480,7 @@ if ($tab == 'stocktable') {
 		$sql = "SELECT COUNT(DISTINCT p.rowid) as nb FROM ".MAIN_DB_PREFIX."product as p";
 		$sql .= " WHERE p.rowid IN (".diamantutils_stocktable_scope_sql($catids).")";
 		$sql .= " AND p.fk_product_type = 0 AND p.entity IN (".getEntity('product').")";
+		$sql .= diamantutils_stocktable_noparent_sql('p.rowid');
 		$resql = $db->query($sql);
 		if ($resql) {
 			$obj = $db->fetch_object($resql);

@@ -220,7 +220,22 @@ function diamantutils_stocktable_scope_sql($catids)
 }
 
 /**
- * Données de l'écran : produits du périmètre ayant du stock ou des commandes en cours, leurs
+ * Condition SQL excluant les produits parents de variantes (produits ayant au moins une variante)
+ *
+ * @param	string	$field	Colonne de l'id produit (« p.rowid »)
+ * @return	string			« AND NOT EXISTS (...) », ou '' si le module Variantes est inactif
+ */
+function diamantutils_stocktable_noparent_sql($field)
+{
+	if (!isModEnabled('variants')) {
+		return '';
+	}
+	return " AND NOT EXISTS (SELECT 1 FROM ".MAIN_DB_PREFIX."product_attribute_combination as pac WHERE pac.fk_product_parent = ".$field.")";
+}
+
+/**
+ * Données de l'écran : produits du périmètre ayant du stock ou des commandes en cours (hors
+ * produits parents de variantes), leurs
  * lots en stock et les attributs de ces lots. 7 requêtes quel que soit le nombre de produits.
  *
  * @param	DoliDB	$db			Base de données
@@ -253,6 +268,7 @@ function diamantutils_stocktable_load($db, $catids)
 	$sql .= " WHERE p.rowid IN (".$filtersql.")";
 	$sql .= " AND p.fk_product_type = 0";
 	$sql .= " AND p.entity IN (".getEntity('product').")";
+	$sql .= diamantutils_stocktable_noparent_sql('p.rowid');
 	$sql .= " GROUP BY p.rowid, p.ref, p.label, p.tobatch, u.short_label";
 	$resql = $db->query($sql);
 	if (!$resql) {

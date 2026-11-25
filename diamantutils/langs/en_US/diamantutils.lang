@@ -288,7 +288,7 @@ DiamantutilsStockTableTabTitle = Stock table
 DiamantutilsStockTableTitle = Batch stock table
 DiamantutilsStockTableEnabledDesc = Products → Stock menu "Stock table by lot": for the products of the chosen tags, lots in stock with their packing, pieces per package and qty per piece (lot attributes) and their real quantity. Dolibarr data only, no stock movement.
 DiamantutilsStockTableCategories = Product tags included
-DiamantutilsStockTableCategoriesDesc = Only products of these tags (product categories) are offered, accepted and compared. No tag = no product.
+DiamantutilsStockTableCategoriesDesc = Products of these tags (product categories) shown in the table, variant parent products excluded. No tag = no product.
 DiamantutilsStockTableSubcategories = Include subcategories
 DiamantutilsStockTableSubcategoriesDesc = Products of subcategories of the chosen tags are also included.
 DiamantutilsStockTableTolerance = Tolerated difference
@@ -299,7 +299,7 @@ DiamantutilsStockTableExcludeWarehousesDesc = Their stock is counted neither in 
 DiamantutilsStockTableStatus = Status
 DiamantutilsStockTableRights = User permissions (DiamantUtils): view, add / edit, delete table lines.
 DiamantutilsStockTableNoCategory = No product tag chosen: the table contains no product.
-DiamantutilsStockTableScopeCount = %s tag(s) (subcategories included), %s product(s) included
+DiamantutilsStockTableScopeCount = %s tag(s) (subcategories included), %s product(s) included, variant parent products excluded
 DiamantutilsStockTableLineCount = %s line(s) entered
 DiamantutilsStockTableNoTable = Table llx_diamantutils_stockline missing: disable then enable the module.
 DiamantutilsStockTableDesc = Packing observed at the warehouse, per batch. Dolibarr is the stock reference: the table reports differences, it creates no movement.

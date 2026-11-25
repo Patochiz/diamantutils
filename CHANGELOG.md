@@ -6,6 +6,7 @@
 - Par produit : stock physique tous entrepôts ; commandes client validées ou en cours moins les expéditions validées ; commandes fournisseur approuvées ou commandées moins les réceptions ; stock virtuel = physique − client + fournisseur. Calculs de la requête de suivi existante, avec filtre d'entité ; liens vers les commandes du produit.
 - Par lot : stock physique hors entrepôts ignorés du colisage ; stock des entrepôts ignorés sur une ligne à part, pour que les lignes totalisent le stock physique du produit.
 - Produits sans stock mais avec des commandes en cours désormais affichés.
+- Produits parents de variantes exclus du tableau (et du décompte de l'onglet de configuration) ; leurs variantes restent affichées.
 - Mise à jour : déposer les fichiers (aucune réactivation nécessaire).
 
 ## 2.13 — Tableau de stock par lots : données Dolibarr seules

@@ -288,7 +288,7 @@ DiamantutilsStockTableTabTitle = Tableau de stock
 DiamantutilsStockTableTitle = Tableau de stock par lots
 DiamantutilsStockTableEnabledDesc = Menu Produits → Stock « Tableau de stock par lots » : pour les produits des tags choisis, lots en stock avec leur colisage, leurs pièces par colis et leur qté par pièce (attributs du lot) et leur quantité réelle. Données Dolibarr seules, aucun mouvement de stock.
 DiamantutilsStockTableCategories = Tags produit concernés
-DiamantutilsStockTableCategoriesDesc = Seuls les produits de ces tags (catégories produit) sont proposés, acceptés et comparés. Aucun tag = aucun produit.
+DiamantutilsStockTableCategoriesDesc = Produits de ces tags (catégories produit) affichés dans le tableau, hors produits parents de variantes. Aucun tag = aucun produit.
 DiamantutilsStockTableSubcategories = Inclure les sous-catégories
 DiamantutilsStockTableSubcategoriesDesc = Les produits des sous-catégories des tags choisis font aussi partie du tableau.
 DiamantutilsStockTableTolerance = Écart toléré
@@ -299,7 +299,7 @@ DiamantutilsStockTableExcludeWarehousesDesc = Leur stock n'est compté ni dans l
 DiamantutilsStockTableStatus = État
 DiamantutilsStockTableRights = Droits utilisateur (DiamantUtils) : voir, ajouter / modifier, supprimer les lignes du tableau.
 DiamantutilsStockTableNoCategory = Aucun tag produit choisi : le tableau ne contient aucun produit.
-DiamantutilsStockTableScopeCount = %s tag(s) (sous-catégories comprises), %s produit(s) concerné(s)
+DiamantutilsStockTableScopeCount = %s tag(s) (sous-catégories comprises), %s produit(s) concerné(s), hors produits parents de variantes
 DiamantutilsStockTableLineCount = %s ligne(s) saisie(s)
 DiamantutilsStockTableNoTable = Table llx_diamantutils_stockline absente : désactivez puis réactivez le module.
 DiamantutilsStockTableDesc = Colisage constaté au dépôt, par lot. Dolibarr est la référence du stock : le tableau signale les écarts, il ne crée aucun mouvement.
