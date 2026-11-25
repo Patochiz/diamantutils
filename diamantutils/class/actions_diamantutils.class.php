@@ -24,6 +24,11 @@
  *  - addMoreActionsButtons : tableau de remplacement (lib/stockcolisage.lib.php) pour un
  *    produit à lots, colonne Colisage modifiable ; tableau natif masqué par JS ensuite.
  *
+ * Renommer un lot (productlotcard, product/stock/productlot_card.php) :
+ *  - addMoreActionsButtons : bouton « Renommer le lot » ;
+ *  - formConfirm : saisie du nouveau numéro ;
+ *  - doActions : confirm_diamantutils_renamelot (lib/lotrename.lib.php, transaction).
+ *
  * Liaison des commandes fournisseurs (ordersuppliercard) :
  *  - showLinkToObjectBlock : entrée « Lier à une commande fournisseur » (clé supplierorder,
  *    tous fournisseurs). La fiche exclut les clés order_supplier et supplier_order du menu ;
@@ -75,6 +80,11 @@ class ActionsDiamantutils
 		if (in_array('ordersuppliercard', $contexts) && in_array($action, array('addlink', 'addlinkbyref'))
 			&& GETPOST('addlink', 'alpha') == self::LINKSO_KEY && !GETPOST('cancel', 'alpha')) {
 			return $this->doLinkSupplierOrder($object, $action);
+		}
+
+		// Fiche lot : renommage confirmé
+		if (in_array('productlotcard', $contexts) && $action == 'confirm_diamantutils_renamelot') {
+			return $this->doRenameLot($object, $action);
 		}
 
 		// Lots de produits sur devis / commande client
@@ -565,6 +575,16 @@ jQuery(function ($) {
 			return 0;	// boutons natifs « Transférer / Corriger le stock » affichés aussi
 		}
 
+		// Fiche lot : bouton « Renommer le lot »
+		if (in_array('productlotcard', $contexts)) {
+			if ($this->canRenameLot($object) && $action == '') {
+				$langs->load('diamantutils@diamantutils');
+				$url = $_SERVER['PHP_SELF'].'?id='.((int) $object->id).'&action=diamantutils_renamelot&token='.newToken();
+				print dolGetButtonAction($langs->trans('DiamantutilsLotRename'), '', 'default', $url, 'diamantutils-renamelot', 1);
+			}
+			return 0;
+		}
+
 		if ($this->lotPieceElement($contexts, $object) === '' || in_array($action, array('editline', 'presend'))) {
 			return 0;
 		}
@@ -622,6 +642,37 @@ jQuery(function ($) {
 
 		$this->resprints = '';
 		$contexts = explode(':', (string) $parameters['context']);
+
+		// Fiche lot : nouveau numéro de lot
+		if (in_array('productlotcard', $contexts) && $action == 'diamantutils_renamelot') {
+			if (!$this->canRenameLot($object)) {
+				return 0;
+			}
+			$langs->load('diamantutils@diamantutils');
+			$form = new Form($this->db);
+			$formquestion = array(
+				array(
+					'type' => 'text',
+					'name' => 'diamantutils_newbatch',
+					'label' => $langs->trans('DiamantutilsLotRenameNew'),
+					'value' => (string) $object->batch,
+					'morecss' => 'minwidth300',
+				),
+			);
+			$this->resprints = $form->formconfirm(
+				$_SERVER['PHP_SELF'].'?id='.((int) $object->id),
+				$langs->trans('DiamantutilsLotRename'),
+				$langs->trans('DiamantutilsLotRenameQuestion', $object->batch),
+				'confirm_diamantutils_renamelot',
+				$formquestion,
+				'yes',
+				1,
+				280,
+				600
+			);
+			return 0;
+		}
+
 		if ($action != 'diamantutils_savelot' || $this->lotPieceElement($contexts, $object) === '') {
 			return 0;
 		}
@@ -655,6 +706,78 @@ jQuery(function ($) {
 		);
 
 		return 0;
+	}
+
+	/**
+	 * Renommage possible : fonction active, lot chargé, droits
+	 *
+	 * @param	Object	$object		Objet de la page (Productlot attendu)
+	 * @return	bool
+	 */
+	private function canRenameLot($object)
+	{
+		global $user;
+
+		if (!is_object($object) || empty($object->id) || $object->element != 'productlot') {
+			return false;
+		}
+		dol_include_once('/diamantutils/lib/lotrename.lib.php');
+		return diamantutils_lotrename_enabled() && diamantutils_lotrename_allowed($user);
+	}
+
+	/**
+	 * Action confirm_diamantutils_renamelot : renomme le lot dans toutes les tables (transaction)
+	 *
+	 * @param	Productlot	$object		Lot de la page
+	 * @param	string		$action		Action (vidée)
+	 * @return	int						0
+	 */
+	private function doRenameLot($object, &$action)
+	{
+		global $langs, $user;
+
+		$action = '';
+		$langs->load('diamantutils@diamantutils');
+		dol_include_once('/diamantutils/lib/lotrename.lib.php');
+
+		if (GETPOST('token', 'alpha') !== currentToken()) {
+			setEventMessages($langs->trans('DiamantutilsLotErrorToken'), null, 'errors');
+			return 0;
+		}
+		if (GETPOST('confirm', 'alpha') != 'yes') {
+			return 0;
+		}
+		if (!diamantutils_lotrename_enabled()) {
+			setEventMessages($langs->trans('DiamantutilsFeatureDisabled'), null, 'errors');
+			return 0;
+		}
+		if (!diamantutils_lotrename_allowed($user)) {
+			setEventMessages($langs->trans('NotEnoughPermissions'), null, 'errors');
+			return 0;
+		}
+		if (!is_object($object) || empty($object->id) || $object->element != 'productlot' || $object->id != GETPOSTINT('id')) {
+			setEventMessages($langs->trans('ErrorRecordNotFound'), null, 'errors');
+			return 0;
+		}
+
+		$old = (string) $object->batch;
+		$new = trim(preg_replace('/\s+/u', ' ', (string) GETPOST('diamantutils_newbatch', 'alphanohtml')));
+		$error = '';
+		$counts = diamantutils_lotrename($this->db, $user, $object, $new, $error);
+		if ($counts === false) {
+			setEventMessages($langs->trans('DiamantutilsLotRenameFailed').' '.$error, null, 'errors');
+			return 0;
+		}
+
+		$details = array();
+		foreach ($counts as $table => $nb) {
+			if ($nb > 0 && $table != 'product_lot') {
+				$details[] = $langs->trans('DiamantutilsLotRenameTable_'.$table).' : '.$nb;
+			}
+		}
+		setEventMessages($langs->trans('DiamantutilsLotRenameDone', $old, $new), $details, 'mesgs');
+		header('Location: '.$_SERVER['PHP_SELF'].'?id='.((int) $object->id));
+		exit;
 	}
 
 	/**

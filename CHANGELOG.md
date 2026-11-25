@@ -1,5 +1,14 @@
 # Changelog — DiamantUtils
 
+## 2.15 — Renommer un lot
+
+- Fiche lot : bouton **Renommer le lot** (hook `productlotcard` : `addMoreActionsButtons`, `formConfirm`, `doActions`). Nouveau numéro saisi dans une confirmation.
+- Numéro remplacé pour le produit du lot seulement, en une transaction (tout ou rien), dans la fiche lot, le stock par entrepôt, les mouvements de stock, les lignes de lot des expéditions et réceptions, les lignes de facture, inventaires, fabrications, transferts de stock et les tables du module (transformations, ancien tableau de stock). Tables vérifiées en Dolibarr 20 et 23.
+- Refusé si le numéro est vide, trop long, identique ou déjà utilisé pour ce produit (pas de fusion de lots). Changement de majuscules permis.
+- Trace dans la note privée du lot et dans le journal ; nombre de lignes modifiées par table affiché.
+- Droits : Produits « Créer/modifier » et Stocks « Créer des mouvements ». Option `DIAMANTUTILS_LOTRENAME_ENABLED` (désactivée par défaut) dans l'onglet **Stock produit**.
+- Mise à jour : déposer les fichiers, **désactiver puis réactiver le module** (hook), puis activer l'option.
+
 ## 2.14 — Tableau de stock par lots : stock physique, commandes, stock virtuel
 
 - La colonne Quantité est remplacée par **Stock physique**, **Cdes client**, **Cdes fournisseur** et **Stock virtuel**.

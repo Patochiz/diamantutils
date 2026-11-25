@@ -10,6 +10,7 @@ Module Dolibarr interne de Diamant Industrie (Dolibarr 20, PHP 8.2, déploiement
 - **Prix de revient à la réception** : le prix de revient du produit prend le prix rendu saisi à chaque réception fournisseur, section ci-dessous.
 - **Liaison des commandes fournisseurs** : lier une commande fournisseur à une commande d'un autre fournisseur (transport ↔ marchandise), section ci-dessous.
 - **Tableau de stock par lots** (menu Produits → Stock) : pour les produits des tags choisis, stock physique, commandes en cours et stock virtuel, et lots en stock avec colisage, pièces par colis et qté par pièce, données Dolibarr seules, section ci-dessous.
+- **Renommer un lot** : bouton sur la fiche lot, numéro remplacé dans le stock et tout l'historique du produit, section ci-dessous.
 - **Colisage sur l'onglet Stock** de la fiche produit : pour un produit à lots, tableau du stock sans dates ni valorisations, avec le colisage du lot modifiable directement ou **calculé et tenu à jour** à chaque mouvement de stock, section ci-dessous.
 
 Chaque fonctionnalité a son onglet dans **Configuration → Modules → DiamantUtils**, avec une option pour l'activer ou la désactiver et ses réglages propres. Une fonctionnalité désactivée masque ses menus et pages ; ses données sont conservées.
@@ -449,3 +450,42 @@ Maintien à jour, trois niveaux :
 | `core/modules/modDiamantutils.class.php` | hook `stockproductcard`, constantes, attributs `pieces_par_colis` / `qte_par_piece` (activation), version |
 | `admin/setup.php`, `lib/diamantutils.lib.php` | onglet de configuration **Stock produit**, bouton de recalcul |
 | `langs/fr_FR/diamantutils.lang`, `langs/en_US/diamantutils.lang` | libellés |
+
+---
+
+## Renommer un lot
+
+### Principe
+Dolibarr ne permet pas de modifier le numéro d'un lot : ce numéro n'est pas une clé, il est recopié en texte dans chaque table qui cite le lot. Le module ajoute sur la fiche lot un bouton **Renommer le lot** qui remplace l'ancien numéro par le nouveau, **pour le produit du lot seulement**, dans toutes ces tables, en une seule transaction : tout est renommé, ou rien.
+
+| Table | Contenu |
+|---|---|
+| `llx_product_lot` | fiche lot |
+| `llx_product_batch` | stock par entrepôt et par lot |
+| `llx_stock_mouvement` | mouvements de stock (historique) |
+| `llx_expeditiondet_batch`, `llx_receptiondet_batch` | lignes de lot des expéditions et des réceptions |
+| `llx_facturedet` | lignes de facture (point de vente) |
+| `llx_inventorydet`, `llx_mrp_production`, `llx_stocktransfer_stocktransferline` | inventaires, fabrications, transferts de stock (si le module a été utilisé) |
+| `llx_diamantutils_transfo_det`, `llx_diamantutils_stockline` | transformations et ancien tableau de stock (module) |
+
+Tables vérifiées dans Dolibarr 20 et 23. L'identifiant du lot ne change pas : attributs (colisage, pièces par colis…), fichiers joints (rangés sous l'identifiant), notes et liens restent attachés. Les tables d'autres modules externes qui citeraient un numéro de lot ne sont pas connues et ne sont pas modifiées.
+
+### Règles
+- Refus avec message, rien n'est modifié : numéro vide, de plus de 128 caractères, identique, ou **déjà utilisé pour ce produit** (autre fiche lot, stock ou historique d'un autre lot : deux lots ne sont jamais fusionnés). Un simple changement de majuscules est permis.
+- Un lot du même nom sur un autre produit n'est pas touché.
+- Trace : ligne « Lot renommé : « ancien » → « nouveau » le … par … » ajoutée à la note privée du lot, et journal (`LOG_NOTICE`). Le message de confirmation indique le nombre de lignes modifiées par table.
+- Droits : Produits « Créer/modifier » (comme la fiche lot) **et** Stocks « Créer des mouvements » (le stock par lot est réécrit). Jeton CSRF vérifié.
+
+### Mise en service
+1. Déposer les fichiers par FTP.
+2. **Désactiver puis réactiver le module** : enregistre le hook `productlotcard` de la fiche lot.
+3. Configuration du module → onglet **Stock produit** → **Renommer un lot** (`DIAMANTUTILS_LOTRENAME_ENABLED`, désactivé par défaut). L'état du hook y est affiché.
+
+### Fichiers
+
+| Fichier | Rôle |
+|---|---|
+| `lib/lotrename.lib.php` | tables concernées, contrôles, renommage en transaction |
+| `class/actions_diamantutils.class.php` | hooks de la fiche lot : bouton, confirmation, action |
+| `admin/setup.php` | réglage dans l'onglet **Stock produit** |
+| `core/modules/modDiamantutils.class.php` | hook `productlotcard`, constante, version |

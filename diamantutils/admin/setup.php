@@ -23,6 +23,7 @@ dol_include_once('/diamantutils/lib/lot.lib.php');
 dol_include_once('/diamantutils/class/diamantlot.class.php');
 dol_include_once('/diamantutils/lib/stocktable.lib.php');
 dol_include_once('/diamantutils/lib/stockcolisage.lib.php');
+dol_include_once('/diamantutils/lib/lotrename.lib.php');
 require_once DOL_DOCUMENT_ROOT.'/categories/class/categorie.class.php';
 
 if (!$user->admin) {
@@ -224,6 +225,11 @@ if ($action == 'update') {
 			}
 		}
 		if (dolibarr_set_const($db, 'DIAMANTUTILS_STOCKCOLISAGE_AUTO', $auto, 'chaine', 0, '', $conf->entity) < 0) {
+			$error++;
+		}
+		// Renommer un lot (fiche lot)
+		$rename = GETPOSTINT('DIAMANTUTILS_LOTRENAME_ENABLED') ? 1 : 0;
+		if (dolibarr_set_const($db, 'DIAMANTUTILS_LOTRENAME_ENABLED', $rename, 'chaine', 0, '', $conf->entity) < 0) {
 			$error++;
 		}
 		// Entrepôts ignorés pour la quantité du lot : '0' = aucun (constante absente = Sous-traitance)
@@ -551,6 +557,12 @@ if ($tab == 'stockcolisage') {
 		$form->multiselectarray('DIAMANTUTILS_STOCKCOLISAGE_EXCLUDE_WAREHOUSES', $sc_warehouses, diamantutils_stockcolisage_excluded_warehouses(), 0, 0, 'minwidth300', 0, '90%')
 	);
 
+	diamantutils_setup_row(
+		$langs->trans('DiamantutilsLotRenameSetup'),
+		$langs->trans('DiamantutilsLotRenameSetupDesc'),
+		$form->selectyesno('DIAMANTUTILS_LOTRENAME_ENABLED', getDolGlobalInt('DIAMANTUTILS_LOTRENAME_ENABLED') ? 1 : 0, 1)
+	);
+
 	// État : attributs du lot, module Lot/série, hook enregistré (module réactivé)
 	if ($sc_code !== '' && diamantutils_stockcolisage_extrafield_exists($db, $sc_code)) {
 		$status = img_picto('', 'tick', 'class="pictofixedwidth"').$langs->trans('DiamantutilsStockColisageExtrafieldOk', $sc_code);
@@ -580,6 +592,12 @@ if ($tab == 'stockcolisage') {
 		$status .= img_picto('', 'tick', 'class="pictofixedwidth"').$langs->trans('DiamantutilsStockColisageHookOk');
 	} else {
 		$status .= img_warning('', 'class="pictofixedwidth"').'<span class="warning">'.$langs->trans('DiamantutilsStockColisageHookMissing').'</span>';
+	}
+	$status .= '<br>';
+	if (in_array('productlotcard', $hooks)) {
+		$status .= img_picto('', 'tick', 'class="pictofixedwidth"').$langs->trans('DiamantutilsLotRenameHookOk');
+	} else {
+		$status .= img_warning('', 'class="pictofixedwidth"').'<span class="warning">'.$langs->trans('DiamantutilsLotRenameHookMissing').'</span>';
 	}
 	diamantutils_setup_row($langs->trans('DiamantutilsStockColisageStatus'), $langs->trans('DiamantutilsStockColisageRights'), $status);
 }
