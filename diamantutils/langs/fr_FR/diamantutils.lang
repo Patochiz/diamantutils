@@ -286,9 +286,9 @@ DiamantutilsLinkSOErrorSelf = Une commande ne peut pas être liée à elle-même
 # Tableau de stock par lots (v2.10)
 DiamantutilsStockTableTabTitle = Tableau de stock
 DiamantutilsStockTableTitle = Tableau de stock par lots
-DiamantutilsStockTableEnabledDesc = Menu Produits → Stock « Tableau de stock par lots » : colisage constaté au dépôt (pièces, pièces par colis, dimensions) par lot, comparé au stock réel Dolibarr. Aucun mouvement de stock n'est créé. Désactivée, les lignes saisies sont conservées mais inaccessibles.
+DiamantutilsStockTableEnabledDesc = Menu Produits → Stock « Tableau de stock par lots » : pour les produits des tags choisis, lots en stock avec leur colisage, leurs pièces par colis et leur qté par pièce (attributs du lot) et leur quantité réelle. Données Dolibarr seules, aucun mouvement de stock.
 DiamantutilsStockTableCategories = Tags produit concernés
-DiamantutilsStockTableCategoriesDesc = Seuls les produits de ces tags (catégories produit) sont proposés, acceptés et comparés. Aucun tag = aucun produit.
+DiamantutilsStockTableCategoriesDesc = Produits de ces tags (catégories produit) affichés dans le tableau, hors produits parents de variantes. Aucun tag = aucun produit.
 DiamantutilsStockTableSubcategories = Inclure les sous-catégories
 DiamantutilsStockTableSubcategoriesDesc = Les produits des sous-catégories des tags choisis font aussi partie du tableau.
 DiamantutilsStockTableTolerance = Écart toléré
@@ -299,7 +299,7 @@ DiamantutilsStockTableExcludeWarehousesDesc = Leur stock n'est compté ni dans l
 DiamantutilsStockTableStatus = État
 DiamantutilsStockTableRights = Droits utilisateur (DiamantUtils) : voir, ajouter / modifier, supprimer les lignes du tableau.
 DiamantutilsStockTableNoCategory = Aucun tag produit choisi : le tableau ne contient aucun produit.
-DiamantutilsStockTableScopeCount = %s tag(s) (sous-catégories comprises), %s produit(s) concerné(s)
+DiamantutilsStockTableScopeCount = %s tag(s) (sous-catégories comprises), %s produit(s) concerné(s), hors produits parents de variantes
 DiamantutilsStockTableLineCount = %s ligne(s) saisie(s)
 DiamantutilsStockTableNoTable = Table llx_diamantutils_stockline absente : désactivez puis réactivez le module.
 DiamantutilsStockTableDesc = Colisage constaté au dépôt, par lot. Dolibarr est la référence du stock : le tableau signale les écarts, il ne crée aucun mouvement.
@@ -442,3 +442,47 @@ DiamantutilsColisageRecalcUnavailable = Recalcul indisponible : activez la fonct
 DiamantutilsColisageRecalcDone = Recalcul terminé : %s lot(s) mis à jour, %s inchangé(s), %s avertissement(s).
 DiamantutilsColisageRecalcErrors = %s lot(s) en erreur (voir le journal).
 DiamantutilsColisageRecalcNoWarning = Aucun avertissement.
+
+# Tableau de stock par lots v2.13 (données Dolibarr seules)
+DiamantutilsStockTableNbProducts = %s produit(s)
+DiamantutilsStockTableDescDoli = Données Dolibarr : par produit, stock physique, commandes client et fournisseur en cours, stock virtuel ; par lot en stock, colisage, pièces par colis et qté par pièce (attributs du lot, modifiables ici comme sur l'onglet Stock du produit) et stock physique.
+DiamantutilsStockTableAutoOff = Colisage calculé inactif : activez-le dans l'onglet « Stock produit » de la configuration pour modifier pièces par colis et qté par pièce.
+DiamantutilsStockTableSearchDoli = Rechercher (produit, lot, colisage)…
+DiamantutilsStockTableEmptyDoli = Aucun stock pour les produits de ces tags.
+DiamantutilsStockTableNoLotPartLine = Stock non rattaché à un lot
+DiamantutilsStockTableNoLotProduct = Produit sans gestion de lots
+DiamantutilsStockTableRightsDoli = Accès : droit DiamantUtils « Voir le tableau de stock par lots ». Modification des attributs du lot : droit Produits « Créer/modifier », fonctionnalité « Stock produit » active.
+DiamantutilsStockTableColisageOk = Fonctionnalité « Stock produit » active : colisage modifiable dans le tableau
+DiamantutilsStockTableColisageOff = Fonctionnalité « Stock produit » inactive : colisage, pièces par colis et qté par pièce en lecture seule
+DiamantutilsStockTableOldLines = %s ligne(s) saisie(s) avant la v2.13 conservée(s) en base (llx_diamantutils_stockline), plus affichée(s).
+DiamantutilsStockTablePhysical = Stock physique
+DiamantutilsStockTableCustomerOrders = Cdes client
+DiamantutilsStockTableSupplierOrders = Cdes fournisseur
+DiamantutilsStockTableVirtual = Stock virtuel
+DiamantutilsStockTableIgnoredLine = Entrepôts ignorés pour le colisage (%s)
+
+# Renommer un lot (fiche lot)
+DiamantutilsLotRename = Renommer le lot
+DiamantutilsLotRenameNew = Nouveau numéro de lot
+DiamantutilsLotRenameQuestion = Renommer le lot « %s » ? Le numéro est remplacé, pour ce produit, dans le stock et dans tout l'historique (mouvements, expéditions, réceptions, inventaires, fabrications, transferts, transformations). L'opération est tracée dans la note privée du lot.
+DiamantutilsLotRenameDone = Lot « %s » renommé en « %s ».
+DiamantutilsLotRenameFailed = Lot non renommé, rien n'a été modifié.
+DiamantutilsLotRenameErrEmpty = Le nouveau numéro de lot est vide.
+DiamantutilsLotRenameErrLength = Numéro de lot trop long (%s caractères au plus).
+DiamantutilsLotRenameErrSame = Le nouveau numéro est identique à l'actuel.
+DiamantutilsLotRenameErrExists = Le numéro « %s » existe déjà pour ce produit (fiche lot, stock ou historique) : renommage refusé pour ne pas mélanger deux lots.
+DiamantutilsLotRenameTrace = Lot renommé : « %s » → « %s » le %s par %s.
+DiamantutilsLotRenameSetup = Renommer un lot
+DiamantutilsLotRenameSetupDesc = Fiche lot : bouton « Renommer le lot ». Le numéro est remplacé, pour le produit du lot, dans le stock et dans tout l'historique Dolibarr, en une seule opération (tout ou rien) ; refusé si le nouveau numéro existe déjà pour ce produit. Droits : Produits « Créer/modifier » et Stocks « Créer des mouvements ».
+DiamantutilsLotRenameHookOk = Hook de la fiche lot enregistré
+DiamantutilsLotRenameHookMissing = Hook de la fiche lot non enregistré : désactivez puis réactivez le module.
+DiamantutilsLotRenameTable_product_batch = Stock par entrepôt
+DiamantutilsLotRenameTable_stock_mouvement = Mouvements de stock
+DiamantutilsLotRenameTable_expeditiondet_batch = Lignes d'expédition
+DiamantutilsLotRenameTable_receptiondet_batch = Lignes de réception
+DiamantutilsLotRenameTable_facturedet = Lignes de facture
+DiamantutilsLotRenameTable_inventorydet = Lignes d'inventaire
+DiamantutilsLotRenameTable_mrp_production = Lignes de fabrication
+DiamantutilsLotRenameTable_stocktransfer_stocktransferline = Lignes de transfert de stock
+DiamantutilsLotRenameTable_diamantutils_transfo_det = Lignes de transformation
+DiamantutilsLotRenameTable_diamantutils_stockline = Lignes de l'ancien tableau de stock

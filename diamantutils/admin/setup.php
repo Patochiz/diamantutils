@@ -23,6 +23,7 @@ dol_include_once('/diamantutils/lib/lot.lib.php');
 dol_include_once('/diamantutils/class/diamantlot.class.php');
 dol_include_once('/diamantutils/lib/stocktable.lib.php');
 dol_include_once('/diamantutils/lib/stockcolisage.lib.php');
+dol_include_once('/diamantutils/lib/lotrename.lib.php');
 require_once DOL_DOCUMENT_ROOT.'/categories/class/categorie.class.php';
 
 if (!$user->admin) {
@@ -195,21 +196,6 @@ if ($action == 'update') {
 		if (dolibarr_set_const($db, 'DIAMANTUTILS_STOCKTABLE_SUBCATEGORIES', $withsub, 'chaine', 0, '', $conf->entity) < 0) {
 			$error++;
 		}
-
-		// Tolérance : nombre ≥ 0, refusé sinon
-		$tolerance = price2num(GETPOST('DIAMANTUTILS_STOCKTABLE_TOLERANCE', 'alpha'));
-		if ($tolerance === '' || !is_numeric($tolerance) || (float) $tolerance < 0) {
-			setEventMessages($langs->trans('DiamantutilsStockTableToleranceInvalid'), null, 'errors');
-			$error++;
-		} elseif (dolibarr_set_const($db, 'DIAMANTUTILS_STOCKTABLE_TOLERANCE', (string) ((float) $tolerance), 'chaine', 0, '', $conf->entity) < 0) {
-			$error++;
-		}
-
-		// Entrepôts exclus : '0' = aucun (constante absente = entrepôt Sous-traitance)
-		$warehouses = diamantutils_stocktable_ids(GETPOST('DIAMANTUTILS_STOCKTABLE_EXCLUDE_WAREHOUSES', 'array'));
-		if (dolibarr_set_const($db, 'DIAMANTUTILS_STOCKTABLE_EXCLUDE_WAREHOUSES', (empty($warehouses) ? '0' : implode(',', $warehouses)), 'chaine', 0, '', $conf->entity) < 0) {
-			$error++;
-		}
 	}
 
 	if ($tab == 'stockcolisage') {
@@ -239,6 +225,11 @@ if ($action == 'update') {
 			}
 		}
 		if (dolibarr_set_const($db, 'DIAMANTUTILS_STOCKCOLISAGE_AUTO', $auto, 'chaine', 0, '', $conf->entity) < 0) {
+			$error++;
+		}
+		// Renommer un lot (fiche lot)
+		$rename = GETPOSTINT('DIAMANTUTILS_LOTRENAME_ENABLED') ? 1 : 0;
+		if (dolibarr_set_const($db, 'DIAMANTUTILS_LOTRENAME_ENABLED', $rename, 'chaine', 0, '', $conf->entity) < 0) {
 			$error++;
 		}
 		// Entrepôts ignorés pour la quantité du lot : '0' = aucun (constante absente = Sous-traitance)
@@ -488,30 +479,6 @@ if ($tab == 'stocktable') {
 		$langs->trans('DiamantutilsStockTableSubcategoriesDesc'),
 		$form->selectyesno('DIAMANTUTILS_STOCKTABLE_SUBCATEGORIES', !empty(getDolGlobalString('DIAMANTUTILS_STOCKTABLE_SUBCATEGORIES', '1')) ? 1 : 0, 1)
 	);
-	diamantutils_setup_row(
-		$langs->trans('DiamantutilsStockTableTolerance'),
-		$langs->trans('DiamantutilsStockTableToleranceDesc'),
-		'<input type="text" class="flat width75" name="DIAMANTUTILS_STOCKTABLE_TOLERANCE" value="'.dol_escape_htmltag(diamantutils_stock_num(diamantutils_stocktable_tolerance(), 6, $langs->transnoentitiesnoconv('SeparatorDecimal'))).'">'
-	);
-
-	// Entrepôts exclus du comparatif
-	$allwarehouses = array();
-	$sql = "SELECT e.rowid, e.ref, e.statut FROM ".MAIN_DB_PREFIX."entrepot as e";
-	$sql .= " WHERE e.entity IN (".getEntity('stock').")";
-	$sql .= " ORDER BY e.ref";
-	$resql = $db->query($sql);
-	if ($resql) {
-		while ($obj = $db->fetch_object($resql)) {
-			$allwarehouses[(int) $obj->rowid] = $obj->ref.(empty($obj->statut) ? ' ('.$langs->transnoentities('Closed').')' : '');
-		}
-		$db->free($resql);
-	}
-	diamantutils_setup_row(
-		$langs->trans('DiamantutilsStockTableExcludeWarehouses'),
-		$langs->trans('DiamantutilsStockTableExcludeWarehousesDesc'),
-		$form->multiselectarray('DIAMANTUTILS_STOCKTABLE_EXCLUDE_WAREHOUSES', $allwarehouses, diamantutils_stocktable_excluded_warehouses(), 0, 0, 'minwidth300', 0, '90%')
-	);
-
 	// État : périmètre et table
 	$catids = diamantutils_stocktable_category_ids($db);
 	$nbproducts = 0;
@@ -519,6 +486,7 @@ if ($tab == 'stocktable') {
 		$sql = "SELECT COUNT(DISTINCT p.rowid) as nb FROM ".MAIN_DB_PREFIX."product as p";
 		$sql .= " WHERE p.rowid IN (".diamantutils_stocktable_scope_sql($catids).")";
 		$sql .= " AND p.fk_product_type = 0 AND p.entity IN (".getEntity('product').")";
+		$sql .= diamantutils_stocktable_noparent_sql('p.rowid');
 		$resql = $db->query($sql);
 		if ($resql) {
 			$obj = $db->fetch_object($resql);
@@ -532,18 +500,24 @@ if ($tab == 'stocktable') {
 		$status = img_picto('', 'tick', 'class="pictofixedwidth"').$langs->trans('DiamantutilsStockTableScopeCount', count($catids), $nbproducts);
 	}
 	$status .= '<br>';
+	if (diamantutils_stockcolisage_enabled()) {
+		$status .= img_picto('', 'tick', 'class="pictofixedwidth"').$langs->trans('DiamantutilsStockTableColisageOk');
+	} else {
+		$status .= img_warning('', 'class="pictofixedwidth"').'<span class="warning">'.$langs->trans('DiamantutilsStockTableColisageOff').'</span>';
+	}
+	if (diamantutils_stocktable_enabled()) {
+		$status .= ' &nbsp; <a href="'.dol_buildpath('/diamantutils/stocktable_list.php', 1).'?mainmenu=products&leftmenu=stock">'.img_picto('', 'stock', 'class="pictofixedwidth"').$langs->trans('DiamantutilsStockTableTitle').'</a>';
+	}
+	// Lignes saisies avant la v2.13 : conservées en base, plus affichées
 	$resql = $db->query("SELECT COUNT(*) as nb FROM ".MAIN_DB_PREFIX."diamantutils_stockline WHERE entity IN (".getEntity('diamantutils_stockline').")");
 	if ($resql) {
 		$obj = $db->fetch_object($resql);
 		$db->free($resql);
-		$status .= img_picto('', 'tick', 'class="pictofixedwidth"').$langs->trans('DiamantutilsStockTableLineCount', ($obj ? (int) $obj->nb : 0));
-		if (diamantutils_stocktable_enabled()) {
-			$status .= ' &nbsp; <a href="'.dol_buildpath('/diamantutils/stocktable_list.php', 1).'?mainmenu=products&leftmenu=stock">'.img_picto('', 'stock', 'class="pictofixedwidth"').$langs->trans('DiamantutilsStockTableTitle').'</a>';
+		if ($obj && (int) $obj->nb > 0) {
+			$status .= '<br><span class="opacitymedium">'.$langs->trans('DiamantutilsStockTableOldLines', (int) $obj->nb).'</span>';
 		}
-	} else {
-		$status .= img_warning('', 'class="pictofixedwidth"').'<span class="warning">'.$langs->trans('DiamantutilsStockTableNoTable').'</span>';
 	}
-	diamantutils_setup_row($langs->trans('DiamantutilsStockTableStatus'), $langs->trans('DiamantutilsStockTableRights'), $status);
+	diamantutils_setup_row($langs->trans('DiamantutilsStockTableStatus'), $langs->trans('DiamantutilsStockTableRightsDoli'), $status);
 }
 
 if ($tab == 'stockcolisage') {
@@ -583,6 +557,12 @@ if ($tab == 'stockcolisage') {
 		$form->multiselectarray('DIAMANTUTILS_STOCKCOLISAGE_EXCLUDE_WAREHOUSES', $sc_warehouses, diamantutils_stockcolisage_excluded_warehouses(), 0, 0, 'minwidth300', 0, '90%')
 	);
 
+	diamantutils_setup_row(
+		$langs->trans('DiamantutilsLotRenameSetup'),
+		$langs->trans('DiamantutilsLotRenameSetupDesc'),
+		$form->selectyesno('DIAMANTUTILS_LOTRENAME_ENABLED', getDolGlobalInt('DIAMANTUTILS_LOTRENAME_ENABLED') ? 1 : 0, 1)
+	);
+
 	// État : attributs du lot, module Lot/série, hook enregistré (module réactivé)
 	if ($sc_code !== '' && diamantutils_stockcolisage_extrafield_exists($db, $sc_code)) {
 		$status = img_picto('', 'tick', 'class="pictofixedwidth"').$langs->trans('DiamantutilsStockColisageExtrafieldOk', $sc_code);
@@ -612,6 +592,12 @@ if ($tab == 'stockcolisage') {
 		$status .= img_picto('', 'tick', 'class="pictofixedwidth"').$langs->trans('DiamantutilsStockColisageHookOk');
 	} else {
 		$status .= img_warning('', 'class="pictofixedwidth"').'<span class="warning">'.$langs->trans('DiamantutilsStockColisageHookMissing').'</span>';
+	}
+	$status .= '<br>';
+	if (in_array('productlotcard', $hooks)) {
+		$status .= img_picto('', 'tick', 'class="pictofixedwidth"').$langs->trans('DiamantutilsLotRenameHookOk');
+	} else {
+		$status .= img_warning('', 'class="pictofixedwidth"').'<span class="warning">'.$langs->trans('DiamantutilsLotRenameHookMissing').'</span>';
 	}
 	diamantutils_setup_row($langs->trans('DiamantutilsStockColisageStatus'), $langs->trans('DiamantutilsStockColisageRights'), $status);
 }

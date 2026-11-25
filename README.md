@@ -9,7 +9,8 @@ Module Dolibarr interne de Diamant Industrie (Dolibarr 20, PHP 8.2, déploiement
 - **Lots de produits** (menu Commerce) : ensembles de produits ajoutés en une fois sur un devis ou une commande client, section ci-dessous.
 - **Prix de revient à la réception** : le prix de revient du produit prend le prix rendu saisi à chaque réception fournisseur, section ci-dessous.
 - **Liaison des commandes fournisseurs** : lier une commande fournisseur à une commande d'un autre fournisseur (transport ↔ marchandise), section ci-dessous.
-- **Tableau de stock par lots** (menu Produits → Stock) : colisage constaté par lot, comparé au stock réel Dolibarr (remplace la base Airtable « Stock Bobine »), section ci-dessous.
+- **Tableau de stock par lots** (menu Produits → Stock) : pour les produits des tags choisis, stock physique, commandes en cours et stock virtuel, et lots en stock avec colisage, pièces par colis et qté par pièce, données Dolibarr seules, section ci-dessous.
+- **Renommer un lot** : bouton sur la fiche lot, numéro remplacé dans le stock et tout l'historique du produit, section ci-dessous.
 - **Colisage sur l'onglet Stock** de la fiche produit : pour un produit à lots, tableau du stock sans dates ni valorisations, avec le colisage du lot modifiable directement ou **calculé et tenu à jour** à chaque mouvement de stock, section ci-dessous.
 
 Chaque fonctionnalité a son onglet dans **Configuration → Modules → DiamantUtils**, avec une option pour l'activer ou la désactiver et ses réglages propres. Une fonctionnalité désactivée masque ses menus et pages ; ses données sont conservées.
@@ -327,70 +328,50 @@ Dolibarr 20 ne le permet pas : la fiche commande fournisseur retire le type « c
 ## Tableau de stock par lots
 
 ### Principe
-Remplace la base Airtable « Stock Bobine ». Le tableau enregistre le **colisage constaté** au dépôt : pour un produit Dolibarr et un lot, le nombre de pièces, les pièces par colis et les dimensions d'une pièce. **Dolibarr reste la référence du stock** : le tableau ne crée, ne corrige ni ne supprime aucun mouvement de stock ; il compare et signale les écarts.
+Vue des **données Dolibarr seules**, pour les produits des **tags** (catégories produit) choisis dans la configuration : lots en stock, avec leur colisage, leurs pièces par colis et leur qté par pièce (attributs du lot, voir « Colisage sur l'onglet Stock ») et leur quantité réelle. Aucun mouvement de stock, aucune donnée propre au tableau.
 
-Seuls les produits des **tags** (catégories produit) choisis dans la configuration sont proposés, acceptés et comparés. Le produit d'une ligne est fixé par son groupe : il ne se tape pas et ne se change pas.
+Depuis la v2.13, le tableau ne compare plus un comptage saisi au stock Dolibarr : les lignes saisies auparavant (`llx_diamantutils_stockline`) sont **conservées en base** mais ne sont plus affichées ni modifiables (leur nombre est rappelé dans l'onglet de configuration).
 
 ### Mise en service
-1. Déposer les fichiers par FTP dans `custom/diamantutils/`.
-2. **Désactiver puis réactiver le module** : crée la table `llx_diamantutils_stockline`, les droits et le menu.
-3. Accorder les droits (Utilisateurs → Permissions → DiamantUtils) : *Voir le tableau de stock par lots*, *Ajouter et modifier les lignes*, *Supprimer les lignes*.
-4. Configuration du module → onglet **Tableau de stock** :
-   - **Tags produit concernés** (`DIAMANTUTILS_STOCKTABLE_CATEGORIES`) et **Inclure les sous-catégories** (`DIAMANTUTILS_STOCKTABLE_SUBCATEGORIES`, oui par défaut). Aucun tag = aucun produit ;
-   - **Écart toléré** (`DIAMANTUTILS_STOCKTABLE_TOLERANCE`, 0,01 dans l'unité du produit) ;
-   - **Entrepôts ignorés par le comparatif** (`DIAMANTUTILS_STOCKTABLE_EXCLUDE_WAREHOUSES`) : par défaut l'entrepôt Sous-traitance, dont le stock transitoire fausserait le comparatif ;
-   - **Activer cette fonctionnalité** (`DIAMANTUTILS_STOCKTABLE_ENABLED`, désactivée par défaut : le déploiement est inerte).
-5. Vérifier les calculs : `/custom/diamantutils/test/stocktable_calc_test.php` (administrateur, aucune donnée lue ni écrite).
+1. Déposer les fichiers par FTP dans `custom/diamantutils/`. Mise à jour depuis une version antérieure à la v2.13 : supprimer sur le serveur `ajax/stocktable.php`, `class/stockline.class.php` et `test/stocktable_calc_*.php`.
+2. **Désactiver puis réactiver le module** : met à jour les droits (seul *Voir le tableau de stock par lots* reste).
+3. Configuration du module → onglet **Tableau de stock** : **Tags produit concernés** (`DIAMANTUTILS_STOCKTABLE_CATEGORIES`), **Inclure les sous-catégories** (`DIAMANTUTILS_STOCKTABLE_SUBCATEGORIES`, oui par défaut), **Activer cette fonctionnalité** (`DIAMANTUTILS_STOCKTABLE_ENABLED`). Aucun tag = aucun produit.
+4. Pour modifier les attributs du lot depuis le tableau : fonctionnalité **Stock produit** active (et colisage calculé pour pièces par colis et qté par pièce).
 
 ### Écran
 Menu **Produits → Stock → Tableau de stock par lots**.
 
-- **Une section par tag choisi** (« Plafond » HORIZON », « Plafond » LAMES »…), triées par libellé, repliables (mémorisé dans le navigateur), avec leur nombre de produits et de produits en écart. Les produits d'une sous-catégorie vont dans la section de leur tag. Un produit présent dans plusieurs tags n'apparaît qu'une fois, dans la première section. Les produits supprimés ou sortis des tags sont regroupés à la fin, dans « Hors périmètre ».
-- Un groupe repliable par produit : réf. et libellé, totaux **Tableau** (somme des lignes) / **Dolibarr** (stock réel, hors entrepôts ignorés) / **Écart**, pastille d'état. Si une partie du stock Dolibarr d'un produit à lots n'est rattachée à aucun lot, elle est indiquée dans l'en-tête et sur une ligne « (sans lot) ».
-- Une ligne par lot / colisage : lot, colisage calculé (« 5 colis de 28u », « 1 colis de 28u + 1 colis de 2u »), pièces, pièces par colis, largeur, longueur, quantité dans l'unité du produit, fournisseur ; sur la première ligne de chaque lot : stock Dolibarr du lot, écart, état. Un même lot peut occuper plusieurs lignes : elles sont additionnées.
-- Barre d'outils : recherche instantanée (produit, lot, fournisseur), « Écarts seulement », filtre par tag, tout replier / tout déplier (mémorisé dans le navigateur). En-tête de colonnes figé.
+| Colonne | Contenu |
+|---|---|
+| Lot | numéro de lot, lien vers la fiche lot |
+| Colisage | attribut `colisage` du lot : calculé (∑, lecture seule, avertissement si la quantité n'est pas un multiple de la pièce) ou saisi à la main |
+| Pièces par colis | attribut `pieces_par_colis` du lot |
+| Qté par pièce | attribut `qte_par_piece` du lot (unité du produit) |
+| Stock physique | produit : stock réel tous entrepôts ; lot : stock réel du lot hors entrepôts ignorés |
+| Cdes client | produit : commandes client validées ou en cours, moins les quantités des expéditions validées (lien vers les commandes du produit) |
+| Cdes fournisseur | produit : commandes fournisseur approuvées ou commandées, moins les quantités réceptionnées (lien vers les commandes du produit) |
+| Stock virtuel | produit : stock physique − cdes client + cdes fournisseur |
 
-| État | Condition | Couleur |
-|---|---|---|
-| OK | écart ≤ tolérance | vert |
-| Écart | lot présent des deux côtés, écart > tolérance | rouge |
-| Dolibarr seul | stock Dolibarr non nul sur un lot absent du tableau (ligne grisée « à saisir ») | orange |
-| Tableau seul | lot du tableau sans stock Dolibarr | orange |
-| Non calculable | dimension manquante ou unité non gérée | gris |
-
-Produit sans gestion de lot : une seule ligne « (sans lot) » comparée au stock total.
-Produit supprimé ou sorti des tags : ses lignes restent affichées, marquées « produit hors périmètre », sans comparaison ; elles ne sont plus modifiables (suppression possible).
-
-### Saisie (droit *write*)
-- **« + »** d'un groupe : ligne de saisie sous l'en-tête, produit fixé. **« + Produit »** (en haut) : recherche limitée aux produits des tags, ouvre le groupe du produit.
-- **Lot** : liste des lots Dolibarr du produit avec leur stock. « Autre lot (pas encore en stock)… » permet un lot inconnu de Dolibarr, avec un avertissement visible ; sans ce choix explicite, le serveur refuse un lot inconnu.
-- **Pré-remplissage** : pièces par colis, largeur, longueur et fournisseur de la dernière ligne du même produit.
-- Colisage et quantité affichés pendant la frappe (indicatif) ; le serveur valide, recalcule et renvoie le groupe à jour. Entrée enregistre, Échap annule.
-- Modification (crayon), suppression (corbeille, droit *delete*, confirmation), **« Ajouter au tableau »** sur une ligne « Dolibarr seul » (lot déjà rempli).
-
-### Règles de calcul et de validation (le serveur fait foi)
-- Quantité dans l'unité du produit, jamais stockée : surface `pièces × larg × long × 1e-6 ÷ 10^échelle` ; longueur `pièces × long × 1e-3 ÷ 10^échelle` ; pièce `pièces`. Échelle des unités `c_units` (m² 0, dm² −2, m 0, mm −3…) ; unités impériales (échelle ≥ 80) et autres types (poids, volume…) refusés. Produit sans unité : compté en pièces.
-- Dimension manquante pour l'unité : quantité « Non calculable », jamais 0.
-- Arrondi d'affichage à 2 décimales, de comparaison à 3.
-- Refus avec message (jamais de correction muette) : produit inexistant, service ou hors tags ; pièces ou pièces par colis ≤ 0 ou décimales (sauf produit au mètre) ; dimension exigée absente ou ≤ 0 ; lot absent pour un produit à lots, lot renseigné pour un produit sans lot, lot inconnu de Dolibarr sans « Autre lot » ; fournisseur inconnu ; changement de produit d'une ligne existante.
-- Écritures par `ajax/stocktable.php` : POST seulement, jeton CSRF vérifié, droits *write* / *delete* (403 sinon). Fonctionnalité désactivée : page et AJAX refusés.
+- Une section repliable par tag choisi, un groupe repliable par produit : réf., libellé, stock physique (lien vers l'onglet Stock), commandes en cours, stock virtuel. Les commandes ne sont pas réparties par lot : elles figurent sur la ligne du produit seulement. Produits sans stock ni commande en cours non affichés. Produits parents de variantes non affichés (leurs variantes le sont).
+- **Stock physique d'un lot** : stock réel total du lot, tous entrepôts sauf les **entrepôts ignorés du colisage** (onglet **Stock produit**, par défaut Sous-traitance). C'est la quantité sur laquelle le colisage enregistré est calculé : colisage et quantité affichés concordent. Le stock des entrepôts ignorés et le stock non rattaché à un lot (produit sans lots, ou part sans lot) sont sur des lignes en italique : les lignes d'un produit totalisent son stock physique.
+- Calculs des commandes repris de la requête de suivi de Diamant Industrie (statuts client 1 et 2, expéditions de statut ≥ 1, statuts fournisseur 3 et 4, réceptions `llx_receptiondet_batch`), avec filtre d'entité ; ils peuvent différer du stock virtuel natif de Dolibarr, qui dépend de ses propres options.
+- Recherche instantanée (produit, lot, colisage), filtre par tag, tout replier / tout déplier (mémorisé dans le navigateur).
+- **Modification en ligne** (droit Produits → Créer/modifier) : pièces par colis et qté par pièce, colisage d'un lot en mode manuel. Même mécanisme que l'onglet Stock (`js/stockcolisage.js`, `ajax/lotcolisage.php`) : Entrée ou sortie du champ = enregistrer, Échap = annuler, colisage recalculé aussitôt. Sans le droit, ou fonctionnalité Stock produit inactive : lecture seule.
 
 ### Détail technique
-- Données de l'écran en **4 requêtes**, quel que soit le nombre de produits : lignes du tableau ; stock par produit et par lot (`product_stock` / `product_batch`) ; produits des tags avec leur stock total ; tags des produits (sections). S'y ajoutent l'arbre des catégories et les listes de la page (libellés des tags, entrepôts ignorés, fournisseurs).
-- Aucun hook, trigger ni extrafield ; aucune écriture hors de `llx_diamantutils_stockline`.
+- Données en **7 requêtes**, quel que soit le nombre de produits : produits des tags avec leur stock ; lots en stock avec leur fiche lot ; commandes client, expéditions, commandes fournisseur moins réceptions ; attributs des lots ; tags des produits (sections).
+- Aucune écriture propre au tableau : les attributs du lot sont écrits par `ajax/lotcolisage.php` (droits, jeton, validation : voir la section suivante).
 
 ### Fichiers
 
 | Fichier | Rôle |
 |---|---|
 | `stocktable_list.php` | écran (rendu serveur) |
-| `ajax/stocktable.php` | recherche produit, infos produit, groupe, enregistrement, suppression (JSON) |
-| `class/stockline.class.php` | classe `DiamantutilsStockLine` : lecture, écriture, validation |
-| `lib/stocktable.lib.php` | calculs (fonctions pures), périmètre, lecture des données, rendu d'un groupe |
-| `js/stocktable.js`, `css/stocktable.css` | filtres, repli, saisie en ligne ; mise en forme |
-| `sql/llx_diamantutils_stockline.sql`, `.key.sql` | table (index `entity, fk_product, batch`, sans unicité) |
-| `test/stocktable_calc_test.php`, `test/stocktable_calc_cases.php` | test des calculs (navigateur, administrateur) |
-| `core/modules/modDiamantutils.class.php` | constantes, droits `stocktable`, menu, version |
+| `lib/stocktable.lib.php` | périmètre (tags), lecture des données, rendu d'un groupe et d'une section |
+| `js/stocktable.js`, `css/stocktable.css` | recherche, sections, repli ; mise en forme |
+| `js/stockcolisage.js`, `css/stockcolisage.css` | modification en ligne des attributs du lot (partagé avec l'onglet Stock) |
+| `sql/llx_diamantutils_stockline.sql`, `.key.sql` | table des lignes saisies avant la v2.13 (conservée, plus utilisée) |
+| `core/modules/modDiamantutils.class.php` | droit `stocktable` *read*, menu, version |
 | `admin/setup.php`, `lib/diamantutils.lib.php` | onglet de configuration |
 | `langs/fr_FR/diamantutils.lang`, `langs/en_US/diamantutils.lang` | libellés |
 
@@ -469,3 +450,42 @@ Maintien à jour, trois niveaux :
 | `core/modules/modDiamantutils.class.php` | hook `stockproductcard`, constantes, attributs `pieces_par_colis` / `qte_par_piece` (activation), version |
 | `admin/setup.php`, `lib/diamantutils.lib.php` | onglet de configuration **Stock produit**, bouton de recalcul |
 | `langs/fr_FR/diamantutils.lang`, `langs/en_US/diamantutils.lang` | libellés |
+
+---
+
+## Renommer un lot
+
+### Principe
+Dolibarr ne permet pas de modifier le numéro d'un lot : ce numéro n'est pas une clé, il est recopié en texte dans chaque table qui cite le lot. Le module ajoute sur la fiche lot un bouton **Renommer le lot** qui remplace l'ancien numéro par le nouveau, **pour le produit du lot seulement**, dans toutes ces tables, en une seule transaction : tout est renommé, ou rien.
+
+| Table | Contenu |
+|---|---|
+| `llx_product_lot` | fiche lot |
+| `llx_product_batch` | stock par entrepôt et par lot |
+| `llx_stock_mouvement` | mouvements de stock (historique) |
+| `llx_expeditiondet_batch`, `llx_receptiondet_batch` | lignes de lot des expéditions et des réceptions |
+| `llx_facturedet` | lignes de facture (point de vente) |
+| `llx_inventorydet`, `llx_mrp_production`, `llx_stocktransfer_stocktransferline` | inventaires, fabrications, transferts de stock (si le module a été utilisé) |
+| `llx_diamantutils_transfo_det`, `llx_diamantutils_stockline` | transformations et ancien tableau de stock (module) |
+
+Tables vérifiées dans Dolibarr 20 et 23. L'identifiant du lot ne change pas : attributs (colisage, pièces par colis…), fichiers joints (rangés sous l'identifiant), notes et liens restent attachés. Les tables d'autres modules externes qui citeraient un numéro de lot ne sont pas connues et ne sont pas modifiées.
+
+### Règles
+- Refus avec message, rien n'est modifié : numéro vide, de plus de 128 caractères, identique, ou **déjà utilisé pour ce produit** (autre fiche lot, stock ou historique d'un autre lot : deux lots ne sont jamais fusionnés). Un simple changement de majuscules est permis.
+- Un lot du même nom sur un autre produit n'est pas touché.
+- Trace : ligne « Lot renommé : « ancien » → « nouveau » le … par … » ajoutée à la note privée du lot, et journal (`LOG_NOTICE`). Le message de confirmation indique le nombre de lignes modifiées par table.
+- Droits : Produits « Créer/modifier » (comme la fiche lot) **et** Stocks « Créer des mouvements » (le stock par lot est réécrit). Jeton CSRF vérifié.
+
+### Mise en service
+1. Déposer les fichiers par FTP.
+2. **Désactiver puis réactiver le module** : enregistre le hook `productlotcard` de la fiche lot.
+3. Configuration du module → onglet **Stock produit** → **Renommer un lot** (`DIAMANTUTILS_LOTRENAME_ENABLED`, désactivé par défaut). L'état du hook y est affiché.
+
+### Fichiers
+
+| Fichier | Rôle |
+|---|---|
+| `lib/lotrename.lib.php` | tables concernées, contrôles, renommage en transaction |
+| `class/actions_diamantutils.class.php` | hooks de la fiche lot : bouton, confirmation, action |
+| `admin/setup.php` | réglage dans l'onglet **Stock produit** |
+| `core/modules/modDiamantutils.class.php` | hook `productlotcard`, constante, version |

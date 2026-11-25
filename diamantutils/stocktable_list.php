@@ -2,12 +2,14 @@
 /**
  * Tableau de stock par lots
  *
- * Un groupe repliable par produit (produits des tags configurés), une ligne par lot / colisage
- * constaté. Chaque groupe et chaque lot est comparé au stock réel Dolibarr (hors entrepôts
- * exclus). Aucun mouvement de stock : le tableau signale les écarts.
+ * Données Dolibarr seules : un groupe repliable par produit des tags configurés (stock physique,
+ * commandes client et fournisseur en cours, stock virtuel), une ligne par lot en stock avec son
+ * colisage, ses pièces par colis et sa qté par pièce (attributs du lot) et son stock physique
+ * (hors entrepôts ignorés du colisage, dont le stock est affiché sur une ligne à part).
  *
- * Rendu côté serveur ; recherche, filtre « écarts seulement » et repli côté client
- * (js/stocktable.js). Saisie en ligne par ajax/stocktable.php (droit write).
+ * Rendu côté serveur ; recherche, filtre par tag et repli côté client (js/stocktable.js).
+ * Attributs du lot modifiables en ligne (js/stockcolisage.js, ajax/lotcolisage.php), avec les
+ * mêmes droits que l'onglet Stock de la fiche produit. Aucun mouvement de stock.
  */
 
 // Pages du module : garder le menu Produits/Stocks sélectionné quel que soit le lien d'arrivée
@@ -29,6 +31,7 @@ if (!$res) {
 
 require_once DOL_DOCUMENT_ROOT.'/categories/class/categorie.class.php';
 dol_include_once('/diamantutils/lib/stocktable.lib.php');
+dol_include_once('/diamantutils/lib/stockcolisage.lib.php');
 
 $langs->loadLangs(array('products', 'stocks', 'productbatch', 'suppliers', 'categories', 'diamantutils@diamantutils'));
 
@@ -36,15 +39,20 @@ if (!isModEnabled('diamantutils') || !$user->hasRight('diamantutils', 'stocktabl
 	accessforbidden();
 }
 
+// Modification des attributs du lot : fonctionnalité « Stock produit » active, droit produit / créer
+$code = diamantutils_stockcolisage_extrafield_code();
+$hasfield = diamantutils_stockcolisage_enabled() && $code !== '' && diamantutils_stockcolisage_extrafield_exists($db, $code);
+$auto = diamantutils_stockcolisage_auto_enabled($db);
 $perms = array(
-	'write' => $user->hasRight('diamantutils', 'stocktable', 'write'),
-	'delete' => $user->hasRight('diamantutils', 'stocktable', 'delete'),
+	'colisage' => ($hasfield && $user->hasRight('produit', 'creer')),
+	'num' => ($auto && $user->hasRight('produit', 'creer')),
+	'auto' => $auto,
 );
 
 $search_categ = GETPOSTINT('search_categ');
 
 $title = $langs->trans('DiamantutilsStockTableTitle');
-llxHeader('', $title, '', '', 0, 0, '', array('/diamantutils/css/stocktable.css'), '', 'mod-diamantutils page-stocktable-list');
+llxHeader('', $title, '', '', 0, 0, '', array('/diamantutils/css/stocktable.css', '/diamantutils/css/stockcolisage.css'), '', 'mod-diamantutils page-stocktable-list');
 
 if (!diamantutils_stocktable_enabled()) {
 	print load_fiche_titre($title, '', 'stock');
@@ -75,13 +83,6 @@ if (!is_array($groups)) {
 	$groups = array();
 }
 
-$nbdiff = 0;
-foreach ($groups as $group) {
-	if ($group['inscope'] && $group['cmp']['state'] !== DIAMANTUTILS_STOCK_OK) {
-		$nbdiff++;
-	}
-}
-
 // Libellés des tags du périmètre (filtre)
 $taglabels = array();
 $form = new Form($db);
@@ -95,11 +96,11 @@ if (is_array($allcats)) {
 	asort($taglabels, SORT_NATURAL | SORT_FLAG_CASE);
 }
 
-// Entrepôts exclus (rappel sous le titre)
-$excluded = diamantutils_stocktable_excluded_warehouses();
+// Entrepôts ignorés (rappel sous le titre)
+$excluded = diamantutils_stockcolisage_excluded_warehouses();
 $excludednames = array();
 if (!empty($excluded)) {
-	$resql = $db->query("SELECT e.ref FROM ".MAIN_DB_PREFIX."entrepot as e WHERE e.rowid IN (".implode(',', $excluded).") AND e.entity IN (".getEntity('stock').") ORDER BY e.ref");
+	$resql = $db->query("SELECT e.ref FROM ".MAIN_DB_PREFIX."entrepot as e WHERE e.rowid IN (".implode(',', array_map('intval', $excluded)).") AND e.entity IN (".getEntity('stock').") ORDER BY e.ref");
 	if ($resql) {
 		while ($obj = $db->fetch_object($resql)) {
 			$excludednames[] = $obj->ref;
@@ -108,43 +109,29 @@ if (!empty($excluded)) {
 	}
 }
 
-// Fournisseurs proposés à la saisie
-$suppliers = array();
-if ($perms['write']) {
-	$sql = "SELECT s.rowid, s.nom FROM ".MAIN_DB_PREFIX."societe as s";
-	$sql .= " WHERE s.fournisseur = 1 AND s.status = 1 AND s.entity IN (".getEntity('societe').")";
-	$sql .= " ORDER BY s.nom";
-	$resql = $db->query($sql);
-	if ($resql) {
-		while ($obj = $db->fetch_object($resql)) {
-			$suppliers[] = array((int) $obj->rowid, (string) $obj->nom);
-		}
-		$db->free($resql);
-	}
-}
+
+$perms['excluded'] = implode(', ', $excludednames);
 
 
 /*
  * Vue
  */
 
-$morehtmlright = '';
-if ($perms['write']) {
-	$morehtmlright = '<button type="button" class="butAction dst-addproduct">'.$langs->trans('DiamantutilsStockTableAddProduct').'</button>';
-}
-print load_fiche_titre($title.' <span class="opacitymedium dst-count">('.$langs->trans('DiamantutilsStockTableProducts', count($groups), $nbdiff).')</span>', $morehtmlright, 'stock');
+print load_fiche_titre($title.' <span class="opacitymedium dst-count">('.$langs->trans('DiamantutilsStockTableNbProducts', count($groups)).')</span>', '', 'stock');
 
-print '<span class="opacitymedium">'.$langs->trans('DiamantutilsStockTableDesc');
+print '<span class="opacitymedium">'.$langs->trans('DiamantutilsStockTableDescDoli');
 if (!empty($excludednames)) {
 	print ' '.$langs->trans('DiamantutilsStockTableExcluded', dol_escape_htmltag(implode(', ', $excludednames))).'.';
+}
+if (!$auto) {
+	print ' '.$langs->trans('DiamantutilsStockTableAutoOff');
 }
 print '</span>'.$setuplink;
 
 // Barre d'outils
 print '<form method="GET" action="'.dol_escape_htmltag($_SERVER['PHP_SELF']).'" class="dst-toolbar">';
 print '<input type="hidden" name="mainmenu" value="products"><input type="hidden" name="leftmenu" value="stock">';
-print '<input type="search" class="flat minwidth250 dst-search" placeholder="'.dol_escape_htmltag($langs->trans('DiamantutilsStockTableSearch')).'" autocomplete="off">';
-print '<label class="dst-onlydiff-label"><input type="checkbox" class="dst-onlydiff"> '.$langs->trans('DiamantutilsStockTableOnlyDiffs').'</label>';
+print '<input type="search" class="flat minwidth250 dst-search" placeholder="'.dol_escape_htmltag($langs->trans('DiamantutilsStockTableSearchDoli')).'" autocomplete="off">';
 if (count($taglabels) > 1) {
 	print '<select name="search_categ" class="flat minwidth150 dst-categ" onchange="this.form.submit()">';
 	print '<option value="0">'.$langs->trans('DiamantutilsStockTableAllTags').'</option>';
@@ -159,96 +146,61 @@ print '<button type="button" class="button smallpaddingimp dst-expandall">'.$lan
 print '</span>';
 print '</form>';
 
-// Zone de recherche « + Produit » (remplie par le JS)
-if ($perms['write']) {
-	print '<div class="dst-productpicker hidden"></div>';
-}
+// Configuration de l'édition en ligne (js/stockcolisage.js, mode tableau)
+$editconfig = array(
+	'url' => dol_buildpath('/diamantutils/ajax/lotcolisage.php', 1),
+	'token' => newToken(),
+	'product' => 0,
+	'canEdit' => $perms['colisage'],
+	'canEditNum' => $perms['num'],
+	'maxLength' => 200,
+	'lang' => diamantutils_stockcolisage_js_lang(),
+);
 
-print '<div class="dst-wrap">';
+print '<div class="dst-wrap dut-sc-standalone" data-config="'.htmlspecialchars(json_encode($editconfig), ENT_QUOTES, 'UTF-8').'">';
 print '<table class="noborder centpercent dst-table">';
 print '<thead><tr class="liste_titre">';
 print '<th>'.$langs->trans('DiamantutilsStockColLot').'</th>';
 print '<th>'.$langs->trans('DiamantutilsStockColColisage').'</th>';
-print '<th class="right">'.$langs->trans('DiamantutilsStockColPieces').'</th>';
-print '<th class="right">'.$langs->trans('DiamantutilsStockColPerColis').'</th>';
-print '<th class="right">'.$langs->trans('DiamantutilsStockColLarg').'</th>';
-print '<th class="right">'.$langs->trans('DiamantutilsStockColLong').'</th>';
-print '<th class="right">'.$langs->trans('DiamantutilsStockColQty').'</th>';
-print '<th>'.$langs->trans('DiamantutilsStockColSupplier').'</th>';
-print '<th class="right">'.$langs->trans('DiamantutilsStockColDoli').'</th>';
-print '<th class="right">'.$langs->trans('DiamantutilsStockColDiff').'</th>';
-print '<th class="center"></th>';
-print '<th></th>';
+print '<th class="right">'.$langs->trans('DiamantutilsColisagePpcCol').'</th>';
+print '<th class="right">'.$langs->trans('DiamantutilsColisageQppCol').'</th>';
+print '<th class="right">'.$langs->trans('DiamantutilsStockTablePhysical').'</th>';
+print '<th class="right">'.$langs->trans('DiamantutilsStockTableCustomerOrders').'</th>';
+print '<th class="right">'.$langs->trans('DiamantutilsStockTableSupplierOrders').'</th>';
+print '<th class="right">'.$langs->trans('DiamantutilsStockTableVirtual').'</th>';
 print '</tr></thead>';
 
-// Une section par tag configuré (toutes sans filtre, sinon celles qui ont des produits),
-// puis « hors périmètre » ; les groupes sont déjà triés dans cet ordre
+// Une section par tag configuré (toutes sans filtre, sinon celles qui ont des produits)
 $sections = diamantutils_stocktable_sections($db);
 $bysection = array();
 foreach ($groups as $pid => $group) {
 	$bysection[(int) $group['section']][] = $group;
 }
-$sections[0] = $langs->transnoentitiesnoconv('DiamantutilsStockTableOutOfScopeSection');
 foreach ($sections as $sectionid => $sectionlabel) {
 	$list = (isset($bysection[$sectionid]) ? $bysection[$sectionid] : array());
-	if (empty($list) && ($sectionid == 0 || $search_categ > 0)) {
+	if (empty($list) && $search_categ > 0) {
 		continue;
 	}
-	$nbsectiondiff = 0;
-	foreach ($list as $group) {
-		if ($sectionid > 0 && $group['cmp']['state'] !== DIAMANTUTILS_STOCK_OK) {
-			$nbsectiondiff++;
-		}
-	}
-	print diamantutils_stocktable_render_section($sectionid, $sectionlabel, count($list), $nbsectiondiff);
+	print diamantutils_stocktable_render_section($sectionid, $sectionlabel, count($list));
 	foreach ($list as $group) {
 		print diamantutils_stocktable_render_group($group, $perms);
 	}
 }
-print '<tbody class="dst-empty'.(empty($groups) ? '' : ' hidden').'"><tr><td colspan="'.DIAMANTUTILS_STOCKTABLE_NBCOLS.'"><span class="opacitymedium">'.(empty($groups) ? $langs->trans('DiamantutilsStockTableEmpty') : $langs->trans('NoRecordFound')).'</span></td></tr></tbody>';
+print '<tbody class="dst-empty'.(empty($groups) ? '' : ' hidden').'"><tr><td colspan="'.DIAMANTUTILS_STOCKTABLE_NBCOLS.'"><span class="opacitymedium">'.(empty($groups) ? $langs->trans('DiamantutilsStockTableEmptyDoli') : $langs->trans('NoRecordFound')).'</span></td></tr></tbody>';
 
 print '</table>';
 print '</div>';
 
-// Configuration du script
-$decsep = $langs->transnoentitiesnoconv('SeparatorDecimal');
+// Configuration du script de la liste
 $jsconfig = array(
-	'ajaxUrl' => dol_buildpath('/diamantutils/ajax/stocktable.php', 1),
-	'token' => newToken(),
 	'entity' => (int) $conf->entity,
-	'write' => (bool) $perms['write'],
-	'delete' => (bool) $perms['delete'],
-	'decsep' => ($decsep === 'SeparatorDecimal' || $decsep === '' ? ',' : $decsep),
-	'suppliers' => $suppliers,
-	'colisFmt' => diamantutils_stocktable_rawtrans('DiamantutilsStockColisFmt'),
 	'labels' => array(
-		'products' => diamantutils_stocktable_rawtrans('DiamantutilsStockTableProducts'),
-		'save' => $langs->transnoentitiesnoconv('Save'),
-		'cancel' => $langs->transnoentitiesnoconv('Cancel'),
-		'chooseLot' => $langs->transnoentitiesnoconv('DiamantutilsStockTableChooseLot'),
-		'otherLot' => $langs->transnoentitiesnoconv('DiamantutilsStockTableOtherLot'),
-		'otherLotName' => $langs->transnoentitiesnoconv('DiamantutilsStockTableOtherLotName'),
-		'otherLotWarn' => $langs->transnoentitiesnoconv('DiamantutilsStockTableOtherLotWarn'),
-		'lotStock' => diamantutils_stocktable_rawtrans('DiamantutilsStockTableLotStock'),
-		'noLot' => $langs->transnoentitiesnoconv('DiamantutilsStockTableNoLot'),
-		'noSupplier' => $langs->transnoentitiesnoconv('DiamantutilsStockTableNoSupplier'),
-		'note' => $langs->transnoentitiesnoconv('DiamantutilsStockTableNote'),
-		'confirmDelete' => $langs->transnoentitiesnoconv('DiamantutilsStockTableConfirmDelete'),
-		'searchProduct' => $langs->transnoentitiesnoconv('DiamantutilsStockTableSearchProduct'),
-		'noProduct' => $langs->transnoentitiesnoconv('DiamantutilsStockTableNoProductFound'),
-		'liveHint' => $langs->transnoentitiesnoconv('DiamantutilsStockTableLiveHint'),
-		'network' => diamantutils_stocktable_rawtrans('DiamantutilsStockTableErrorNetwork'),
-		'partial' => $langs->transnoentitiesnoconv('DiamantutilsStockColisPartial'),
-		'pieces' => $langs->transnoentitiesnoconv('DiamantutilsStockColPieces'),
-		'perColis' => $langs->transnoentitiesnoconv('DiamantutilsStockColPerColis'),
-		'larg' => $langs->transnoentitiesnoconv('DiamantutilsStockColLarg'),
-		'long' => $langs->transnoentitiesnoconv('DiamantutilsStockColLong'),
-		'dimsSurface' => $langs->transnoentitiesnoconv('DiamantutilsStockErrDimsSurface'),
-		'dimsSize' => $langs->transnoentitiesnoconv('DiamantutilsStockErrDimsSize'),
+		'products' => diamantutils_stocktable_rawtrans('DiamantutilsStockTableNbProducts'),
 	),
 );
 print '<script>window.diamantutilsStockTable = '.json_encode($jsconfig, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT).';</script>';
-print '<script src="'.dol_buildpath('/diamantutils/js/stocktable.js', 1).'?v=2.10"></script>';
+print '<script src="'.dol_buildpath('/diamantutils/js/stocktable.js', 1).'?v=2.14"></script>';
+print '<script src="'.dol_buildpath('/diamantutils/js/stockcolisage.js', 1).'?v=2.14"></script>';
 
 llxFooter();
 $db->close();

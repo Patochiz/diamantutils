@@ -18,16 +18,16 @@ class modDiamantutils extends DolibarrModules
 		$this->family = 'custom';
 		$this->module_position = '90';
 		$this->name = preg_replace('/^mod/i', '', get_class($this));
-		$this->description = "Module interne Diamant Industrie : ordres de transformation de stock par lots (menu GPAO), commandes sous-traitées livrées directement au client, listes personnalisées SQL (menu Outils) description pour devis sur la fiche produit et lots de produits ajoutés en une fois sur les devis et commandes (menu Commerce), liaison d'une commande fournisseur à une commande d'un autre fournisseur, tableau de stock par lots comparé au stock Dolibarr, colonne Colisage modifiable sur l'onglet Stock de la fiche produit";
-		$this->descriptionlong = "Transformation de stock par lots : consommation de N lots et production de M lots (découpe de profilés, peinture, changement d'unité), avec saisie en pièces × longueur, contrôle d'équilibre, gestion des restes et des pertes, calcul du coût et traçabilité des mouvements de stock. Commandes sous-traitées : réception sur l'entrepôt Sous-traitance avec lot = ref de la commande fournisseur, BL client prélevé sur ce lot. Listes personnalisées : requêtes SQL en lecture seule enregistrées par un administrateur, consultables avec recherche, tri, pagination et export CSV. Description pour devis : texte saisi sur la fiche produit, repris sur les lignes de propositions commerciales à la place de la description standard. Lots de produits : ensembles prédéfinis de produits et quantités, ajoutés en une fois (avec multiplicateur) sur un devis ou une commande client en brouillon, aux prix et descriptions de la saisie standard. Liaison des commandes fournisseurs : entrée « Lier à une commande fournisseur » du bloc Objets liés de la commande fournisseur, tous fournisseurs confondus (commande de transport liée aux commandes qu'elle enlève). Tableau de stock par lots (menu Produits → Stock) : colisage constaté par lot (pièces, pièces par colis, dimensions) pour les produits des tags choisis, comparé au stock réel Dolibarr par produit et par lot, sans aucun mouvement de stock. Colisage sur l'onglet Stock : pour un produit géré par lots, tableau du stock par entrepôt et par lot sans les colonnes de dates et de valorisation, avec l'attribut colisage du lot modifiable directement dans le tableau.";
+		$this->description = "Module interne Diamant Industrie : ordres de transformation de stock par lots (menu GPAO), commandes sous-traitées livrées directement au client, listes personnalisées SQL (menu Outils) description pour devis sur la fiche produit et lots de produits ajoutés en une fois sur les devis et commandes (menu Commerce), liaison d'une commande fournisseur à une commande d'un autre fournisseur, tableau de stock par lots (données Dolibarr : colisage, pièces par colis, qté par pièce des lots), colonne Colisage modifiable sur l'onglet Stock de la fiche produit";
+		$this->descriptionlong = "Transformation de stock par lots : consommation de N lots et production de M lots (découpe de profilés, peinture, changement d'unité), avec saisie en pièces × longueur, contrôle d'équilibre, gestion des restes et des pertes, calcul du coût et traçabilité des mouvements de stock. Commandes sous-traitées : réception sur l'entrepôt Sous-traitance avec lot = ref de la commande fournisseur, BL client prélevé sur ce lot. Listes personnalisées : requêtes SQL en lecture seule enregistrées par un administrateur, consultables avec recherche, tri, pagination et export CSV. Description pour devis : texte saisi sur la fiche produit, repris sur les lignes de propositions commerciales à la place de la description standard. Lots de produits : ensembles prédéfinis de produits et quantités, ajoutés en une fois (avec multiplicateur) sur un devis ou une commande client en brouillon, aux prix et descriptions de la saisie standard. Liaison des commandes fournisseurs : entrée « Lier à une commande fournisseur » du bloc Objets liés de la commande fournisseur, tous fournisseurs confondus (commande de transport liée aux commandes qu'elle enlève). Tableau de stock par lots (menu Produits → Stock) : pour les produits des tags choisis, lots en stock avec leur colisage, leurs pièces par colis et leur qté par pièce (attributs du lot, modifiables dans le tableau) et leur quantité réelle, sans aucun mouvement de stock. Colisage sur l'onglet Stock : pour un produit géré par lots, tableau du stock par entrepôt et par lot sans les colonnes de dates et de valorisation, avec l'attribut colisage du lot modifiable directement dans le tableau.";
 		$this->editor_name = 'Diamant Industrie';
-		$this->version = '2.12';
+		$this->version = '2.15';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'generic';
 
 		// Format plat (le format imbriqué data/entity casse l'enregistrement en v20)
 		$this->module_parts = array(
-			'hooks' => array('ordersupplierdispatch', 'receptioncard', 'ordershipmentcard', 'expeditioncard', 'productcard', 'propalcard', 'ordercard', 'ordersuppliercard', 'stockproductcard'),
+			'hooks' => array('ordersupplierdispatch', 'receptioncard', 'ordershipmentcard', 'expeditioncard', 'productcard', 'propalcard', 'ordercard', 'ordersuppliercard', 'stockproductcard', 'productlotcard'),
 			'triggers' => 1,
 		);
 
@@ -147,15 +147,6 @@ class modDiamantutils extends DolibarrModules
 				'current',
 				0
 			),
-			12 => array(
-				'DIAMANTUTILS_STOCKTABLE_TOLERANCE',
-				'chaine',
-				'0.01',
-				'Tableau de stock par lots : écart toléré avec le stock Dolibarr (unité du produit)',
-				0,
-				'current',
-				0
-			),
 			13 => array(
 				'DIAMANTUTILS_STOCKTABLE_SUBCATEGORIES',
 				'chaine',
@@ -188,6 +179,15 @@ class modDiamantutils extends DolibarrModules
 				'chaine',
 				'1',
 				'Colisage du lot calculé (pièces par colis, qté par pièce, quantité du lot) et tenu à jour à chaque mouvement de stock : 1 = actif',
+				0,
+				'current',
+				0
+			),
+			17 => array(
+				'DIAMANTUTILS_LOTRENAME_ENABLED',
+				'chaine',
+				'0',
+				'Fiche lot : bouton « Renommer le lot » (numéro remplacé dans le stock et tout l\'historique du produit) : 1 = actif',
 				0,
 				'current',
 				0
@@ -268,25 +268,11 @@ class modDiamantutils extends DolibarrModules
 		$this->rights[$r][5] = 'delete';
 		$r++;
 		$this->rights[$r][0] = $this->numero.'10';
-		$this->rights[$r][1] = 'Voir le tableau de stock par lots';
+		$this->rights[$r][1] = 'Voir le tableau de stock par lots';	// v2.13 : droits 11 (écrire) et 12 (supprimer) retirés, plus de saisie propre au tableau
 		$this->rights[$r][2] = 'r';
 		$this->rights[$r][3] = 0;
 		$this->rights[$r][4] = 'stocktable';
 		$this->rights[$r][5] = 'read';
-		$r++;
-		$this->rights[$r][0] = $this->numero.'11';
-		$this->rights[$r][1] = 'Ajouter et modifier les lignes du tableau de stock par lots';
-		$this->rights[$r][2] = 'w';
-		$this->rights[$r][3] = 0;
-		$this->rights[$r][4] = 'stocktable';
-		$this->rights[$r][5] = 'write';
-		$r++;
-		$this->rights[$r][0] = $this->numero.'12';
-		$this->rights[$r][1] = 'Supprimer les lignes du tableau de stock par lots';
-		$this->rights[$r][2] = 'd';
-		$this->rights[$r][3] = 0;
-		$this->rights[$r][4] = 'stocktable';
-		$this->rights[$r][5] = 'delete';
 		$r++;
 
 		// Menus gauche dans le menu haut GPAO (eldy : mainmenu=mrp)

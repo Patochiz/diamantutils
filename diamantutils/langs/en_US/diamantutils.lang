@@ -286,9 +286,9 @@ DiamantutilsLinkSOErrorSelf = An order cannot be linked to itself.
 # Batch stock table (v2.10)
 DiamantutilsStockTableTabTitle = Stock table
 DiamantutilsStockTableTitle = Batch stock table
-DiamantutilsStockTableEnabledDesc = Menu Products → Stock "Batch stock table": packing observed at the warehouse (pieces, pieces per pack, dimensions) per batch, compared with the real Dolibarr stock. No stock movement is created. When disabled, the entered lines are kept but not accessible.
+DiamantutilsStockTableEnabledDesc = Products → Stock menu "Stock table by lot": for the products of the chosen tags, lots in stock with their packing, pieces per package and qty per piece (lot attributes) and their real quantity. Dolibarr data only, no stock movement.
 DiamantutilsStockTableCategories = Product tags included
-DiamantutilsStockTableCategoriesDesc = Only products of these tags (product categories) are offered, accepted and compared. No tag = no product.
+DiamantutilsStockTableCategoriesDesc = Products of these tags (product categories) shown in the table, variant parent products excluded. No tag = no product.
 DiamantutilsStockTableSubcategories = Include subcategories
 DiamantutilsStockTableSubcategoriesDesc = Products of subcategories of the chosen tags are also included.
 DiamantutilsStockTableTolerance = Tolerated difference
@@ -299,7 +299,7 @@ DiamantutilsStockTableExcludeWarehousesDesc = Their stock is counted neither in 
 DiamantutilsStockTableStatus = Status
 DiamantutilsStockTableRights = User permissions (DiamantUtils): view, add / edit, delete table lines.
 DiamantutilsStockTableNoCategory = No product tag chosen: the table contains no product.
-DiamantutilsStockTableScopeCount = %s tag(s) (subcategories included), %s product(s) included
+DiamantutilsStockTableScopeCount = %s tag(s) (subcategories included), %s product(s) included, variant parent products excluded
 DiamantutilsStockTableLineCount = %s line(s) entered
 DiamantutilsStockTableNoTable = Table llx_diamantutils_stockline missing: disable then enable the module.
 DiamantutilsStockTableDesc = Packing observed at the warehouse, per batch. Dolibarr is the stock reference: the table reports differences, it creates no movement.
@@ -443,3 +443,47 @@ DiamantutilsColisageRecalcUnavailable = Recompute unavailable: enable the featur
 DiamantutilsColisageRecalcDone = Recompute done: %s lot(s) updated, %s unchanged, %s warning(s).
 DiamantutilsColisageRecalcErrors = %s lot(s) in error (see the log).
 DiamantutilsColisageRecalcNoWarning = No warning.
+
+# Stock table by lot v2.13 (Dolibarr data only)
+DiamantutilsStockTableNbProducts = %s product(s)
+DiamantutilsStockTableDescDoli = Dolibarr data: per product, physical stock, open customer and supplier orders, virtual stock; per lot in stock, packing, pieces per package and qty per piece (lot attributes, editable here as on the product Stock tab) and physical stock.
+DiamantutilsStockTableAutoOff = Computed packing disabled: enable it in the "Product stock" setup tab to edit pieces per package and qty per piece.
+DiamantutilsStockTableSearchDoli = Search (product, lot, packing)…
+DiamantutilsStockTableEmptyDoli = No stock for the products of these tags.
+DiamantutilsStockTableNoLotPartLine = Stock not linked to a lot
+DiamantutilsStockTableNoLotProduct = Product without lot management
+DiamantutilsStockTableRightsDoli = Access: DiamantUtils permission "See the stock table by lot". Editing the lot attributes: Products "Create/modify" permission, "Product stock" feature enabled.
+DiamantutilsStockTableColisageOk = "Product stock" feature enabled: packing editable in the table
+DiamantutilsStockTableColisageOff = "Product stock" feature disabled: packing, pieces per package and qty per piece read only
+DiamantutilsStockTableOldLines = %s line(s) entered before v2.13 kept in the database (llx_diamantutils_stockline), no longer shown.
+DiamantutilsStockTablePhysical = Physical stock
+DiamantutilsStockTableCustomerOrders = Customer orders
+DiamantutilsStockTableSupplierOrders = Supplier orders
+DiamantutilsStockTableVirtual = Virtual stock
+DiamantutilsStockTableIgnoredLine = Warehouses ignored for packing (%s)
+
+# Rename a lot (lot card)
+DiamantutilsLotRename = Rename lot
+DiamantutilsLotRenameNew = New lot number
+DiamantutilsLotRenameQuestion = Rename lot "%s"? The number is replaced, for this product, in the stock and in the whole history (movements, shipments, receptions, inventories, manufacturing, transfers, transformations). The operation is logged in the lot private note.
+DiamantutilsLotRenameDone = Lot "%s" renamed to "%s".
+DiamantutilsLotRenameFailed = Lot not renamed, nothing was changed.
+DiamantutilsLotRenameErrEmpty = The new lot number is empty.
+DiamantutilsLotRenameErrLength = Lot number too long (%s characters at most).
+DiamantutilsLotRenameErrSame = The new number is the same as the current one.
+DiamantutilsLotRenameErrExists = Number "%s" already exists for this product (lot card, stock or history): rename refused so as not to merge two lots.
+DiamantutilsLotRenameTrace = Lot renamed: "%s" → "%s" on %s by %s.
+DiamantutilsLotRenameSetup = Rename a lot
+DiamantutilsLotRenameSetupDesc = Lot card: "Rename lot" button. The number is replaced, for the lot product, in the stock and in the whole Dolibarr history, in a single operation (all or nothing); refused if the new number already exists for this product. Permissions: Products "Create/modify" and Stocks "Create movements".
+DiamantutilsLotRenameHookOk = Lot card hook registered
+DiamantutilsLotRenameHookMissing = Lot card hook not registered: disable then enable the module.
+DiamantutilsLotRenameTable_product_batch = Stock per warehouse
+DiamantutilsLotRenameTable_stock_mouvement = Stock movements
+DiamantutilsLotRenameTable_expeditiondet_batch = Shipment lines
+DiamantutilsLotRenameTable_receptiondet_batch = Reception lines
+DiamantutilsLotRenameTable_facturedet = Invoice lines
+DiamantutilsLotRenameTable_inventorydet = Inventory lines
+DiamantutilsLotRenameTable_mrp_production = Manufacturing lines
+DiamantutilsLotRenameTable_stocktransfer_stocktransferline = Stock transfer lines
+DiamantutilsLotRenameTable_diamantutils_transfo_det = Transformation lines
+DiamantutilsLotRenameTable_diamantutils_stockline = Old stock table lines

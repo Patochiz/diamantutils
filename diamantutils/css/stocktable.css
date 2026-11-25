@@ -259,3 +259,8 @@
 .dst-section.dst-hidden {
 	display: none;
 }
+
+/* v2.13 : stock non rattaché à un lot */
+.dst-nolotline td {
+	font-style: italic;
+}
