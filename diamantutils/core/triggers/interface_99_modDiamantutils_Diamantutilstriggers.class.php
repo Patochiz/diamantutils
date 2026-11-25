@@ -18,6 +18,9 @@
  *  - PRODUCT_CREATE, PRODUCT_MODIFY : syntaxe de desc_propal vérifiée, avertissement non bloquant.
  * Prix de revient (DIAMANTUTILS_COSTPRICE_FROM_RECEIPT) :
  *  - STOCK_MOVEMENT : entrée issue d'une réception fournisseur, cost_price = prix du mouvement.
+ * Colisage calculé (DIAMANTUTILS_STOCKCOLISAGE_AUTO, lib/stockcolisage.lib.php) :
+ *  - STOCK_MOVEMENT : colisage du lot recalculé (quantité totale du lot, déjà à jour) ;
+ *    toute erreur est journalisée et absorbée : le mouvement n'est jamais bloqué.
  * Tous ces triggers sont appelés dans la transaction : un retour < 0 annule l'opération.
  */
 
@@ -33,8 +36,8 @@ class InterfaceDiamantutilstriggers extends DolibarrTriggers
 		// Le constructeur parent initialise error et errors (déclarés sans valeur en v20)
 		parent::__construct($db);
 		$this->family = 'other';
-		$this->description = 'Triggers DiamantUtils : contrôles des commandes sous-traitées, description pour devis';
-		$this->version = '2.8';
+		$this->description = 'Triggers DiamantUtils : contrôles des commandes sous-traitées, description pour devis, prix de revient, colisage des lots';
+		$this->version = '2.12';
 		$this->picto = 'generic';
 	}
 
@@ -55,7 +58,10 @@ class InterfaceDiamantutilstriggers extends DolibarrTriggers
 			return $this->checkDescPropal($object, $langs);
 		}
 		if ($action == 'STOCK_MOVEMENT') {
-			return $this->costPriceFromReceipt($object);
+			// Deux traitements indépendants : l'échec de l'un n'empêche pas l'autre
+			$result = $this->costPriceFromReceipt($object);
+			$this->colisageFromMovement($object);	// ne bloque jamais le mouvement
+			return $result;
 		}
 
 		if (!in_array($action, array('RECEPTION_CREATE', 'RECEPTION_VALIDATE', 'LINERECEPTION_CREATE', 'LINERECEPTION_MODIFY', 'LINEORDER_SUPPLIER_DISPATCH', 'SHIPPING_CREATE', 'SHIPPING_VALIDATE', 'LINESHIPPING_MODIFY'))) {
@@ -163,6 +169,39 @@ class InterfaceDiamantutilstriggers extends DolibarrTriggers
 			$langs->load('diamantutils@diamantutils');
 			setEventMessages($langs->trans('DiamantutilsDescPropalCheckWarning', implode(' ; ', $errors)), null, 'warnings');
 			dol_syslog(__METHOD__.' produit '.$product->ref.' : '.implode(' ; ', $errors), LOG_WARNING);
+		}
+		return 0;
+	}
+
+	/**
+	 * STOCK_MOVEMENT : recalcule le colisage du lot du mouvement.
+	 *
+	 * Appelé par MouvementStock::_create() dans la transaction du mouvement, après la mise à
+	 * jour de product_stock / product_batch : la quantité lue est à jour, et un rollback du
+	 * mouvement annule aussi l'écriture. Un transfert = deux mouvements, deux recalculs.
+	 * Jamais d'erreur renvoyée : une erreur de calcul ne doit ni bloquer ni annuler le mouvement.
+	 *
+	 * @param	MouvementStock	$mvt	Mouvement de stock créé
+	 * @return	int						0
+	 */
+	private function colisageFromMovement($mvt)
+	{
+		try {
+			$batch = (string) ($mvt->batch ?? '');
+			$productId = (int) (!empty($mvt->product_id) ? $mvt->product_id : ($mvt->fk_product ?? 0));
+			if ($batch === '' || $productId <= 0 || !isModEnabled('diamantutils') || !isModEnabled('productbatch')) {
+				return 0;
+			}
+			dol_include_once('/diamantutils/lib/stockcolisage.lib.php');
+			if (!function_exists('diamantutils_stockcolisage_auto_enabled') || !diamantutils_stockcolisage_auto_enabled($this->db)) {
+				return 0;
+			}
+			$res = diamantutils_stockcolisage_recompute_lot($this->db, $productId, $batch);
+			if ($res['status'] == 'updated') {
+				dol_syslog(__METHOD__.' product='.$productId.' batch='.$batch.' qty='.$res['qty'].' colisage="'.$res['text'].'"'.($res['warn'] !== '' ? ' warn='.$res['warn'] : '').' mvt='.((int) ($mvt->id ?? 0)), LOG_DEBUG);
+			}
+		} catch (Throwable $e) {
+			dol_syslog(__METHOD__.' product='.((int) ($mvt->product_id ?? 0)).' batch='.((string) ($mvt->batch ?? '')).' : '.$e->getMessage(), LOG_ERR);
 		}
 		return 0;
 	}

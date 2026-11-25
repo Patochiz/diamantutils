@@ -770,3 +770,252 @@ function diamantutils_colisage_install_extrafields($db, &$error)
 	}
 	return $nb;
 }
+
+/**
+ * Colisage calculé actif ? Fonctionnalité active, DIAMANTUTILS_STOCKCOLISAGE_AUTO, module
+ * Lot/série, attributs colisage, pieces_par_colis et qte_par_piece présents.
+ *
+ * @param	DoliDB	$db		Base de données
+ * @return	bool
+ */
+function diamantutils_stockcolisage_auto_enabled($db)
+{
+	if (!diamantutils_stockcolisage_enabled() || !getDolGlobalInt('DIAMANTUTILS_STOCKCOLISAGE_AUTO', 1) || !isModEnabled('productbatch')) {
+		return false;
+	}
+	$code = diamantutils_stockcolisage_extrafield_code();
+	if ($code === '' || !diamantutils_stockcolisage_extrafield_exists($db, $code)) {
+		return false;
+	}
+	$fields = diamantutils_colisage_fields_status($db);
+	return ($fields[DIAMANTUTILS_STOCKCOLISAGE_PPC] && $fields[DIAMANTUTILS_STOCKCOLISAGE_QPP]);
+}
+
+/**
+ * Entrepôts ignorés pour la quantité du lot (valeur stockée).
+ * Constante absente = entrepôt Sous-traitance ; '0' = aucun.
+ *
+ * @return	int[]
+ */
+function diamantutils_stockcolisage_excluded_warehouses()
+{
+	$raw = getDolGlobalString('DIAMANTUTILS_STOCKCOLISAGE_EXCLUDE_WAREHOUSES', 'default');
+	if ($raw === 'default') {
+		dol_include_once('/diamantutils/lib/soustraitance.lib.php');
+		$st = (function_exists('diamantutils_st_warehouse_id') ? diamantutils_st_warehouse_id() : 0);
+		return ($st > 0 ? array($st) : array());
+	}
+	return diamantutils_stockcolisage_ids($raw);
+}
+
+/**
+ * Liste d'identifiants « 1,5,7 » → array(1, 5, 7) (positifs, sans doublon)
+ *
+ * @param	string|array	$raw	Liste
+ * @return	int[]
+ */
+function diamantutils_stockcolisage_ids($raw)
+{
+	$ids = array();
+	foreach ((is_array($raw) ? $raw : explode(',', (string) $raw)) as $id) {
+		$id = (int) $id;
+		if ($id > 0) {
+			$ids[$id] = $id;
+		}
+	}
+	return array_values($ids);
+}
+
+/**
+ * Quantité réelle totale d'un lot : somme de product_batch.qty, entrepôts de l'entité, hors
+ * entrepôts ignorés
+ *
+ * @param	DoliDB	$db				Base de données
+ * @param	int		$fk_product		Id produit
+ * @param	string	$batch			Numéro de lot
+ * @return	float
+ * @throws	Exception				Erreur SQL
+ */
+function diamantutils_stockcolisage_lot_total_qty($db, $fk_product, $batch)
+{
+	$sql = "SELECT SUM(pb.qty) as qty FROM ".MAIN_DB_PREFIX."product_batch as pb";
+	$sql .= " INNER JOIN ".MAIN_DB_PREFIX."product_stock as ps ON ps.rowid = pb.fk_product_stock";
+	$sql .= " INNER JOIN ".MAIN_DB_PREFIX."entrepot as e ON e.rowid = ps.fk_entrepot";
+	$sql .= " WHERE ps.fk_product = ".((int) $fk_product);
+	$sql .= " AND pb.batch = '".$db->escape((string) $batch)."'";
+	$sql .= " AND e.entity IN (".getEntity('stock').")";
+	$excluded = diamantutils_stockcolisage_excluded_warehouses();
+	if (!empty($excluded)) {
+		$sql .= " AND ps.fk_entrepot NOT IN (".implode(',', array_map('intval', $excluded)).")";
+	}
+	$resql = $db->query($sql);
+	if (!$resql) {
+		throw new Exception('SQL '.$db->lasterror());
+	}
+	$obj = $db->fetch_object($resql);
+	$db->free($resql);
+	return ($obj && $obj->qty !== null ? (float) $obj->qty : 0.0);
+}
+
+/**
+ * Attributs des lots : colisage, pièces par colis, qté par pièce (attributs absents = null)
+ *
+ * @param	DoliDB	$db			Base de données
+ * @param	int[]	$lotids		Ids des lots (llx_product_lot.rowid)
+ * @return	array				array(lotid => array('colisage' => ?string, 'ppc' => ?string, 'qpp' => ?string))
+ * @throws	Exception			Erreur SQL
+ */
+function diamantutils_stockcolisage_lot_attributes($db, $lotids)
+{
+	$out = array();
+	$lotids = array_values(array_unique(array_filter(array_map('intval', $lotids))));
+	if (empty($lotids)) {
+		return $out;
+	}
+	$cols = array();
+	$code = diamantutils_stockcolisage_extrafield_code();
+	if ($code !== '' && diamantutils_stockcolisage_extrafield_exists($db, $code)) {
+		$cols['colisage'] = $code;
+	}
+	foreach (array('ppc' => DIAMANTUTILS_STOCKCOLISAGE_PPC, 'qpp' => DIAMANTUTILS_STOCKCOLISAGE_QPP) as $key => $field) {
+		if (diamantutils_stockcolisage_extrafield_exists($db, $field)) {
+			$cols[$key] = $field;
+		}
+	}
+	foreach ($lotids as $id) {
+		$out[$id] = array('colisage' => null, 'ppc' => null, 'qpp' => null);
+	}
+	if (empty($cols)) {
+		return $out;
+	}
+	$select = array();
+	foreach ($cols as $key => $field) {
+		$select[] = "ef.".$field." as ".$key;
+	}
+	$sql = "SELECT ef.fk_object, ".implode(', ', $select)." FROM ".MAIN_DB_PREFIX."product_lot_extrafields as ef";
+	$sql .= " WHERE ef.fk_object IN (".implode(',', $lotids).")";
+	$resql = $db->query($sql);
+	if (!$resql) {
+		throw new Exception('SQL '.$db->lasterror());
+	}
+	while ($obj = $db->fetch_object($resql)) {
+		foreach ($cols as $key => $field) {
+			$out[(int) $obj->fk_object][$key] = $obj->$key;
+		}
+	}
+	$db->free($resql);
+	return $out;
+}
+
+/**
+ * Écrit le colisage calculé d'un lot, directement dans llx_product_lot_extrafields.
+ *
+ * Valeur dérivée, écrite depuis le trigger STOCK_MOVEMENT, l'affichage et le recalcul : pas de
+ * Productlot::insertExtraFields(), qui réécrirait tous les attributs du lot, contrôlerait les
+ * attributs obligatoires (un attribut obligatoire vide bloquerait le mouvement) et déclencherait
+ * PRODUCT_LOT_MODIFY à chaque mouvement de stock.
+ *
+ * @param	DoliDB		$db		Base de données
+ * @param	int			$lotid	Id du lot
+ * @param	string		$text	Texte calculé ('' = vider)
+ * @return	void
+ * @throws	Exception			Erreur SQL
+ */
+function diamantutils_stockcolisage_store_computed($db, $lotid, $text)
+{
+	$code = diamantutils_stockcolisage_extrafield_code();
+	if ($code === '' || (int) $lotid <= 0) {
+		throw new Exception('colisage: attribut ou lot invalide');
+	}
+	$value = diamantutils_stockcolisage_storage_value($text);
+	$sqlvalue = ($value === null ? 'NULL' : "'".$db->escape($value)."'");
+
+	$resql = $db->query("SELECT rowid FROM ".MAIN_DB_PREFIX."product_lot_extrafields WHERE fk_object = ".((int) $lotid));
+	if (!$resql) {
+		throw new Exception('SQL '.$db->lasterror());
+	}
+	$exists = ($db->num_rows($resql) > 0);
+	$db->free($resql);
+
+	if ($exists) {
+		$sql = "UPDATE ".MAIN_DB_PREFIX."product_lot_extrafields SET ".$code." = ".$sqlvalue." WHERE fk_object = ".((int) $lotid);
+	} else {
+		if ($value === null) {
+			return;	// pas de ligne d'attributs et rien à écrire
+		}
+		$sql = "INSERT INTO ".MAIN_DB_PREFIX."product_lot_extrafields (fk_object, ".$code.") VALUES (".((int) $lotid).", ".$sqlvalue.")";
+	}
+	if (!$db->query($sql)) {
+		throw new Exception('SQL '.$db->lasterror());
+	}
+}
+
+/**
+ * Valeur enregistrée et valeur calculée identiques ?
+ *
+ * @param	string|null	$stored		Valeur enregistrée
+ * @param	string		$text		Texte calculé
+ * @return	bool
+ */
+function diamantutils_stockcolisage_same($stored, $text)
+{
+	$expected = diamantutils_stockcolisage_storage_value($text);
+	return ((string) $stored === (string) $expected);
+}
+
+/**
+ * Recalcule et enregistre le colisage d'un lot (produit, numéro de lot) à partir de sa quantité
+ * totale. N'écrit que si la valeur change.
+ *
+ * @param	DoliDB	$db				Base de données
+ * @param	int		$fk_product		Id produit
+ * @param	string	$batch			Numéro de lot
+ * @return	array					array('status' => 'updated'|'unchanged'|'manual'|'nolot', 'lotid', 'qty', 'text', 'warn', 'old')
+ * @throws	Exception				Erreur SQL (ou DIAMANTUTILS_STOCKCOLISAGE_FORCE_ERROR)
+ */
+function diamantutils_stockcolisage_recompute_lot($db, $fk_product, $batch)
+{
+	if (getDolGlobalInt('DIAMANTUTILS_STOCKCOLISAGE_FORCE_ERROR')) {
+		throw new Exception('DIAMANTUTILS_STOCKCOLISAGE_FORCE_ERROR');
+	}
+
+	$res = array('status' => 'nolot', 'lotid' => 0, 'qty' => 0.0, 'text' => '', 'warn' => '', 'old' => null);
+
+	$sql = "SELECT pl.rowid FROM ".MAIN_DB_PREFIX."product_lot as pl";
+	$sql .= " INNER JOIN ".MAIN_DB_PREFIX."product as p ON p.rowid = pl.fk_product";
+	$sql .= " WHERE pl.fk_product = ".((int) $fk_product);
+	$sql .= " AND pl.batch = '".$db->escape((string) $batch)."'";
+	$sql .= " AND pl.entity IN (".getEntity('productlot').")";
+	$sql .= " AND p.tobatch > 0";
+	$sql .= " ORDER BY pl.rowid";
+	$resql = $db->query($sql);
+	if (!$resql) {
+		throw new Exception('SQL '.$db->lasterror());
+	}
+	$obj = $db->fetch_object($resql);
+	$db->free($resql);
+	if (!$obj) {
+		return $res;	// pas de fiche lot (lotid = 0) : rien à écrire
+	}
+	$res['lotid'] = (int) $obj->rowid;
+
+	$attrs = diamantutils_stockcolisage_lot_attributes($db, array($res['lotid']));
+	$attr = $attrs[$res['lotid']];
+	$res['old'] = $attr['colisage'];
+
+	$res['qty'] = diamantutils_stockcolisage_lot_total_qty($db, $fk_product, $batch);
+	$calc = diamantutils_colisage_compute($res['qty'], $attr['qpp'], $attr['ppc']);
+	if ($calc['mode'] != 'auto') {
+		$res['status'] = 'manual';
+		return $res;
+	}
+	$res['text'] = $calc['text'];
+	$res['warn'] = $calc['warn'];
+	if (diamantutils_stockcolisage_same($attr['colisage'], $calc['text'])) {
+		$res['status'] = 'unchanged';
+		return $res;
+	}
+	diamantutils_stockcolisage_store_computed($db, $res['lotid'], $calc['text']);
+	$res['status'] = 'updated';
+	return $res;
+}
