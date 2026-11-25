@@ -69,3 +69,28 @@
 	color: #a66300;
 	white-space: normal;
 }
+
+/* Colisage calculé (v2.12) */
+#dut-stockcolisage td.dut-sc-auto {
+	cursor: default;
+	color: inherit;
+}
+#dut-stockcolisage td.dut-sc-auto .dut-sc-text::after {
+	content: "\2211";
+	opacity: 0.35;
+	font-size: 0.8em;
+	margin-left: 0.4em;
+}
+#dut-stockcolisage .dut-sc-calcwarn {
+	display: block;
+	font-size: 0.85em;
+	color: #a66300;
+	white-space: normal;
+}
+#dut-stockcolisage td.dut-sc-num {
+	min-width: 6em;
+}
+#dut-stockcolisage input.dut-sc-input-num {
+	width: 7em;
+	min-width: 5em;
+}

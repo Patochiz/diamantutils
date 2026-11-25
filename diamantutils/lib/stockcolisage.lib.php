@@ -241,49 +241,21 @@ function diamantutils_stockcolisage_load($db, $object)
 }
 
 /**
- * Valeurs de l'attribut colisage des lots, par id de lot (llx_product_lot.rowid)
- *
- * @param	DoliDB	$db			Base de données
- * @param	int[]	$lotids		Ids des lots
- * @param	string	$code		Code de l'attribut (vérifié existant)
- * @return	array				array(lotid => valeur brute)
- * @throws	Exception			Erreur SQL
- */
-function diamantutils_stockcolisage_values($db, $lotids, $code)
-{
-	$values = array();
-	$lotids = array_values(array_unique(array_filter(array_map('intval', $lotids))));
-	if (empty($lotids) || !preg_match('/^[a-z0-9_]{1,64}$/i', $code)) {
-		return $values;
-	}
-	$sql = "SELECT ef.fk_object, ef.".$code." as val FROM ".MAIN_DB_PREFIX."product_lot_extrafields as ef";
-	$sql .= " WHERE ef.fk_object IN (".implode(',', $lotids).")";
-	$resql = $db->query($sql);
-	if (!$resql) {
-		throw new Exception('SQL '.$db->lasterror());
-	}
-	while ($obj = $db->fetch_object($resql)) {
-		$values[(int) $obj->fk_object] = $obj->val;
-	}
-	$db->free($resql);
-	return $values;
-}
-
-/**
  * HTML de la cellule Colisage
  *
  * @param	string|null	$raw		Valeur enregistrée
  * @param	string		$batch		Numéro de lot
  * @param	bool		$editable	Modifiable par l'utilisateur
+ * @param	int			$warehouse	Id de l'entrepôt de la ligne
  * @return	string
  */
-function diamantutils_stockcolisage_cell($raw, $batch, $editable)
+function diamantutils_stockcolisage_cell($raw, $batch, $editable, $warehouse = 0)
 {
 	$text = diamantutils_stockcolisage_text($raw);
 	$ishtml = diamantutils_stockcolisage_is_html($raw);
 
 	$attrs = ' class="dut-sc-colisage'.($editable ? ' dut-sc-editable' : '').($text === '' ? ' dut-sc-empty' : '').'"';
-	$attrs .= ' data-batch="'.dol_escape_htmltag($batch).'"';
+	$attrs .= ' data-batch="'.dol_escape_htmltag($batch).'" data-field="colisage" data-warehouse="'.((int) $warehouse).'"';
 	if ($editable) {
 		$attrs .= ' data-html="'.($ishtml ? '1' : '0').'"';
 		$attrs .= ' tabindex="0"';
@@ -293,6 +265,90 @@ function diamantutils_stockcolisage_cell($raw, $batch, $editable)
 	}
 
 	return '<td'.$attrs.'><span class="dut-sc-text">'.dol_escape_htmltag($text, 1).'</span></td>';
+}
+
+/**
+ * HTML de la cellule Colisage en mode automatique (lecture seule, calculée avec la quantité
+ * de la ligne affichée)
+ *
+ * @param	array	$calc		Résultat de diamantutils_colisage_compute()
+ * @param	string	$batch		Numéro de lot
+ * @param	int		$warehouse	Id de l'entrepôt de la ligne
+ * @return	string
+ */
+function diamantutils_stockcolisage_auto_cell($calc, $batch, $warehouse)
+{
+	global $langs;
+
+	$title = $langs->transnoentitiesnoconv('DiamantutilsColisageAutoTitle');
+	$out = '<td class="dut-sc-colisage dut-sc-auto" data-batch="'.dol_escape_htmltag($batch).'" data-field="colisage" data-warehouse="'.((int) $warehouse).'"';
+	$out .= ' title="'.dol_escape_htmltag(($calc['text'] !== '' ? $calc['text'].' — ' : '').$title).'">';
+	$out .= '<span class="dut-sc-text">'.dol_escape_htmltag($calc['text']).'</span>';
+	if ($calc['warn'] !== '') {
+		$out .= '<span class="dut-sc-calcwarn">'.img_warning('', 'class="pictofixedwidth"').dol_escape_htmltag($calc['warn']).'</span>';
+	}
+	$out .= '</td>';
+	return $out;
+}
+
+/**
+ * HTML d'une cellule numérique (pièces par colis, qté par pièce)
+ *
+ * @param	string		$field		DIAMANTUTILS_STOCKCOLISAGE_PPC ou DIAMANTUTILS_STOCKCOLISAGE_QPP
+ * @param	string|null	$raw		Valeur enregistrée
+ * @param	string		$batch		Numéro de lot
+ * @param	int			$warehouse	Id de l'entrepôt de la ligne
+ * @param	bool		$editable	Modifiable par l'utilisateur
+ * @param	string		$title		Infobulle
+ * @return	string
+ */
+function diamantutils_stockcolisage_num_cell($field, $raw, $batch, $warehouse, $editable, $title)
+{
+	$text = diamantutils_stockcolisage_num_display($field, $raw);
+	$out = '<td class="right nowraponall dut-sc-num'.($editable ? ' dut-sc-editable' : '').($text === '' ? ' dut-sc-empty' : '').'"';
+	$out .= ' data-batch="'.dol_escape_htmltag($batch).'" data-field="'.dol_escape_htmltag($field).'" data-warehouse="'.((int) $warehouse).'"';
+	if ($editable) {
+		$out .= ' tabindex="0"';
+	}
+	if ($title !== '') {
+		$out .= ' title="'.dol_escape_htmltag($title).'"';
+	}
+	$out .= '><span class="dut-sc-text">'.dol_escape_htmltag($text).'</span></td>';
+	return $out;
+}
+
+/**
+ * Valeur affichée d'un attribut numérique du lot
+ *
+ * @param	string		$field	DIAMANTUTILS_STOCKCOLISAGE_PPC ou DIAMANTUTILS_STOCKCOLISAGE_QPP
+ * @param	string|null	$raw	Valeur enregistrée
+ * @return	string
+ */
+function diamantutils_stockcolisage_num_display($field, $raw)
+{
+	$n = diamantutils_colisage_number($raw);
+	if ($n === null) {
+		return '';
+	}
+	return diamantutils_colisage_format_number($n, ($field == DIAMANTUTILS_STOCKCOLISAGE_PPC ? 0 : 8));
+}
+
+/**
+ * Infobulle des cellules numériques d'un lot en mode manuel : le colisage saisi à la main
+ * sera remplacé quand les deux valeurs seront renseignées.
+ *
+ * @param	string|null	$colisage	Colisage enregistré
+ * @return	string
+ */
+function diamantutils_stockcolisage_num_title($colisage)
+{
+	global $langs;
+
+	$text = diamantutils_stockcolisage_text($colisage);
+	if ($text === '') {
+		return $langs->transnoentitiesnoconv('DiamantutilsColisageNumTitle');
+	}
+	return $langs->transnoentitiesnoconv('DiamantutilsColisageNumTitleReplace', dol_trunc($text, 60));
 }
 
 /**
@@ -324,12 +380,34 @@ function diamantutils_stockcolisage_render($db, $object)
 	$canedit = ($hasfield && $user->hasRight('produit', 'creer'));
 
 	$lotids = array();
+	$lotbatch = array();
 	foreach ($data['warehouses'] as $wh) {
 		foreach ($wh['lots'] as $pdluo) {
-			$lotids[] = (int) $pdluo->lotid;
+			if ($pdluo->lotid > 0) {
+				$lotids[] = (int) $pdluo->lotid;
+				$lotbatch[(int) $pdluo->lotid] = (string) $pdluo->batch;
+			}
 		}
 	}
-	$values = ($hasfield ? diamantutils_stockcolisage_values($db, $lotids, $code) : array());
+	$attrs = ($hasfield ? diamantutils_stockcolisage_lot_attributes($db, $lotids) : array());
+
+	// Colisage calculé : deux colonnes numériques ; valeur enregistrée corrigée si elle ne
+	// correspond plus à la quantité totale du lot (auto-réparation, valeur dérivée)
+	$auto = diamantutils_stockcolisage_auto_enabled($db);
+	$caneditnum = ($auto && $user->hasRight('produit', 'creer'));
+	if ($auto) {
+		foreach ($attrs as $lotid => $attr) {
+			if (diamantutils_colisage_compute(0, $attr['qpp'], $attr['ppc'])['mode'] != 'auto') {
+				continue;
+			}
+			$fix = diamantutils_stockcolisage_recompute_lot($db, $object->id, $lotbatch[$lotid]);
+			if ($fix['status'] == 'updated') {
+				dol_syslog(__FUNCTION__.' colisage corrigé à l\'affichage : produit '.$object->id.' lot "'.$lotbatch[$lotid].'" (id '.$lotid.') « '.$fix['old'].' » → « '.$fix['text'].' » (quantité '.$fix['qty'].')', LOG_WARNING);
+				$attrs[$lotid]['colisage'] = diamantutils_stockcolisage_storage_value($fix['text']);
+			}
+		}
+	}
+	$ncols = ($auto ? 7 : 5);
 
 	$showall = getDolGlobalString('STOCK_SHOW_ALL_BATCH_BY_DEFAULT') ? true : false;
 	$transfer = diamantutils_stockcolisage_transfer_action();
@@ -352,6 +430,7 @@ function diamantutils_stockcolisage_render($db, $object)
 		'token' => $token,
 		'product' => (int) $object->id,
 		'canEdit' => $canedit,
+		'canEditNum' => $caneditnum,
 		'maxLength' => 200,
 		'showAll' => $showall,
 		'lang' => array(
@@ -362,10 +441,13 @@ function diamantutils_stockcolisage_render($db, $object)
 			'htmlWarning' => $langs->transnoentitiesnoconv('DiamantutilsStockColisageHtmlWarning'),
 			'placeholder' => $langs->transnoentitiesnoconv('DiamantutilsStockColisagePlaceholder'),
 			'editTitle' => $langs->transnoentitiesnoconv('DiamantutilsStockColisageEditTitle'),
+			'autoTitle' => $langs->transnoentitiesnoconv('DiamantutilsColisageAutoTitle'),
+			'numTitle' => $langs->transnoentitiesnoconv('DiamantutilsColisageNumTitle'),
+			'replaced' => $langs->transnoentitiesnoconv('DiamantutilsColisageReplaced'),
 		),
 	);
 
-	$out = '<link rel="stylesheet" href="'.dol_buildpath('/diamantutils/css/stockcolisage.css', 1).'?v=2.11">'."\n";
+	$out = '<link rel="stylesheet" href="'.dol_buildpath('/diamantutils/css/stockcolisage.css', 1).'?v=2.12">'."\n";
 	$out .= '<div id="dut-stockcolisage" class="div-table-responsive" style="display: none;" data-config="'.htmlspecialchars(json_encode($config), ENT_QUOTES, 'UTF-8').'">'."\n";
 	$out .= '<table class="noborder centpercent dut-sc-table">'."\n";
 
@@ -381,6 +463,10 @@ function diamantutils_stockcolisage_render($db, $object)
 		$out .= ' '.img_warning($langs->trans('DiamantutilsStockColisageExtrafieldMissing', $code));
 	}
 	$out .= '</td>';
+	if ($auto) {
+		$out .= '<td class="right">'.$langs->trans('DiamantutilsColisagePpcCol').'</td>';
+		$out .= '<td class="right">'.$langs->trans('DiamantutilsColisageQppCol').($unit !== '' ? ' ('.dol_escape_htmltag($unit).')' : '').'</td>';
+	}
 	$out .= '<td class="right">'.$langs->trans('Quantity').($unit !== '' ? ' ('.dol_escape_htmltag($unit).')' : '').'</td>';
 	$out .= '<td></td>';
 	$out .= '<td></td>';
@@ -404,7 +490,7 @@ function diamantutils_stockcolisage_render($db, $object)
 			$out .= '<a href="#" class="dut-sc-toggle marginleftonly" data-warehouse="'.((int) $wh['id']).'">'.($showall ? '(-)' : '(+)').'</a>';
 		}
 		$out .= '</td>';
-		$out .= '<td></td>';
+		$out .= '<td'.($auto ? ' colspan="3"' : '').'></td>';
 		$out .= '<td class="right nowraponall">'.$stock_real.($stock_real < 0 ? ' '.img_warning() : '').'</td>';
 		$out .= '<td></td>';
 		$out .= '<td></td>';
@@ -421,8 +507,19 @@ function diamantutils_stockcolisage_render($db, $object)
 			$out .= '<td class="dut-sc-lotname nowraponall">';
 			$out .= ($lotstatic->id > 0 ? $lotstatic->getNomUrl(1) : $lotstatic->getNomUrl(1, 'nolink'));
 			$out .= '</td>';
-			$raw = ($pdluo->lotid > 0 && isset($values[(int) $pdluo->lotid]) ? $values[(int) $pdluo->lotid] : null);
-			$out .= diamantutils_stockcolisage_cell($raw, (string) $pdluo->batch, $canedit);
+			$attr = ($pdluo->lotid > 0 && isset($attrs[(int) $pdluo->lotid]) ? $attrs[(int) $pdluo->lotid] : array('colisage' => null, 'ppc' => null, 'qpp' => null));
+			// Texte de la ligne : quantité de la ligne affichée (la valeur enregistrée suit le total du lot)
+			$calc = ($auto ? diamantutils_colisage_compute($pdluo->qty, $attr['qpp'], $attr['ppc']) : array('mode' => 'manual'));
+			if ($calc['mode'] == 'auto') {
+				$out .= diamantutils_stockcolisage_auto_cell($calc, (string) $pdluo->batch, (int) $wh['id']);
+			} else {
+				$out .= diamantutils_stockcolisage_cell($attr['colisage'], (string) $pdluo->batch, $canedit, (int) $wh['id']);
+			}
+			if ($auto) {
+				$numtitle = ($calc['mode'] == 'auto' ? '' : diamantutils_stockcolisage_num_title($attr['colisage']));
+				$out .= diamantutils_stockcolisage_num_cell(DIAMANTUTILS_STOCKCOLISAGE_PPC, $attr['ppc'], (string) $pdluo->batch, (int) $wh['id'], $caneditnum, $numtitle);
+				$out .= diamantutils_stockcolisage_num_cell(DIAMANTUTILS_STOCKCOLISAGE_QPP, $attr['qpp'], (string) $pdluo->batch, (int) $wh['id'], $caneditnum, $numtitle);
+			}
 			$out .= '<td class="right nowraponall">'.$pdluo->qty.($pdluo->qty < 0 ? ' '.img_warning() : (($pdluo->qty > 1 && $object->status_batch == 2) ? ' '.img_warning($langs->trans('IlligalQtyForSerialNumbers')) : '')).'</td>';
 			$out .= '<td class="center tdoverflowmax125" title="'.dol_escape_htmltag($langs->trans('TransferStock')).'">';
 			if (!$closed) {
@@ -446,7 +543,7 @@ function diamantutils_stockcolisage_render($db, $object)
 
 	// Total
 	$out .= '<tr class="liste_total">';
-	$out .= '<td class="right liste_total" colspan="2">'.$langs->trans('Total').':</td>';
+	$out .= '<td class="right liste_total" colspan="'.($ncols - 3).'">'.$langs->trans('Total').':</td>';
 	$out .= '<td class="liste_total right">'.price2num($data['total'], 'MS').'</td>';
 	$out .= '<td class="liste_total"></td>';
 	$out .= '<td class="liste_total"></td>';
@@ -454,7 +551,7 @@ function diamantutils_stockcolisage_render($db, $object)
 
 	$out .= '</table>'."\n";
 	$out .= '</div>'."\n";
-	$out .= '<script src="'.dol_buildpath('/diamantutils/js/stockcolisage.js', 1).'?v=2.11"></script>'."\n";
+	$out .= '<script src="'.dol_buildpath('/diamantutils/js/stockcolisage.js', 1).'?v=2.12"></script>'."\n";
 
 	return $out;
 }
@@ -1018,4 +1115,168 @@ function diamantutils_stockcolisage_recompute_lot($db, $fk_product, $batch)
 	diamantutils_stockcolisage_store_computed($db, $res['lotid'], $calc['text']);
 	$res['status'] = 'updated';
 	return $res;
+}
+
+/**
+ * Valeur saisie d'un attribut numérique du lot, validée (jamais de correction muette)
+ *
+ * @param	string	$field	DIAMANTUTILS_STOCKCOLISAGE_PPC ou DIAMANTUTILS_STOCKCOLISAGE_QPP
+ * @param	string	$raw	Valeur saisie (virgule ou point décimal)
+ * @param	string	$error	Message d'erreur en sortie
+ * @return	string|null|false	Valeur à enregistrer (texte numérique), null pour vider, false si refus
+ */
+function diamantutils_stockcolisage_parse_num($field, $raw, &$error)
+{
+	global $langs;
+
+	$error = '';
+	$raw = str_replace(array(' ', "\xc2\xa0"), '', trim((string) $raw));
+	if ($raw === '') {
+		return null;
+	}
+	$norm = str_replace(',', '.', $raw);
+	$label = $langs->transnoentitiesnoconv($field == DIAMANTUTILS_STOCKCOLISAGE_PPC ? 'DiamantutilsColisagePpcCol' : 'DiamantutilsColisageQppCol');
+	if (!preg_match('/^-?\d+(\.\d+)?$/', $norm)) {
+		$error = $langs->transnoentitiesnoconv('DiamantutilsColisageErrNumber', $label);
+		return false;
+	}
+	if ((float) $norm <= 0 || $norm[0] === '-') {
+		$error = $langs->transnoentitiesnoconv('DiamantutilsColisageErrPositive', $label);
+		return false;
+	}
+	if ($field == DIAMANTUTILS_STOCKCOLISAGE_PPC) {
+		if (!preg_match('/^\d+(\.0+)?$/', $norm)) {
+			$error = $langs->transnoentitiesnoconv('DiamantutilsColisageErrInteger', $label);
+			return false;
+		}
+		$int = (int) $norm;
+		if ($int > 1000000) {
+			$error = $langs->transnoentitiesnoconv('DiamantutilsColisageErrTooBig', $label);
+			return false;
+		}
+		return (string) $int;
+	}
+	if (preg_match('/\.(\d+)$/', $norm, $reg) && strlen(rtrim($reg[1], '0')) > 8) {
+		$error = $langs->transnoentitiesnoconv('DiamantutilsColisageErrDecimals', $label, 8);
+		return false;
+	}
+	if ((float) $norm >= 1e15) {
+		$error = $langs->transnoentitiesnoconv('DiamantutilsColisageErrTooBig', $label);
+		return false;
+	}
+	return $norm;
+}
+
+/**
+ * Quantités d'un lot par entrepôt (lignes affichées sur l'onglet Stock, entrepôts exclus compris)
+ *
+ * @param	DoliDB	$db				Base de données
+ * @param	int		$fk_product		Id produit
+ * @param	string	$batch			Numéro de lot
+ * @return	array					array(fk_entrepot => quantité)
+ * @throws	Exception				Erreur SQL
+ */
+function diamantutils_stockcolisage_lot_rows($db, $fk_product, $batch)
+{
+	$rows = array();
+	$sql = "SELECT ps.fk_entrepot, pb.qty FROM ".MAIN_DB_PREFIX."product_batch as pb";
+	$sql .= " INNER JOIN ".MAIN_DB_PREFIX."product_stock as ps ON ps.rowid = pb.fk_product_stock";
+	$sql .= " INNER JOIN ".MAIN_DB_PREFIX."entrepot as e ON e.rowid = ps.fk_entrepot";
+	$sql .= " WHERE ps.fk_product = ".((int) $fk_product);
+	$sql .= " AND pb.batch = '".$db->escape((string) $batch)."'";
+	$sql .= " AND e.entity IN (".getEntity('stock').")";
+	$resql = $db->query($sql);
+	if (!$resql) {
+		throw new Exception('SQL '.$db->lasterror());
+	}
+	while ($obj = $db->fetch_object($resql)) {
+		$rows[(int) $obj->fk_entrepot] = (isset($rows[(int) $obj->fk_entrepot]) ? $rows[(int) $obj->fk_entrepot] : 0) + (float) $obj->qty;
+	}
+	$db->free($resql);
+	return $rows;
+}
+
+/**
+ * Enregistre un attribut numérique du lot (pièces par colis, qté par pièce) et, si les deux
+ * sont renseignés, le colisage recalculé avec la quantité totale du lot, en une seule écriture
+ * (Productlot::create() ou array_options + insertExtraFields(), comme une saisie sur la fiche lot).
+ *
+ * @param	DoliDB		$db				Base de données
+ * @param	User		$user			Utilisateur
+ * @param	int			$fk_product		Id produit
+ * @param	array		$lot			Résultat de diamantutils_stockcolisage_find_lot()
+ * @param	string		$field			DIAMANTUTILS_STOCKCOLISAGE_PPC ou DIAMANTUTILS_STOCKCOLISAGE_QPP
+ * @param	string|null	$value			Valeur validée (diamantutils_stockcolisage_parse_num)
+ * @param	string		$error			Message d'erreur en sortie
+ * @return	array|false					array('mode', 'ppc', 'qpp', 'colisage', 'replaced'), false si erreur
+ */
+function diamantutils_stockcolisage_save_num($db, $user, $fk_product, $lot, $field, $value, &$error)
+{
+	require_once DOL_DOCUMENT_ROOT.'/product/stock/class/productlot.class.php';
+
+	$error = '';
+	$code = diamantutils_stockcolisage_extrafield_code();
+	$productlot = new Productlot($db);
+	if ($lot['lotid'] > 0) {
+		if ($productlot->fetch($lot['lotid']) <= 0) {
+			$error = ($productlot->error ? $productlot->error : implode(', ', $productlot->errors));
+			return false;
+		}
+		if (!is_array($productlot->array_options)) {
+			$productlot->array_options = array();
+		}
+	} else {
+		if ($value === null) {
+			return array('mode' => 'manual', 'ppc' => null, 'qpp' => null, 'colisage' => null, 'replaced' => '');
+		}
+		$productlot->fk_product = (int) $fk_product;
+		$productlot->batch = $lot['batch'];
+		$productlot->fk_user_creat = (int) $user->id;
+		$productlot->array_options = array();
+	}
+
+	$productlot->array_options['options_'.$field] = $value;
+	$ppc = (isset($productlot->array_options['options_'.DIAMANTUTILS_STOCKCOLISAGE_PPC]) ? $productlot->array_options['options_'.DIAMANTUTILS_STOCKCOLISAGE_PPC] : null);
+	$qpp = (isset($productlot->array_options['options_'.DIAMANTUTILS_STOCKCOLISAGE_QPP]) ? $productlot->array_options['options_'.DIAMANTUTILS_STOCKCOLISAGE_QPP] : null);
+	$old = (isset($productlot->array_options['options_'.$code]) ? $productlot->array_options['options_'.$code] : null);
+
+	$res = array('mode' => 'manual', 'ppc' => $ppc, 'qpp' => $qpp, 'colisage' => $old, 'replaced' => '');
+	$calc = diamantutils_colisage_compute(diamantutils_stockcolisage_lot_total_qty($db, $fk_product, $lot['batch']), $qpp, $ppc);
+	if ($calc['mode'] == 'auto') {
+		$res['mode'] = 'auto';
+		$new = diamantutils_stockcolisage_storage_value($calc['text']);
+		// Lot qui passe en mode automatique : texte saisi à la main remplacé, signalé en retour
+		$wasauto = ($lot['lotid'] > 0 && diamantutils_stockcolisage_lot_was_auto($db, $lot['lotid']));
+		$oldtext = diamantutils_stockcolisage_text($old);
+		if (!$wasauto && $oldtext !== '' && !diamantutils_stockcolisage_same($old, $calc['text'])) {
+			$res['replaced'] = $oldtext;
+		}
+		$productlot->array_options['options_'.$code] = $new;
+		$res['colisage'] = $new;
+	}
+
+	if ($lot['lotid'] > 0) {
+		$result = $productlot->insertExtraFields('PRODUCT_LOT_MODIFY', $user);
+	} else {
+		$result = $productlot->create($user);
+	}
+	if ($result <= 0 && !($lot['lotid'] > 0 && $result == 0)) {
+		$error = ($productlot->error ? $productlot->error : implode(', ', $productlot->errors));
+		return false;
+	}
+	return $res;
+}
+
+/**
+ * Le lot était-il en mode automatique avant la saisie (deux attributs valides en base) ?
+ *
+ * @param	DoliDB	$db		Base de données
+ * @param	int		$lotid	Id du lot
+ * @return	bool
+ */
+function diamantutils_stockcolisage_lot_was_auto($db, $lotid)
+{
+	$attrs = diamantutils_stockcolisage_lot_attributes($db, array((int) $lotid));
+	$attr = $attrs[(int) $lotid];
+	return (diamantutils_colisage_compute(0, $attr['qpp'], $attr['ppc'])['mode'] == 'auto');
 }

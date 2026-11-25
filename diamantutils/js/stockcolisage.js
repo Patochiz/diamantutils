@@ -5,8 +5,9 @@
  *  - place le bloc juste avant le tableau natif, l'affiche, puis masque le tableau natif ;
  *    tableau natif introuvable ou erreur : le bloc est retiré, le tableau natif reste visible ;
  *  - repli / dépli des lots par entrepôt, « Afficher tous les lots » / « Masquer les lots » ;
- *  - édition en ligne du colisage (ajax/lotcolisage.php) : Entrée ou sortie du champ =
- *    enregistrer, Échap = annuler.
+ *  - édition en ligne (ajax/lotcolisage.php) du colisage en mode manuel, des pièces par colis
+ *    et de la qté par pièce : Entrée ou sortie du champ = enregistrer, Échap = annuler. Un
+ *    champ numérique enregistré renvoie le colisage recalculé de chaque ligne du lot.
  */
 (function () {
 	'use strict';
@@ -48,7 +49,7 @@
 			native.parentNode.insertBefore(block, native);
 			block.style.display = '';
 			bindCollapse();
-			if (cfg.canEdit) {
+			if (cfg.canEdit || cfg.canEditNum) {
 				bindEdit();
 			}
 			native.style.display = 'none';
@@ -117,7 +118,13 @@
 		}
 	}
 
-	/* Édition en ligne du colisage */
+	/* Édition en ligne : colisage (mode manuel), pièces par colis, qté par pièce */
+	function cellsOf(batch, field) {
+		return Array.prototype.filter.call(block.querySelectorAll('td[data-field="' + field + '"]'), function (td) {
+			return td.getAttribute('data-batch') === batch;
+		});
+	}
+
 	function setView(td, text) {
 		td.innerHTML = '';
 		var span = document.createElement('span');
@@ -125,10 +132,12 @@
 		span.textContent = text;
 		td.appendChild(span);
 		td.classList.toggle('dut-sc-empty', text === '');
-		if (text === '') {
-			td.setAttribute('title', lang.editTitle || '');
-		} else {
-			td.setAttribute('title', text);
+		if (td.getAttribute('data-field') === 'colisage') {
+			if (text === '') {
+				td.setAttribute('title', lang.editTitle || '');
+			} else {
+				td.setAttribute('title', text);
+			}
 		}
 		td.classList.remove('dut-sc-editing', 'dut-sc-saving');
 	}
@@ -146,17 +155,68 @@
 			if (msg.parentNode) {
 				msg.parentNode.removeChild(msg);
 			}
-		}, isError ? 6000 : 1500);
+		}, isError ? 6000 : (text.length > 2 ? 6000 : 1500));
+	}
+
+	/* Colisage d'une ligne en mode automatique (lecture seule) ou manuel (modifiable) */
+	function setColisageAuto(td, text, warn) {
+		setView(td, text);
+		td.classList.add('dut-sc-auto');
+		td.classList.remove('dut-sc-editable', 'dut-sc-empty');
+		td.removeAttribute('tabindex');
+		td.setAttribute('title', (text ? text + ' — ' : '') + (lang.autoTitle || ''));
+		if (warn) {
+			var w = document.createElement('span');
+			w.className = 'dut-sc-calcwarn';
+			w.textContent = '⚠ ' + warn;
+			td.appendChild(w);
+		}
+	}
+	function setColisageManual(td, text, isHtml) {
+		td.classList.remove('dut-sc-auto');
+		setView(td, text);
+		if (cfg.canEdit) {
+			td.classList.add('dut-sc-editable');
+			td.setAttribute('tabindex', '0');
+			td.setAttribute('data-html', isHtml ? '1' : '0');
+		}
+	}
+
+	/* Réponse d'un champ numérique : valeurs du lot et colisage de toutes ses lignes */
+	function applyNumResult(batch, data) {
+		cellsOf(batch, 'pieces_par_colis').forEach(function (td) {
+			setView(td, data.ppc || '');
+			td.setAttribute('title', data.numTitle || '');
+		});
+		cellsOf(batch, 'qte_par_piece').forEach(function (td) {
+			setView(td, data.qpp || '');
+			td.setAttribute('title', data.numTitle || '');
+		});
+		var rows = {};
+		(data.rows || []).forEach(function (r) {
+			rows[String(r.warehouse)] = r;
+		});
+		cellsOf(batch, 'colisage').forEach(function (td) {
+			if (data.mode === 'auto') {
+				var r = rows[td.getAttribute('data-warehouse')] || {text: '', warn: ''};
+				setColisageAuto(td, r.text, r.warn);
+			} else {
+				setColisageManual(td, data.colisage || '', !!data.colisageHtml);
+			}
+		});
 	}
 
 	function save(td, input, value, original) {
+		var field = td.getAttribute('data-field') || 'colisage';
+		var batch = td.getAttribute('data-batch');
 		td.classList.add('dut-sc-saving');
 		input.disabled = true;
 		var body = new URLSearchParams();
 		body.append('token', cfg.token);
 		body.append('fk_product', String(cfg.product));
-		body.append('batch', td.getAttribute('data-batch'));
-		body.append('colisage', value);
+		body.append('batch', batch);
+		body.append('field', field);
+		body.append(field === 'colisage' ? 'colisage' : 'value', value);
 
 		fetch(cfg.url, {
 			method: 'POST',
@@ -176,9 +236,14 @@
 			});
 		}).then(function (data) {
 			if (data && data.ok) {
-				setView(td, typeof data.value === 'string' ? data.value : value);
-				td.setAttribute('data-html', '0');
-				flash(td, '✓', false);
+				if (field === 'colisage') {
+					setView(td, typeof data.value === 'string' ? data.value : value);
+					td.setAttribute('data-html', '0');
+					flash(td, '✓', false);
+				} else {
+					applyNumResult(batch, data);
+					flash(td, data.replaced ? '✓ ' + (lang.replaced || '').replace('%s', data.replaced) : '✓', false);
+				}
 			} else {
 				setView(td, original);
 				flash(td, (data && data.error) ? data.error : (lang.error || 'Error'), true);
@@ -190,9 +255,10 @@
 	}
 
 	function startEdit(td) {
-		if (td.classList.contains('dut-sc-editing') || td.classList.contains('dut-sc-saving')) {
+		if (!td.classList.contains('dut-sc-editable') || td.classList.contains('dut-sc-editing') || td.classList.contains('dut-sc-saving')) {
 			return;
 		}
+		var field = td.getAttribute('data-field') || 'colisage';
 		var textNode = td.querySelector('.dut-sc-text');
 		var original = textNode ? textNode.textContent : '';
 		var done = false;
@@ -201,13 +267,17 @@
 		td.innerHTML = '';
 		var input = document.createElement('input');
 		input.type = 'text';
-		input.className = 'flat dut-sc-input';
-		input.maxLength = cfg.maxLength || 200;
+		input.className = 'flat dut-sc-input' + (field === 'colisage' ? '' : ' dut-sc-input-num right');
+		input.maxLength = (field === 'colisage' ? (cfg.maxLength || 200) : 30);
 		input.value = original;
-		input.placeholder = lang.placeholder || '';
+		if (field === 'colisage') {
+			input.placeholder = lang.placeholder || '';
+		} else {
+			input.setAttribute('inputmode', 'decimal');
+		}
 		input.setAttribute('aria-label', lang.editTitle || '');
 		td.appendChild(input);
-		if (td.getAttribute('data-html') === '1') {
+		if (field === 'colisage' && td.getAttribute('data-html') === '1') {
 			var warn = document.createElement('div');
 			warn.className = 'dut-sc-warn';
 			warn.textContent = lang.htmlWarning || '';
@@ -244,22 +314,26 @@
 		});
 	}
 
+	/* Délégation : les cellules changent de mode (manuel ↔ automatique) sans rechargement */
 	function bindEdit() {
-		var cells = block.querySelectorAll('td.dut-sc-editable');
-		Array.prototype.forEach.call(cells, function (td) {
+		Array.prototype.forEach.call(block.querySelectorAll('td.dut-sc-colisage.dut-sc-editable'), function (td) {
 			td.setAttribute('title', td.getAttribute('title') || lang.editTitle || '');
-			td.addEventListener('click', function (e) {
-				if (e.target && e.target.tagName === 'INPUT') {
-					return;
-				}
+		});
+		block.addEventListener('click', function (e) {
+			if (e.target && e.target.tagName === 'INPUT') {
+				return;
+			}
+			var td = e.target && e.target.closest ? e.target.closest('td.dut-sc-editable') : null;
+			if (td && block.contains(td)) {
 				startEdit(td);
-			});
-			td.addEventListener('keydown', function (e) {
-				if (e.target === td && (e.key === 'Enter' || e.key === 'F2')) {
-					e.preventDefault();
-					startEdit(td);
-				}
-			});
+			}
+		});
+		block.addEventListener('keydown', function (e) {
+			var td = e.target;
+			if (td && td.tagName === 'TD' && td.classList.contains('dut-sc-editable') && (e.key === 'Enter' || e.key === 'F2')) {
+				e.preventDefault();
+				startEdit(td);
+			}
 		});
 	}
 
