@@ -443,7 +443,8 @@ function diamantutils_stockcolisage_render($db, $object)
 			'editTitle' => $langs->transnoentitiesnoconv('DiamantutilsStockColisageEditTitle'),
 			'autoTitle' => $langs->transnoentitiesnoconv('DiamantutilsColisageAutoTitle'),
 			'numTitle' => $langs->transnoentitiesnoconv('DiamantutilsColisageNumTitle'),
-			'replaced' => $langs->transnoentitiesnoconv('DiamantutilsColisageReplaced'),
+			// Format avec %s complété par le script : texte brut (transnoentitiesnoconv() viderait le %s)
+			'replaced' => (isset($langs->tab_translate['DiamantutilsColisageReplaced']) ? (string) $langs->tab_translate['DiamantutilsColisageReplaced'] : 'DiamantutilsColisageReplaced'),
 		),
 	);
 
