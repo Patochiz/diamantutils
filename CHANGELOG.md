@@ -1,5 +1,16 @@
 # Changelog — DiamantUtils
 
+## 2.12 — Colisage calculé et tenu à jour
+
+- Nouveaux attributs du lot **Pièces par colis** (`pieces_par_colis`, entier) et **Qté par pièce** (`qte_par_piece`, décimal 24,8), créés à l'activation du module (idempotent).
+- Les deux renseignés : `colisage` calculé à partir du stock réel total du lot (entrepôts ignorés exclus, par défaut Sous-traitance) et enregistré dans l'attribut (`6 colis de 28px`, `1 colis de 28px + 1 colis de 2px`, `1 colis de 6px`). Quantité non multiple de la pièce ou négative : texte vide et avertissement, jamais de texte faux. Fonction unique `diamantutils_colisage_compute()`.
+- Trigger `STOCK_MOVEMENT` : recalcul du lot à chaque mouvement, dans la transaction du mouvement ; erreurs journalisées, jamais bloquantes ; traitement du prix de revient inchangé et indépendant. Écriture directe de l'attribut, seulement si la valeur change.
+- Onglet Stock : colonnes Pièces par colis et Qté par pièce modifiables en ligne, recalcul immédiat sans rechargement, colisage calculé en lecture seule (texte par ligne avec la quantité de la ligne), avertissements ; auto-réparation de la valeur enregistrée à l'affichage (`LOG_WARNING`).
+- `ajax/lotcolisage.php` : paramètre `field` (`colisage`, `pieces_par_colis`, `qte_par_piece`), validation serveur, colisage manuel refusé sur un lot calculé.
+- Onglet **Stock produit** : `DIAMANTUTILS_STOCKCOLISAGE_AUTO` (oui), `DIAMANTUTILS_STOCKCOLISAGE_EXCLUDE_WAREHOUSES`, état des attributs, bouton **Recalculer tous les colisages** avec rapport.
+- Test `test/stockcolisage_compute_test.php` (navigateur, administrateur).
+- Mise à jour : déposer les fichiers, **désactiver puis réactiver le module** (attributs), renseigner les lots, lancer **Recalculer tous les colisages**.
+
 ## 2.11 — Colisage sur l'onglet Stock de la fiche produit
 
 - Nouvelle fonctionnalité `DIAMANTUTILS_STOCKCOLISAGE_ENABLED` (désactivée par défaut), onglet **Stock produit** de la configuration, avec le code de l'attribut du lot (`DIAMANTUTILS_STOCKCOLISAGE_EXTRAFIELD`, `colisage`) et l'état de l'attribut, du module Lot/série et du hook.

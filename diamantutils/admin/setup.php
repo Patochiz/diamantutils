@@ -29,7 +29,7 @@ if (!$user->admin) {
 	accessforbidden();
 }
 
-$langs->loadLangs(array("admin", "stocks", "diamantutils@diamantutils"));
+$langs->loadLangs(array("admin", "stocks", "productbatch", "diamantutils@diamantutils"));
 
 $action = GETPOST('action', 'aZ09');
 $tab = GETPOST('tab', 'aZ09');
@@ -41,6 +41,23 @@ if (!in_array($tab, array('transfo', 'soustraitance', 'customlist', 'descpropal'
 /*
  * Actions : chaque onglet n'enregistre que ses propres réglages
  */
+
+// Colisage calculé : recalcul de tous les lots (POST, jeton vérifié, administrateur)
+$recalcreport = null;
+if ($action == 'recalccolisage' && $tab == 'stockcolisage') {
+	if ($_SERVER['REQUEST_METHOD'] !== 'POST' || GETPOST('token', 'alpha') === '' || GETPOST('token', 'alpha') !== currentToken()) {
+		setEventMessages($langs->trans('DiamantutilsStockColisageErrToken'), null, 'errors');
+	} elseif (!diamantutils_stockcolisage_auto_enabled($db)) {
+		setEventMessages($langs->trans('DiamantutilsColisageRecalcUnavailable'), null, 'errors');
+	} else {
+		$recalcreport = diamantutils_stockcolisage_recompute_all($db);
+		setEventMessages($langs->trans('DiamantutilsColisageRecalcDone', $recalcreport['updated'], $recalcreport['unchanged'], count($recalcreport['warnings'])), null, ($recalcreport['errors'] ? 'warnings' : 'mesgs'));
+		if ($recalcreport['errors']) {
+			setEventMessages($langs->trans('DiamantutilsColisageRecalcErrors', $recalcreport['errors']), null, 'errors');
+		}
+	}
+	$action = '';
+}
 
 if ($action == 'update') {
 	$error = 0;
@@ -209,6 +226,24 @@ if ($action == 'update') {
 			setEventMessages($langs->trans('DiamantutilsStockColisageCodeInvalid'), null, 'errors');
 			$error++;
 		} elseif (dolibarr_set_const($db, 'DIAMANTUTILS_STOCKCOLISAGE_EXTRAFIELD', $code, 'chaine', 0, '', $conf->entity) < 0) {
+			$error++;
+		}
+
+		// Colisage calculé : attributs créés si besoin (supprimés à la main)
+		$auto = GETPOSTINT('DIAMANTUTILS_STOCKCOLISAGE_AUTO') ? 1 : 0;
+		if ($auto) {
+			$errmsg = '';
+			if (diamantutils_colisage_install_extrafields($db, $errmsg) < 0) {
+				setEventMessages($errmsg, null, 'errors');
+				$error++;
+			}
+		}
+		if (dolibarr_set_const($db, 'DIAMANTUTILS_STOCKCOLISAGE_AUTO', $auto, 'chaine', 0, '', $conf->entity) < 0) {
+			$error++;
+		}
+		// Entrepôts ignorés pour la quantité du lot : '0' = aucun (constante absente = Sous-traitance)
+		$warehouses = diamantutils_stockcolisage_ids(GETPOST('DIAMANTUTILS_STOCKCOLISAGE_EXCLUDE_WAREHOUSES', 'array'));
+		if (dolibarr_set_const($db, 'DIAMANTUTILS_STOCKCOLISAGE_EXCLUDE_WAREHOUSES', (empty($warehouses) ? '0' : implode(',', $warehouses)), 'chaine', 0, '', $conf->entity) < 0) {
 			$error++;
 		}
 	}
@@ -524,13 +559,45 @@ if ($tab == 'stockcolisage') {
 		'<input type="text" class="flat minwidth150" maxlength="64" name="DIAMANTUTILS_STOCKCOLISAGE_EXTRAFIELD" value="'.dol_escape_htmltag(getDolGlobalString('DIAMANTUTILS_STOCKCOLISAGE_EXTRAFIELD', 'colisage')).'">'
 	);
 
-	// État : attribut du lot, module Lot/série, hook enregistré (module réactivé)
+	diamantutils_setup_row(
+		$langs->trans('DiamantutilsColisageAuto'),
+		$langs->trans('DiamantutilsColisageAutoDesc'),
+		$form->selectyesno('DIAMANTUTILS_STOCKCOLISAGE_AUTO', getDolGlobalInt('DIAMANTUTILS_STOCKCOLISAGE_AUTO', 1) ? 1 : 0, 1)
+	);
+
+	// Entrepôts ignorés pour la quantité du lot
+	$sc_warehouses = array();
+	$sql = "SELECT e.rowid, e.ref, e.statut FROM ".MAIN_DB_PREFIX."entrepot as e";
+	$sql .= " WHERE e.entity IN (".getEntity('stock').")";
+	$sql .= " ORDER BY e.ref";
+	$resql = $db->query($sql);
+	if ($resql) {
+		while ($obj = $db->fetch_object($resql)) {
+			$sc_warehouses[(int) $obj->rowid] = $obj->ref.(empty($obj->statut) ? ' ('.$langs->transnoentities('Closed').')' : '');
+		}
+		$db->free($resql);
+	}
+	diamantutils_setup_row(
+		$langs->trans('DiamantutilsColisageExcludeWarehouses'),
+		$langs->trans('DiamantutilsColisageExcludeWarehousesDesc'),
+		$form->multiselectarray('DIAMANTUTILS_STOCKCOLISAGE_EXCLUDE_WAREHOUSES', $sc_warehouses, diamantutils_stockcolisage_excluded_warehouses(), 0, 0, 'minwidth300', 0, '90%')
+	);
+
+	// État : attributs du lot, module Lot/série, hook enregistré (module réactivé)
 	if ($sc_code !== '' && diamantutils_stockcolisage_extrafield_exists($db, $sc_code)) {
 		$status = img_picto('', 'tick', 'class="pictofixedwidth"').$langs->trans('DiamantutilsStockColisageExtrafieldOk', $sc_code);
 	} else {
 		$status = img_warning('', 'class="pictofixedwidth"').'<span class="warning">'.$langs->trans('DiamantutilsStockColisageExtrafieldMissing', ($sc_code !== '' ? $sc_code : '?')).'</span>';
 	}
 	$status .= '<br>';
+	foreach (diamantutils_colisage_fields_status($db) as $sc_field => $sc_ok) {
+		if ($sc_ok) {
+			$status .= img_picto('', 'tick', 'class="pictofixedwidth"').$langs->trans('DiamantutilsStockColisageExtrafieldOk', $sc_field);
+		} else {
+			$status .= img_warning('', 'class="pictofixedwidth"').'<span class="warning">'.$langs->trans('DiamantutilsColisageFieldMissing', $sc_field).'</span>';
+		}
+		$status .= '<br>';
+	}
 	if (isModEnabled('productbatch')) {
 		$status .= img_picto('', 'tick', 'class="pictofixedwidth"').$langs->trans('DiamantutilsStockColisageBatchOk');
 	} else {
@@ -554,6 +621,38 @@ print '</table>';
 print '<div class="center"><input type="submit" class="button button-save" value="'.$langs->trans('Save').'"></div>';
 
 print '</form>';
+
+// Colisage calculé : recalcul de tous les lots, et rapport du dernier recalcul
+if ($tab == 'stockcolisage') {
+	print '<br>';
+	print load_fiche_titre($langs->trans('DiamantutilsColisageRecalcTitle'), '', 'technic');
+	print '<span class="opacitymedium">'.$langs->trans('DiamantutilsColisageRecalcDesc').'</span><br><br>';
+	print '<form method="POST" action="'.dol_escape_htmltag($_SERVER["PHP_SELF"]).'">';
+	print '<input type="hidden" name="token" value="'.newToken().'">';
+	print '<input type="hidden" name="action" value="recalccolisage">';
+	print '<input type="hidden" name="tab" value="stockcolisage">';
+	print '<input type="submit" class="button" value="'.dol_escape_htmltag($langs->trans('DiamantutilsColisageRecalcButton')).'"'.(diamantutils_stockcolisage_auto_enabled($db) ? '' : ' disabled title="'.dol_escape_htmltag($langs->trans('DiamantutilsColisageRecalcUnavailable')).'"').'>';
+	print '</form>';
+
+	if (is_array($recalcreport)) {
+		print '<br><table class="noborder centpercent">';
+		print '<tr class="liste_titre"><td colspan="4">'.$langs->trans('DiamantutilsColisageRecalcDone', $recalcreport['updated'], $recalcreport['unchanged'], count($recalcreport['warnings'])).'</td></tr>';
+		if (count($recalcreport['warnings'])) {
+			print '<tr class="liste_titre"><td>'.$langs->trans('Product').'</td><td>'.$langs->trans('Batch').'</td><td class="right">'.$langs->trans('Quantity').'</td><td>'.$langs->trans('Warning').'</td></tr>';
+			foreach ($recalcreport['warnings'] as $w) {
+				print '<tr class="oddeven">';
+				print '<td>'.dol_escape_htmltag($w['product']).'</td>';
+				print '<td><a href="'.DOL_URL_ROOT.'/product/stock/productlot_card.php?id='.((int) $w['lotid']).'">'.img_picto('', 'lot', 'class="pictofixedwidth"').dol_escape_htmltag($w['batch']).'</a></td>';
+				print '<td class="right">'.dol_escape_htmltag(price2num($w['qty'], 'MS')).'</td>';
+				print '<td>'.img_warning('', 'class="pictofixedwidth"').dol_escape_htmltag($w['warn']).'</td>';
+				print '</tr>';
+			}
+		} else {
+			print '<tr class="oddeven"><td colspan="4"><span class="opacitymedium">'.$langs->trans('DiamantutilsColisageRecalcNoWarning').'</span></td></tr>';
+		}
+		print '</table>';
+	}
+}
 
 // Transformations : produits saisis en pièces × longueur (option « Lot = longueur » cochée)
 if ($tab == 'transfo') {

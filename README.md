@@ -10,7 +10,7 @@ Module Dolibarr interne de Diamant Industrie (Dolibarr 20, PHP 8.2, déploiement
 - **Prix de revient à la réception** : le prix de revient du produit prend le prix rendu saisi à chaque réception fournisseur, section ci-dessous.
 - **Liaison des commandes fournisseurs** : lier une commande fournisseur à une commande d'un autre fournisseur (transport ↔ marchandise), section ci-dessous.
 - **Tableau de stock par lots** (menu Produits → Stock) : colisage constaté par lot, comparé au stock réel Dolibarr (remplace la base Airtable « Stock Bobine »), section ci-dessous.
-- **Colisage sur l'onglet Stock** de la fiche produit : pour un produit à lots, tableau du stock sans dates ni valorisations, avec le colisage du lot modifiable directement, section ci-dessous.
+- **Colisage sur l'onglet Stock** de la fiche produit : pour un produit à lots, tableau du stock sans dates ni valorisations, avec le colisage du lot modifiable directement ou **calculé et tenu à jour** à chaque mouvement de stock, section ci-dessous.
 
 Chaque fonctionnalité a son onglet dans **Configuration → Modules → DiamantUtils**, avec une option pour l'activer ou la désactiver et ses réglages propres. Une fonctionnalité désactivée masque ses menus et pages ; ses données sont conservées.
 
@@ -410,8 +410,10 @@ Les produits sans lots, les produits parents de variantes (sans `VARIANT_ALLOW_S
 ### Mise en service
 1. Déposer les fichiers par FTP dans `custom/diamantutils/`.
 2. **Désactiver puis réactiver le module** : enregistre le hook `stockproductcard` de l'onglet Stock.
-3. Configuration du module → onglet **Stock produit** : vérifier l'état (attribut « colisage » présent, module Lot/série actif, hook enregistré), puis **Activer cette fonctionnalité** (`DIAMANTUTILS_STOCKCOLISAGE_ENABLED`, désactivée par défaut : le déploiement est inerte).
+3. Configuration du module → onglet **Stock produit** : vérifier l'état (attributs `colisage`, `pieces_par_colis` et `qte_par_piece` présents, module Lot/série actif, hook enregistré), puis **Activer cette fonctionnalité** (`DIAMANTUTILS_STOCKCOLISAGE_ENABLED`, désactivée par défaut : le déploiement est inerte, trigger compris).
 4. Code de l'attribut (`DIAMANTUTILS_STOCKCOLISAGE_EXTRAFIELD`, `colisage` par défaut) : à changer seulement si l'attribut des lots porte un autre code.
+5. **Colisage calculé** (`DIAMANTUTILS_STOCKCOLISAGE_AUTO`, oui par défaut ; non = saisie à la main seulement, le trigger ne fait rien) et **Entrepôts ignorés pour la quantité du lot** (`DIAMANTUTILS_STOCKCOLISAGE_EXCLUDE_WAREHOUSES`, par défaut Sous-traitance).
+6. Renseigner pièces par colis et qté par pièce des lots (onglet Stock ou fiche lot), puis lancer **Recalculer tous les colisages** (premier déploiement, et après tout import ou SQL direct sur le stock).
 
 ### Modifier le colisage
 - Droit **Produits → Créer/modifier** (le même que la fiche lot). Sans ce droit : texte seul.
@@ -419,9 +421,33 @@ Les produits sans lots, les produits parents de variantes (sans `VARIANT_ALLOW_S
 - Texte simple : la valeur est enregistrée échappée (aucune balise active). Une valeur mise en forme depuis la fiche du lot est affichée aplatie (texte complet en infobulle) ; un avertissement prévient qu'elle sera enregistrée sans mise en forme. Une saisie contenant une balise de script est refusée par la protection de Dolibarr, avec un message dans la cellule.
 - Lot en stock sans fiche lot (`llx_product_lot`) : la fiche lot est créée à la première saisie, avec le colisage.
 
+### Colisage calculé (v2.12)
+Deux attributs du lot, créés à l'activation du module : **Pièces par colis** (`pieces_par_colis`, entier) et **Qté par pièce** (`qte_par_piece`, décimal jusqu'à 8 décimales, dans l'unité du produit : 0,36 pour une pièce de 0,36 m²). Quand les deux sont renseignés, le lot passe en **mode automatique** : `colisage` est calculé et enregistré dans l'attribut, où les autres modules, listes et documents le lisent. Sinon, **mode manuel** : saisie libre comme avant.
+
+| Quantité | Qté / pièce | Pièces / colis | Colisage |
+|---|---|---|---|
+| 60,48 | 0,36 | 28 | `6 colis de 28px` |
+| 2,16 | 0,36 | 28 | `1 colis de 6px` |
+| 10,80 | 0,36 | 28 | `1 colis de 28px + 1 colis de 2px` |
+| 2,17 | 0,36 | 28 | vide, avertissement « quantité non multiple de la pièce » |
+| 0 | 0,36 | 28 | vide (lot épuisé) |
+
+Règle (`diamantutils_colisage_compute()`, seule implémentation, utilisée partout) : quantité arrondie au stock (`price2num(…, 'MS')`), pièces = quantité ÷ qté par pièce, tolérance 0,02 pièce pour les arrondis ; jamais de texte faux (quantité non multiple ou négative : texte vide et avertissement).
+
+**Quantité utilisée pour la valeur enregistrée** : stock réel total du lot, tous entrepôts sauf les entrepôts ignorés (réglage de l'onglet, par défaut Sous-traitance). Sur l'onglet Stock, chaque ligne entrepôt × lot affiche le colisage de **sa** quantité : un lot présent dans deux entrepôts montre deux textes, la valeur enregistrée correspond au total.
+
+Maintien à jour, trois niveaux :
+1. **Trigger `STOCK_MOVEMENT`** : à chaque mouvement portant un lot (correction, transfert, réception, expédition, inventaire, transformation…), recalcul du lot dans la transaction du mouvement. Un mouvement annulé annule aussi le recalcul. Une erreur de calcul est journalisée (`LOG_ERR`) et **ne bloque jamais le mouvement**. Le prix de revient (même trigger) reste un traitement indépendant.
+2. **Auto-réparation à l'affichage** de l'onglet Stock : valeur enregistrée différente du calcul → corrigée, journalisée en `LOG_WARNING`.
+3. **Bouton « Recalculer tous les colisages »** (onglet de configuration) : tous les lots dont les deux attributs sont renseignés ; rapport lots mis à jour / inchangés / avertissements (avec lien vers la fiche lot).
+
+Écran : colonnes **Pièces par colis** et **Qté par pièce** modifiables en ligne (droit Produits → Créer/modifier, virgule acceptée, entier > 0 pour les pièces par colis, > 0 et 8 décimales au plus pour la qté par pièce, refus avec message). Enregistrer l'un des deux recalcule aussitôt le colisage de toutes les lignes du lot, sans rechargement. En mode automatique, le colisage est en lecture seule (∑, infobulle « calculé ») ; un texte saisi à la main est remplacé, ce qu'annoncent l'infobulle des deux champs et un message. Lot en stock sans fiche lot : la fiche est créée à la première saisie.
+
+Écriture de la valeur calculée (trigger, auto-réparation, recalcul) : mise à jour directe de `llx_product_lot_extrafields.colisage`, seulement si la valeur change. `insertExtraFields()` n'est pas utilisé ici : il réécrit tous les attributs du lot, refuserait l'écriture si un autre attribut obligatoire était vide (le mouvement serait bloqué) et déclencherait `PRODUCT_LOT_MODIFY` à chaque mouvement. Les saisies de l'utilisateur (onglet Stock) passent, elles, par `Productlot` (`insertExtraFields('PRODUCT_LOT_MODIFY')` ou `create()`), comme la fiche lot.
+
 ### Repli de sécurité
 - Le tableau du module est affiché masqué, placé par `js/stockcolisage.js` juste avant le tableau standard, qui n'est masqué qu'ensuite. Tableau standard introuvable, erreur JavaScript, JavaScript désactivé : le tableau standard reste affiché.
-- Erreur au rendu côté serveur (exception, erreur SQL) : journalisée (`LOG_ERR`), rien n'est affiché, le tableau standard reste visible. Pour le vérifier : constante `DIAMANTUTILS_STOCKCOLISAGE_FORCE_ERROR = 1` (Configuration → Divers), à supprimer ensuite.
+- Erreur au rendu côté serveur (exception, erreur SQL) : journalisée (`LOG_ERR`), rien n'est affiché, le tableau standard reste visible. Pour le vérifier : constante `DIAMANTUTILS_STOCKCOLISAGE_FORCE_ERROR = 1` (Configuration → Divers), à supprimer ensuite. La même constante fait échouer le recalcul du trigger : le mouvement de stock doit passer quand même.
 - Fonctionnalité désactivée : la page est strictement celle de Dolibarr.
 
 ### Détail technique
@@ -434,10 +460,12 @@ Les produits sans lots, les produits parents de variantes (sans `VARIANT_ALLOW_S
 
 | Fichier | Rôle |
 |---|---|
-| `lib/stockcolisage.lib.php` | conditions, lecture des données, rendu du tableau, recherche du lot, enregistrement |
+| `lib/stockcolisage.lib.php` | conditions, lecture des données, rendu du tableau, recherche du lot, enregistrement, calcul du colisage, recalcul |
+| `core/triggers/interface_99_modDiamantutils_Diamantutilstriggers.class.php` | `STOCK_MOVEMENT` : recalcul du colisage du lot |
+| `test/stockcolisage_compute_test.php` | test du calcul (navigateur, administrateur, aucune donnée lue ni écrite) |
 | `class/actions_diamantutils.class.php` | hook `addMoreActionsButtons` (contexte `stockproductcard`) |
 | `ajax/lotcolisage.php` | enregistrement du colisage (JSON) |
 | `js/stockcolisage.js`, `css/stockcolisage.css` | placement, repli, édition en ligne ; mise en forme |
-| `core/modules/modDiamantutils.class.php` | hook `stockproductcard`, constantes, version |
-| `admin/setup.php`, `lib/diamantutils.lib.php` | onglet de configuration **Stock produit** |
+| `core/modules/modDiamantutils.class.php` | hook `stockproductcard`, constantes, attributs `pieces_par_colis` / `qte_par_piece` (activation), version |
+| `admin/setup.php`, `lib/diamantutils.lib.php` | onglet de configuration **Stock produit**, bouton de recalcul |
 | `langs/fr_FR/diamantutils.lang`, `langs/en_US/diamantutils.lang` | libellés |

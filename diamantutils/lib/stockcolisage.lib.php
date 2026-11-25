@@ -1280,3 +1280,53 @@ function diamantutils_stockcolisage_lot_was_auto($db, $lotid)
 	$attr = $attrs[(int) $lotid];
 	return (diamantutils_colisage_compute(0, $attr['qpp'], $attr['ppc'])['mode'] == 'auto');
 }
+
+/**
+ * Recalcule le colisage de tous les lots dont les deux attributs sont renseignés (bouton de la
+ * configuration). Les lots sans stock sont compris : leur colisage est vidé s'il ne l'était pas.
+ *
+ * @param	DoliDB	$db		Base de données
+ * @return	array			array('updated' => int, 'unchanged' => int, 'errors' => int, 'warnings' => array(array('lotid', 'batch', 'product', 'qty', 'warn')))
+ */
+function diamantutils_stockcolisage_recompute_all($db)
+{
+	$report = array('updated' => 0, 'unchanged' => 0, 'errors' => 0, 'warnings' => array());
+
+	$sql = "SELECT pl.rowid, pl.batch, pl.fk_product, p.ref FROM ".MAIN_DB_PREFIX."product_lot as pl";
+	$sql .= " INNER JOIN ".MAIN_DB_PREFIX."product_lot_extrafields as ef ON ef.fk_object = pl.rowid";
+	$sql .= " INNER JOIN ".MAIN_DB_PREFIX."product as p ON p.rowid = pl.fk_product";
+	$sql .= " WHERE pl.entity IN (".getEntity('productlot').")";
+	$sql .= " AND p.tobatch > 0";
+	$sql .= " AND ef.".DIAMANTUTILS_STOCKCOLISAGE_PPC." > 0 AND ef.".DIAMANTUTILS_STOCKCOLISAGE_QPP." > 0";
+	$sql .= " ORDER BY p.ref, pl.batch";
+	$resql = $db->query($sql);
+	if (!$resql) {
+		dol_syslog(__FUNCTION__.' '.$db->lasterror(), LOG_ERR);
+		$report['errors']++;
+		return $report;
+	}
+	$lots = array();
+	while ($obj = $db->fetch_object($resql)) {
+		$lots[] = $obj;
+	}
+	$db->free($resql);
+
+	foreach ($lots as $obj) {
+		try {
+			$res = diamantutils_stockcolisage_recompute_lot($db, (int) $obj->fk_product, (string) $obj->batch);
+		} catch (Throwable $e) {
+			dol_syslog(__FUNCTION__.' lot '.$obj->rowid.' : '.$e->getMessage(), LOG_ERR);
+			$report['errors']++;
+			continue;
+		}
+		if ($res['status'] == 'updated') {
+			$report['updated']++;
+		} elseif ($res['status'] == 'unchanged') {
+			$report['unchanged']++;
+		}
+		if ($res['warn'] !== '') {
+			$report['warnings'][] = array('lotid' => (int) $obj->rowid, 'batch' => (string) $obj->batch, 'product' => (string) $obj->ref, 'qty' => $res['qty'], 'warn' => $res['warn']);
+		}
+	}
+	return $report;
+}
